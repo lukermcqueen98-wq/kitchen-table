@@ -18,6 +18,8 @@ Use **Chrome or Edge** on a computer. Captions, voice commands, and the AI card 
 
 The first run builds a picture index of every Magic card, which takes a few hours. The page is usable as soon as that run deploys. If the build runs out of time it deploys what it has, and the next run carries on from there.
 
+After that, runs only add cards the index doesn't have yet, so a new set takes minutes. The workflow runs every Monday; to pick up a set sooner, open **Actions > Deploy site and card index > Run workflow**. GitHub pauses scheduled workflows in a repository with no activity for 60 days; a manual run turns the schedule back on.
+
 Hosting matters. The phone camera QR code and the all-cards index only work from the hosted page, and Chrome remembers the microphone permission there. Opened as a local file, captions may ask for the mic every time they restart.
 
 ### Local file

@@ -42,6 +42,20 @@ jobs:
           key: card-index-${{ github.run_id }}
           restore-keys: card-index-
 
+      # GitHub drops cached data unused for 7 days. Without it, start from the index the live site already
+      # publishes, so a missed week means a quick update instead of rebuilding every card from scratch.
+      - name: Fall back to the published card index
+        if: hashFiles('site/index/cards.json') == ''
+        run: |
+          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          mkdir -p site/index
+          if curl -fsSL "$site/index/cards.json" -o site/index/cards.json && curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin; then
+            echo "Starting from the published index."
+          else
+            rm -f site/index/cards.json site/index/cards.bin
+            echo "No published index yet; building from scratch."
+          fi
+
       - name: Install the index builder
         run: npm ci --prefix tools --no-audit --no-fund
 
