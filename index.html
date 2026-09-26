@@ -512,11 +512,12 @@ function runPhoneCam(){
    ===================================================================== */
 let localStream = null, peer = null, mySeat = 0, roomCode = "", me = null;
 const calls = {}, conns = {}, camCalls = {}, players = {};
-const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off", mode:"cmdr" };
+const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off", mode:"cmdr", turns:{} };  // turns: seat -> turns taken this game
 let turnStartAt = null, gameStartAt = null, tableKnown = false, joinedAt = 0;
 let damageLog = [], pending = null, camHidden = false;
 const shown = new Set();
-const nm = s => (s === mySeat ? me?.name : players[s]?.name) || `Seat ${s}`;
+const lastNames = {};  // seat -> last name heard, so a brief reconnect doesn't turn "Rick" into "Seat 2" in the log
+const nm = s => (s === mySeat ? me?.name : players[s]?.name) || lastNames[s] || `Seat ${s}`;
 
 /* ---------- Lobby ---------- */
 $("#nameIn").value = store.get("kt-name", "");
@@ -822,7 +823,17 @@ function setTable(patch){
     table[k] = v;
     if (k === "monarch") log(v ? `${nm(v)} is the monarch.` : "No one is the monarch.");
     if (k === "initiative") log(v ? `${nm(v)} has the initiative.` : "No one has the initiative.");
-    if (k === "turnSeat" && v) log(`${nm(v)}'s turn.`);
+    if (k === "turnSeat" && v) {
+      // Everyone counts turns as the turn passes; a count sent with the table (below) settles any difference
+      table.turns = { ...table.turns, [v]:(table.turns[v] || 0) + 1 };
+      const all = Object.values(table.turns).reduce((a, b) => a + b, 0);
+      log(`${nm(v)}'s turn ${table.turns[v]} (game turn ${all}).`);
+    }
+  }
+  if (patch.turns && typeof patch.turns === "object") {
+    const t = {};
+    for (const [k, n] of Object.entries(patch.turns)) { const seat = int(k, 1, MAX), c = int(n, 0, 999); if (seat && c) t[seat] = c; }
+    table.turns = t;
   }
   if ("dayNight" in patch && ["", "day", "night"].includes(patch.dayNight) && patch.dayNight !== table.dayNight) {
     table.dayNight = patch.dayNight; log(table.dayNight ? `It is now ${table.dayNight}.` : "Day and night cleared.");
@@ -877,7 +888,7 @@ function onMessage(s, msg){
       const st = msg.state || {};
       const isNew = !p.name;
       const oldKey = p.camKey, oldLife = p.life;
-      p.name = String(st.name || "Player").slice(0, 24);
+      p.name = String(st.name || "Player").slice(0, 24); lastNames[s] = p.name;
       p.life = int(st.life, -999, 999); p.poison = int(st.poison, 0, 99); p.exp = int(st.exp, 0, 999); p.energy = int(st.energy, 0, 999);
       p.blessing = !!st.blessing;
       p.emblems = Array.isArray(st.emblems) ? st.emblems.slice(0, 10).map(x => String(x).slice(0, 140)) : [];
@@ -1031,7 +1042,7 @@ function applyNewGame(by){
   me.startLife = modeOf(table.mode).life;
   Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
   lastLife = me.life; pending = null; shown.clear();
-  Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"" });
+  Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"", turns:{} });
   turnStartAt = null; gameStartAt = null; damageLog = [];
   pushState(); render(); renderDmg();
   log(`${by} started a new game.`);
@@ -1039,7 +1050,7 @@ function applyNewGame(by){
 }
 function turnText(s){
   if (table.turnSeat !== s) return ["", false];
-  const base = s === mySeat ? "Your turn" : "Their turn";
+  const base = (s === mySeat ? "Your turn" : "Their turn") + (table.turns[s] ? ` ${table.turns[s]}` : "");
   if (table.clockMode === "off" || !turnStartAt) return [base, false];
   const el = (Date.now() - turnStartAt) / 1000;
   if (table.clockMode === "up") return [`${base} ${fmt(el)}`, false];
