@@ -3,7 +3,7 @@
 
    For every unique paper Magic artwork on Scryfall, it downloads the art crop, runs the same vision model the
    page uses (DINOv2-small), and saves one fingerprint per artwork:
-     cards.json  { model, dims, n, built, cards:[[scryfall id, name, face index], ...] }
+     cards.json  { model, prep, dims, n, built, cards:[[scryfall id, name, face index], ...] }
      cards.bin   n float32 scales, then n * dims int8 values (fingerprint = int8 / scale)
 
    Runs are incremental: artworks already in the output folder are kept, only new ones are processed, and progress
@@ -27,6 +27,10 @@ let MODEL = FAKE ? MODELS[0] : "";
 const MAX_MS = (+process.env.MAX_MINUTES || 300) * 60e3;
 const CONC = +process.env.CONCURRENCY || 8;
 const BATCH = 16;
+// How art is prepared before fingerprinting: shrunk to this many pixels wide by averaging blocks of pixels, so it
+// looks like art seen through a webcam (see shrinkArt in index.html, which clicks go through too). The page reads
+// "prep" from cards.json and prepares clicks the same way; changing it means re-fingerprinting every card.
+const SHRINK = 40, PREP = `shrink${SHRINK}`;
 const UA = "KitchenTable-card-index/1.0 (+https://github.com/lukermcqueen98-wq/kitchen-table)";
 const started = Date.now();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -96,12 +100,18 @@ async function artworks(){
   return out;
 }
 
-function loadPrevious(){
+/* A rebuild (a new model or way of preparing art) goes into cards.next.json and cards.next.bin, so the page keeps
+   using the old, complete index until the new one has every card; then the new one takes its place. */
+const REBUILDING = (() => { try { const m = JSON.parse(fs.readFileSync(path.join(OUT, "cards.json"), "utf8"));
+  return (m.model !== undefined) && ((m.prep || "") !== PREP || (MODEL && m.model !== MODEL)); } catch { return false; } })();
+const base = next => next ? "cards.next" : "cards";
+function loadPrevious(){ const a = loadFiles(false); return a.dims ? a : loadFiles(true); }
+function loadFiles(next){
   try {
-    const meta = JSON.parse(fs.readFileSync(path.join(OUT, "cards.json"), "utf8"));
-    const bin = fs.readFileSync(path.join(OUT, "cards.bin"));
+    const meta = JSON.parse(fs.readFileSync(path.join(OUT, base(next) + ".json"), "utf8"));
+    const bin = fs.readFileSync(path.join(OUT, base(next) + ".bin"));
     const n = meta.cards.length, D = meta.dims;
-    if (meta.model !== MODEL || !!meta.fake !== FAKE || bin.length !== n * 4 + n * D) return { dims:0, map:new Map() };
+    if (meta.model !== MODEL || (meta.prep || "") !== PREP || !!meta.fake !== FAKE || bin.length !== n * 4 + n * D) return { dims:0, map:new Map() };
     const scales = new Float32Array(bin.buffer.slice(bin.byteOffset, bin.byteOffset + n * 4));
     const map = new Map();
     meta.cards.forEach((c, i) => map.set(`${c[0]}:${c[2] || 0}`, { s:scales[i], v:new Int8Array(bin.buffer.slice(bin.byteOffset + n * 4 + i * D, bin.byteOffset + n * 4 + (i + 1) * D)) }));
@@ -109,19 +119,22 @@ function loadPrevious(){
   } catch { return { dims:0, map:new Map() }; }
 }
 
-function save(entries, dims){
+// done: every artwork is in (a rebuild then replaces the old index); otherwise progress is saved to carry on from
+function save(entries, dims, done = false){
   const list = [...entries.values()].filter(e => e.v);
   const n = list.length, bin = Buffer.alloc(n * 4 + n * dims);
   const scales = new Float32Array(n);
   list.forEach((e, i) => { scales[i] = e.s; bin.set(new Uint8Array(e.v.buffer, e.v.byteOffset, dims), n * 4 + i * dims); });
   bin.set(new Uint8Array(scales.buffer), 0);
-  const meta = { model:MODEL, ...(FAKE ? { fake:true } : {}), dims, n, built:new Date().toISOString(), cards:list.map(e => [e.id, e.name, e.face]) };
+  const meta = { model:MODEL, prep:PREP, ...(FAKE ? { fake:true } : {}), dims, n, built:new Date().toISOString(), cards:list.map(e => [e.id, e.name, e.face]) };
   fs.mkdirSync(OUT, { recursive:true });
+  const b = base(REBUILDING && !done);
   // Write both files beside the old ones, then swap, so a cut-off run never leaves a half-written index
-  fs.writeFileSync(path.join(OUT, "cards.bin.tmp"), bin);
-  fs.writeFileSync(path.join(OUT, "cards.json.tmp"), JSON.stringify(meta));
-  fs.renameSync(path.join(OUT, "cards.bin.tmp"), path.join(OUT, "cards.bin"));
-  fs.renameSync(path.join(OUT, "cards.json.tmp"), path.join(OUT, "cards.json"));
+  fs.writeFileSync(path.join(OUT, b + ".bin.tmp"), bin);
+  fs.writeFileSync(path.join(OUT, b + ".json.tmp"), JSON.stringify(meta));
+  fs.renameSync(path.join(OUT, b + ".bin.tmp"), path.join(OUT, b + ".bin"));
+  fs.renameSync(path.join(OUT, b + ".json.tmp"), path.join(OUT, b + ".json"));
+  if (b === "cards") for (const f of ["cards.next.json", "cards.next.bin"]) fs.rmSync(path.join(OUT, f), { force:true });
   return n;
 }
 
@@ -159,12 +172,34 @@ async function fakeExtractor(images){
   return { data:out, dims:[images.length, 1, D] };
 }
 
-// The art crop, shrunk to 240 pixels wide like the page does before fingerprinting
+// Same arithmetic as shrinkPixels in index.html: each output pixel is the average of the block of pixels it covers
+function shrinkPixels(src, ch, sw, sh, w, h){
+  const out = new Uint8ClampedArray(w * h * 3), fx = sw / w, fy = sh / h;
+  for (let y = 0; y < h; y++) {
+    const y0 = y * fy, y1 = y0 + fy;
+    for (let x = 0; x < w; x++) {
+      const x0 = x * fx, x1 = x0 + fx; let r = 0, g = 0, b = 0, wt = 0;
+      for (let yy = Math.floor(y0); yy < Math.min(sh, Math.ceil(y1)); yy++) {
+        const wy = Math.min(y1, yy + 1) - Math.max(y0, yy);
+        for (let xx = Math.floor(x0); xx < Math.min(sw, Math.ceil(x1)); xx++) {
+          const k = wy * (Math.min(x1, xx + 1) - Math.max(x0, xx)), i = (yy * sw + xx) * ch;
+          r += src[i] * k; g += src[i + 1] * k; b += src[i + 2] * k; wt += k;
+        }
+      }
+      const o = (y * w + x) * 3; out[o] = r / wt; out[o + 1] = g / wt; out[o + 2] = b / wt;
+    }
+  }
+  return out;
+}
+// The art crop, shrunk to webcam detail (see SHRINK)
 async function loadArt(url){
   for (let i = 0; i < 3; i++) {
     try {
       const r = await fetch(url, { headers:{ "User-Agent":UA } });
-      if (r.ok) { const img = await RawImage.fromBlob(await r.blob()); return await img.resize(240, Math.max(1, Math.round(img.height * 240 / img.width))); }
+      if (r.ok) {
+        const img = await RawImage.fromBlob(await r.blob()), h = Math.max(1, Math.round(img.height * SHRINK / img.width));
+        return new RawImage(shrinkPixels(img.data, img.channels, img.width, img.height, SHRINK, h), SHRINK, h, 3);
+      }
       if (r.status === 404) return null;
     } catch {}
     await sleep(1000 * 2 ** i);
@@ -201,6 +236,7 @@ let dims = prev.dims;
 const todo = [...entries.values()].filter(e => !e.v);
 console.log(`${all.size} artworks on Scryfall, ${all.size - todo.length} already indexed, ${todo.length} to add.`);
 
+let timedOut = false;
 if (todo.length) {
   const fetchChunk = i => mapPool(todo.slice(i, i + BATCH), CONC, e => loadArt(e.art));
   let added = 0, failed = 0, lastSave = Date.now(), nextImgs = fetchChunk(0);
@@ -219,9 +255,12 @@ if (todo.length) {
     }
     if (Date.now() - lastSave > 5 * 60e3) { save(entries, dims); lastSave = Date.now(); }
     if ((i / BATCH) % 25 === 0) console.log(`${added} added, ${failed} failed, ${todo.length - i - chunk.length} left, ${Math.round((Date.now() - started) / 60e3)} min`);
-    if (Date.now() - started > MAX_MS) { console.log("Time limit reached. Saving; the next run continues from here."); break; }
+    if (Date.now() - started > MAX_MS) { console.log("Time limit reached. Saving; the next run continues from here."); timedOut = true; break; }
   }
   console.log(`Added ${added} artworks, ${failed} couldn't be downloaded.`);
 }
-if (dims) console.log(`Index has ${save(entries, dims)} artworks (${dims} values each) in ${OUT}.`);
+// (artworks that couldn't be downloaded don't hold a rebuild back; every run tries them again)
+if (REBUILDING && timedOut) console.log(`Rebuilding the index for a new way of preparing art: ${[...entries.values()].filter(e => e.v).length} of ${entries.size} done. ` +
+  "The site keeps the old index until the rest are done; run Build card index again to carry on.");
+if (dims) console.log(`Index has ${save(entries, dims, !timedOut)} artworks (${dims} values each) in ${OUT}.`);
 else console.log("Nothing to index.");

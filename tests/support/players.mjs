@@ -7,7 +7,7 @@ import { OUT, NAMES, cardId } from "./fixtures.mjs";
 import { BASE, PEER_PORT } from "./global-setup.mjs";
 
 const MODULES = path.resolve(import.meta.dirname, "..", "node_modules");
-const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js" };
+const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js", "opencv.js":"@techstark/opencv-js/dist/opencv.js" };
 const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:"Artifact", oracle_text:"Test card.", scryfall_uri:"https://scryfall.com",
   image_uris:{ small:`https://cards.scryfall.io/small/${k % 3}.png`, normal:`https://cards.scryfall.io/normal/${k % 3}.png`, art_crop:`https://cards.scryfall.io/art_crop/${k % 3}.png` } });
 const json = (route, body, status = 200) => route.fulfill({ status, contentType:"application/json", headers:{ "access-control-allow-origin":"*" }, body:JSON.stringify(body) });
@@ -33,6 +33,9 @@ export async function newPlayer(browser, { lisp = false } = {}){
   await ctx.route(/api\.scryfall\.com/, r => {
     const u = decodeURIComponent(r.request().url()).toLowerCase(), byId = /\/cards\/(0{7}\d)/.exec(u);
     const k = NAMES.findIndex(n => u.includes(n.toLowerCase()));
+    if (u.includes("/catalog/keyword-abilities")) return json(r, { data:["Flying", "Offspring", "Fear"] });
+    if (u.includes("/catalog/keyword-actions")) return json(r, { data:["Forage", "Cast"] });
+    if (u.includes("/catalog/ability-words")) return json(r, { data:["Coven", "Eerie"] });
     if (u.includes("/catalog/")) return json(r, { data:NAMES });
     if (byId) return json(r, card(+byId[1].slice(-1)));
     if (k >= 0) return json(r, u.includes("/search") ? { data:[card(k)] } : card(k));
@@ -65,12 +68,15 @@ export async function newPlayer(browser, { lisp = false } = {}){
 // Open the lobby (optionally for a table code), fill in the name and deck, and sit down
 export async function sitDown(page, name, { room = "", deck, mode } = {}){
   await page.goto(`${BASE}/index.html${room ? "?room=" + room : ""}`);
-  await expect(page.locator("#lobby")).toBeVisible();
+  await expect(page.locator("#lobby")).toBeVisible({ timeout:10000 });
   await page.fill("#nameIn", name);
   if (deck !== undefined) await page.fill("#deckIn", deck);
   if (mode) await page.selectOption("#modeSel", mode);
   await page.click("#joinBtn");
-  await expect(page.locator("#table")).toBeVisible({ timeout:15000 });
+  // (on failure, say what the lobby showed: its error line and the button's text)
+  await expect(page.locator("#table")).toBeVisible({ timeout:15000 }).catch(async e => {
+      throw new Error(e.message + `\nAfter waiting: lobby said "${await page.textContent("#lobbyErr")}", button "${await page.textContent("#joinBtn")}"`);
+    });
   await page.waitForTimeout(700);
   await page.keyboard.press("Escape");  // skip the commander question
   return new URL(page.url()).searchParams.get("room");

@@ -1,0 +1,69 @@
+# Measures how often a click finds the right card, on webcam-like pictures of real cards (tools/eval-matching.mjs).
+# Run it from Actions > Matching benchmark > Run workflow. It also runs when a branch changes the matcher.
+name: Matching benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      cards:
+        description: How many cards to test
+        default: "100"
+      dtype:
+        description: "Model number format: q8 (browsers without WebGPU) or fp32"
+        default: q8
+      mode:
+        description: "match (click matching) or refs (ways of preparing pictures)"
+        default: match
+      local_index:
+        description: "Leave blank to use the published index, or a prep (like shrink40) to test against a stand-in index made here"
+        default: ""
+      extra:
+        description: Other cards in the stand-in index (refs mode and local_index)
+        default: "2900"
+      preps:
+        description: Ways of preparing art to compare (refs mode)
+        default: shrink40
+  push:
+    branches: ["claude/**"]
+    paths: ["index.html", "tools/eval-matching.mjs", "tools/eval/**", ".github/workflows/eval-matching.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-matching-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci --prefix tests
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests
+      - name: Get the published card index
+        run: |
+          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          mkdir -p site/index
+          curl -fsSL "$site/index/cards.json" -o site/index/cards.json
+          curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin
+      - name: Run the benchmark
+        env:
+          # (refs mode, and LOCAL_INDEX: how many other cards to test against, and which ways of preparing art)
+          EXTRA: ${{ github.event.inputs.extra || '2900' }}
+          PREPS: ${{ github.event.inputs.preps || 'shrink40' }}
+          LOCAL_INDEX: ${{ github.event.inputs.local_index || (github.event_name == 'push' && 'shrink40' || '') }}
+        run: node tools/eval-matching.mjs "${{ github.event.inputs.cards || '100' }}" "${{ github.event.inputs.dtype || 'q8' }}" "${{ github.event.inputs.mode || 'match' }}"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: matching-benchmark
+          path: eval-results
+          retention-days: 14

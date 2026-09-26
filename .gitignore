@@ -3,3 +3,4 @@ site/
 tests/.fixtures/
 tests/test-results/
 tests/playwright-report/
+eval-results/
