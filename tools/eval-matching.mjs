@@ -39,7 +39,7 @@ await new Promise(r => server.listen(PORT, "127.0.0.1", r));
 const meta = JSON.parse(fs.readFileSync(path.join(ROOT, "site", "index", "cards.json"), "utf8"));
 let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 const pickCards = n => Array.from({ length:n }, () => meta.cards[Math.floor(rnd() * meta.cards.length)]);
-const tests = pickCards(N), mats = pickCards(12), others = pickCards(16), extra = MODE === "refs" ? pickCards(+process.env.EXTRA || 900) : [];
+const tests = pickCards(N), mats = pickCards(12), others = pickCards(16), extra = MODE === "refs" || process.env.LOCAL_INDEX ? pickCards(+process.env.EXTRA || 900) : [];
 console.log(`Index: ${meta.cards.length} artworks, model ${meta.model}. Testing ${N} cards with ${DTYPE}.`);
 
 const browser = await chromium.launch();
@@ -126,6 +126,16 @@ if (MODE === "refs") {
   await browser.close(); server.close(); process.exit(0);
 }
 
+// LOCAL_INDEX=shrink40: search the test cards plus the extra cards, fingerprinted here with that prep, instead of the
+// published index (to measure a way of preparing art before rebuilding the real index for it)
+if (process.env.LOCAL_INDEX) {
+  const n = await page.evaluate(async prep => {
+    const b = window.bench, c240 = src => { const c = document.createElement("canvas"); c.width = 240; c.height = Math.round(240 * src.naturalHeight / src.naturalWidth); c.getContext("2d").drawImage(src, 0, 0, c.width, c.height); return c; };
+    return window.ktEval.useIndex([...b.tests.filter(Boolean), ...b.extra].map(x => ({ name:x.name, canvas:c240(x.art) })), prep);
+  }, process.env.LOCAL_INDEX);
+  console.log(`Using a stand-in index of ${n} cards prepared as ${process.env.LOCAL_INDEX}.`);
+  ready.index = n;
+}
 const results = [];
 for (let i = 0; i < N; i++) {
   const r = await page.evaluate(async i => {
@@ -162,7 +172,7 @@ const pct = (k, f) => { const v = results.filter(r => r[k]); return v.length ? M
 const avg = (k, f) => { const v = results.filter(r => r[k]).map(r => f(r[k])); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length) : 0; };
 const rows = ["clean", "before", "finder", "perfect"].map(k =>
   `| ${k} | ${pct(k, m => m.ok)}% | ${pct(k, m => m.top4)}% | ${pct(k, m => m.sure)}% | ${pct(k, m => m.sure && !m.ok)}% | ${avg(k, m => m.score).toFixed(3)} | ${Math.round(avg(k, m => m.ms))} ms |`);
-const summary = [`## Matching benchmark: ${results.length} cards, model ${ready.model} (${DTYPE} on ${ready.device}), index of ${ready.index}`, "",
+const summary = [`## Matching benchmark: ${results.length} cards, model ${ready.model} (${DTYPE} on ${ready.device}), ${process.env.LOCAL_INDEX ? `stand-in index (${process.env.LOCAL_INDEX})` : "index"} of ${ready.index}`, "",
   "| method | right card first | in top 4 | called sure | sure but wrong | mean score | time |", "|---|---|---|---|---|---|---|", ...rows, "",
   "clean: Scryfall's own art crop (should be about 100%). before: clicks before the card finder. finder: with the card finder. perfect: the card's true corners."].join("\n");
 fs.writeFileSync(path.join(OUT, "summary.md"), summary + "\n");

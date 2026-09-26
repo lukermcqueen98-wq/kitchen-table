@@ -14,6 +14,15 @@ on:
       mode:
         description: "match (click matching) or refs (ways of preparing pictures)"
         default: match
+      local_index:
+        description: "Leave blank to use the published index, or a prep (like shrink40) to test against a stand-in index made here"
+        default: ""
+      extra:
+        description: Other cards in the stand-in index (refs mode and local_index)
+        default: "2900"
+      preps:
+        description: Ways of preparing art to compare (refs mode)
+        default: shrink40
   push:
     branches: ["claude/**"]
     paths: ["index.html", "tools/eval-matching.mjs", "tools/eval/**", ".github/workflows/eval-matching.yml"]
@@ -47,9 +56,11 @@ jobs:
           curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin
       - name: Run the benchmark
         env:
-          EXTRA: "4900"
-          PREPS: shrink48,shrink40,shrink32
-        run: node tools/eval-matching.mjs "${{ github.event.inputs.cards || '100' }}" "${{ github.event.inputs.dtype || 'q8' }}" "${{ github.event.inputs.mode || 'refs' }}"
+          # (refs mode, and LOCAL_INDEX: how many other cards to test against, and which ways of preparing art)
+          EXTRA: ${{ github.event.inputs.extra || '2900' }}
+          PREPS: ${{ github.event.inputs.preps || 'shrink40' }}
+          LOCAL_INDEX: ${{ github.event.inputs.local_index || (github.event_name == 'push' && 'shrink40' || '') }}
+        run: node tools/eval-matching.mjs "${{ github.event.inputs.cards || '100' }}" "${{ github.event.inputs.dtype || 'q8' }}" "${{ github.event.inputs.mode || 'match' }}"
       - uses: actions/upload-artifact@v6
         if: always()
         with:

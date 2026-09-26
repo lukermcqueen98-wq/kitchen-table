@@ -30,7 +30,7 @@ const BATCH = 16;
 // How art is prepared before fingerprinting: shrunk to this many pixels wide by averaging blocks of pixels, so it
 // looks like art seen through a webcam (see shrinkArt in index.html, which clicks go through too). The page reads
 // "prep" from cards.json and prepares clicks the same way; changing it means re-fingerprinting every card.
-const SHRINK = 48, PREP = `shrink${SHRINK}`;
+const SHRINK = 40, PREP = `shrink${SHRINK}`;
 const UA = "KitchenTable-card-index/1.0 (+https://github.com/lukermcqueen98-wq/kitchen-table)";
 const started = Date.now();
 const sleep = ms => new Promise(r => setTimeout(r, ms));

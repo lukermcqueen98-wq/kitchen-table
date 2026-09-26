@@ -2399,7 +2399,7 @@ const AI_MODELS = ["Xenova/dinov2-small", "onnx-community/dinov2-small-ONNX", "o
 const aiKey = () => (AI.model || AI_MODELS[0]) + ":v3:" + (prepWidth() || "full") + ":";
 // Pictures are shrunk to this width before fingerprinting (see shrinkArt). The all-cards index says which it was built
 // with ("prep" in cards.json), and clicks must match it; an index from before shrinking was added used full pictures.
-const SHRINK_DEFAULT = 48;
+const SHRINK_DEFAULT = 40;
 function prepWidth(){
   if (!IDX.n) return SHRINK_DEFAULT;
   const m = /^shrink(\d+)$/.exec(IDX.prep || ""); return m ? +m[1] : 0;
@@ -2915,6 +2915,16 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
   },
   embed:canvases => aiEmbed(canvases),
   shrink:(canvas, w) => shrinkArt(canvas, w),
+  // Search a stand-in index instead of the published one: art pictures with names, fingerprinted here the way the
+  // builder would with this prep (for measuring a new way of preparing art before rebuilding the real index)
+  async useIndex(list, prep){
+    IDX.prep = prep; IDX.n = 1;  // (so prepWidth reads the new prep while fingerprinting)
+    const vecs = []; for (let i = 0; i < list.length; i += 16) vecs.push(...await aiEmbed(list.slice(i, i + 16).map(x => x.canvas)));
+    const D = vecs[0].length, V = new Int8Array(list.length * D), S = new Float32Array(list.length);
+    vecs.forEach((v, i) => { let m = 0; for (const x of v) m = Math.max(m, Math.abs(x)); S[i] = 127 / (m || 1); for (let j = 0; j < D; j++) V[i * D + j] = Math.round(v[j] * S[i]); });
+    Object.assign(IDX, { n:list.length, dims:D, model:AI.model, vecs:V, scales:S, ids:list.map(x => x.id || x.name), names:list.map(x => x.name) });
+    AI.refs = []; return IDX.n;
+  },
   // The art box of a card with known corners, straightened out, as the AI sees it
   artFromCard(canvas, q){
     const [u0, v0, u1, v1] = ART_IN_CARD;
