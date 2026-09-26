@@ -144,6 +144,19 @@ aside section+section{margin-top:22px}
 #cardView .oracle{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
 #cardView a{color:var(--brass)}
 #cardView .from{background:rgba(201,164,76,.15);border:1px solid var(--brass);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:14px}
+#cardView.flash{animation:cardFlash .9s ease-out}
+@keyframes cardFlash{from{box-shadow:0 0 0 3px var(--brass);border-radius:6px}to{box-shadow:0 0 0 3px transparent}}
+#histBox{margin:0 0 10px;font-size:13px}
+#histBox summary{cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:8px}
+#histBox summary .spacer{flex:1}
+#histList{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;max-height:132px;overflow:auto}
+#histList button{display:flex;align-items:center;gap:6px;max-width:100%;padding:3px 8px 3px 3px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);font-size:13px}
+#histList button.on{border-color:var(--brass);color:var(--brass)}
+#histList img{width:30px;height:22px;object-fit:cover;border-radius:3px;flex:none}
+#histList span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#alts{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:13px;color:var(--muted);margin:0 0 8px}
+#alts button{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 3px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);font-size:13px}
+#alts img{width:30px;height:22px;object-fit:cover;border-radius:3px}
 #status{font-size:13px;color:var(--muted);min-height:1.4em;margin-bottom:6px}
 .tbl{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;font-size:14px}
 .tbl select{padding:6px 8px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);width:100%}
@@ -156,6 +169,9 @@ aside section+section{margin-top:22px}
 .dmghead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dmghead select{padding:5px 8px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
 #dmgTotals{font-size:13px;color:var(--muted);margin-top:6px}
+#capPeers{font-size:13px;color:var(--muted);margin:0 0 6px}
+#capPeers div{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:2px 0}
+#capPeers .ok{color:var(--parchment)}
 #captions{list-style:none;padding:0;margin:6px 0 0;font-size:14px;max-height:240px;overflow:auto;border:1px solid var(--felt-edge);border-radius:8px}
 #captions li{padding:6px 10px;border-top:1px solid rgba(255,255,255,.05)}
 #captions li:first-child{border-top:0}
@@ -294,7 +310,7 @@ button.mpip{cursor:pointer}
   </header>
   <div id="grid"></div>
   <aside>
-    <section>
+    <section id="cardSec">
       <h2>Card</h2>
       <div class="search">
         <div class="searchwrap">
@@ -305,7 +321,12 @@ button.mpip{cursor:pointer}
       </div>
       <div id="status" aria-live="polite"></div>
       <p class="hint" id="artStat"></p>
-      <div id="cardView"><p class="hint">Click a card's art on any camera to identify it. If that misses, click the card's name bar, or drag a box around just the name.</p></div>
+      <details id="histBox" class="hidden" open>
+        <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
+        <div id="histList"></div>
+      </details>
+      <div id="alts" class="hidden"></div>
+      <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
     </section>
     <section>
       <h2>Table</h2>
@@ -330,6 +351,7 @@ button.mpip{cursor:pointer}
     <section>
       <h2>Captions</h2>
       <p class="hint" id="capHint"></p>
+      <div id="capPeers"></div>
       <ul id="captions"></ul>
       <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
       <label class="opts-line">Speech engine
@@ -337,6 +359,7 @@ button.mpip{cursor:pointer}
           <option value="browser">Chrome or Edge speech (most accurate)</option>
           <option value="device">Chrome on-device (private, audio stays on this computer)</option>
         </select></label>
+      <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
       <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn")</label>
     </section>
     <section>
@@ -351,7 +374,6 @@ button.mpip{cursor:pointer}
 <img id="cmdrPop" class="hidden" alt="">
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (() => {
@@ -755,7 +777,7 @@ function applyWebcam(){ const t = localStream?.getVideoTracks()[0]; if (t) t.ena
 function send(conn, msg){ try { if (conn.open) conn.send(msg); } catch {} }
 function broadcast(msg){ Object.values(conns).forEach(c => send(c.conn, msg)); }
 function publicState(){
-  return { name:me.name, life:me.life, startLife:me.startLife, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
+  return { name:me.name, life:me.life, startLife:me.startLife, cap:capState(), lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
            emblems:me.emblems, custom:me.custom, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
 }
 let lastLife = null;
@@ -866,6 +888,8 @@ function onMessage(s, msg){
       if (!isNew && msg.type === "state" && oldStart === p.startLife) noteLife(s, oldLife, p.life);
       p.cmd = {}; if (st.cmd && typeof st.cmd === "object") for (const [k, v] of Object.entries(st.cmd)) { const kk = int(k, 1, MAX); if (kk) p.cmd[kk] = int(v, 0, 999); }
       p.rot = !!st.rot;
+      p.cap = ["on", "off", "muted", "none"].includes(st.cap) ? st.cap : "";
+      p.lisp = !!st.lisp;
       p.manaOn = !!st.manaOn;
       const oldCmdr = (p.cmdrs || []).map(c => c.name).join(" and ");
       p.cmdrs = cleanCmdrs(st.cmdrs);
@@ -909,6 +933,11 @@ function onMessage(s, msg){
       break;
     }
     case "dice": playDice(msg, s); break;
+    case "snap": answerSnap(s, msg.id); break;
+    case "capask":
+      if (!capOn && SR) toast(`${p.name || "Another player"} asked you to turn on captions so your words show up for the table.`, () => { capOn = true; quickEnds = 0; startRec(); updateCapBtn(); }, "Turn on");
+      break;
+    case "snapr": takeSnap(s, msg); break;
     case "rolloff": playRollOff(msg); break;
     case "newgame": applyNewGame(p.name); break;
   }
@@ -926,6 +955,7 @@ function enterTable(){
   $("#roomLabel").textContent = `Table ${roomCode}`;
   if (LOCAL) { $("#copyBtn").textContent = "Copy table code"; $("#waitNote").textContent = `Waiting for players. They open their copy of this file and enter code ${roomCode}.`; }
   $("#voiceIn").checked = store.get("kt-voice", "1") === "1";
+  $("#lispIn").checked = me.lisp = store.get("kt-lisp-me", "0") === "1";
   $("#oneWord").checked = store.get("kt-oneword", "1") === "1";
   try { tileOrder = JSON.parse(store.get("kt-order:" + roomCode, "[]")).map(Number).filter(n => n >= 1 && n <= MAX); } catch { tileOrder = []; }
   wirePeer(); render(); renderDmg();
@@ -972,6 +1002,7 @@ $("#micBtn").onclick = e => {
   const t = localStream.getAudioTracks()[0]; if (!t) return;
   t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mute mic" : "Unmute mic"; e.target.classList.toggle("off", !t.enabled);
   if (!t.enabled) stopRec(); else if (capOn) startRec();
+  pushState();
 };
 $("#camBtn").onclick = e => {
   camHidden = !camHidden; applyWebcam();
@@ -1066,7 +1097,7 @@ function render(bumpMine){
     el.querySelector(".life").classList.toggle("low", p.life <= 5);
     renderCounters(el, s);
   });
-  renderAsk(); renderTablePanel(); updateClocks();
+  renderAsk(); renderTablePanel(); renderCapPeers(); updateClocks();
   const dc = $("#dayChip");
   dc.classList.toggle("hidden", !table.dayNight); dc.classList.toggle("night", table.dayNight === "night");
   dc.textContent = table.dayNight === "night" ? "Night" : "Day";
@@ -1855,7 +1886,7 @@ function artSearch(G, cx, cy, cards, seatBias){
     }
   }
   const ranked = [...byName.values()].sort((a, b) => b.score - a.score);
-  return { best:ranked[0] || null, second:ranked[1] || null, patches:patches.length, top };
+  return { best:ranked[0] || null, second:ranked[1] || null, patches:patches.length, top, ranked };
 }
 
 const BASICS = new Set(["plains", "island", "swamp", "mountain", "forest", "wastes", "snow covered plains", "snow covered island", "snow covered swamp", "snow covered mountain", "snow covered forest"]);
@@ -1864,7 +1895,7 @@ function artStat(){
   const el = $("#artStat"); if (!el) return;
   const all = [...ART.names.values()], done = all.filter(x => x.state === "done" || x.state === "none").length;
   if (ART.blocked) el.textContent = "Picture matching isn't available in this browser (card images couldn't be read). Name reading still works.";
-  else if (!all.length) el.textContent = "Tip: paste decklists in the lobby to turn on picture matching.";
+  else if (!all.length) el.textContent = "Tip: paste decklists in the lobby so picture matching knows every card at the table. Cards you look up get learned too.";
   else if (done < all.length) el.textContent = `Learning card art: ${done} of ${all.length} cards...`;
   else if (AI.loading) el.textContent = "Loading the AI card matcher (one-time download, about 25 to 45 MB)...";
   else if (AI.failed) el.textContent = `Basic picture matching ready for ${all.length} cards. The AI matcher couldn't load in this browser.`;
@@ -1940,9 +1971,9 @@ async function learnCard(name, info){
     if (raw) { ART.entries.push(artEntry(raw, { id:p.id, name })); info.count++; }
   }));
 }
-function artMatch(video, pt, rot, seat){
+function artMatch(fr, c, seat){
   if (!ART.entries.length) return null;
-  const vw = video.videoWidth, vh = video.videoHeight, c = toVideo(video, pt.x, pt.y, rot);
+  const vw = fr.w, vh = fr.h;
   if (c.x < 0 || c.y < 0 || c.x > vw || c.y > vh) return null;
   const Rr = Math.round(Math.min(vw, vh) * 0.45);
   const rx0 = Math.max(0, Math.round(c.x - Rr)), ry0 = Math.max(0, Math.round(c.y - Rr));
@@ -1952,7 +1983,7 @@ function artMatch(video, pt, rot, seat){
   const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
   const ctx = cv.getContext("2d", { willReadFrequently:true }); if (!ctx) return null;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(video, rx0, ry0, w0, h0, 0, 0, cw, ch);
+  ctx.drawImage(fr.src, rx0, ry0, w0, h0, 0, 0, cw, ch);
   const G = integral(ctx.getImageData(0, 0, cw, ch).data, cw, ch);
   const seatsOf = new Map(); for (const v of deckPool().values()) seatsOf.set(v.name, v.seats);
   const res = artSearch(G, (c.x - rx0) * ds, (c.y - ry0) * ds, ART.entries, e => seatsOf.get(e.name)?.has(seat) ? 0.02 : 0);
@@ -1966,7 +1997,7 @@ function artMatch(video, pt, rot, seat){
   if (!res.best) return { ok:false, cands:cands.map(toVid) };
   const margin = res.best.score - (res.second ? res.second.score : -1);
   return { ok:res.best.score >= 0.75 && margin >= 0.05, name:res.best.name, id:res.best.id, score:res.best.score,
-           vbox:toVid(res.best.box), cands:cands.map(toVid) };
+           vbox:toVid(res.best.box), cands:cands.map(toVid), top:res.ranked.slice(0, 4).map(r => ({ name:r.name, id:r.id, score:r.score })) };
 }
 function boxIoU(a, b){
   const ix = Math.max(0, Math.min(a.bx + a.bw, b.bx + b.bw) - Math.max(a.bx, b.bx));
@@ -1983,7 +2014,8 @@ function boxIoU(a, b){
    ===================================================================== */
 const TJS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js";
 const AI_MODEL = "Xenova/dinov2-small";
-const AI = { ext:null, loading:null, failed:false, device:"", refs:[], learned:new Set() };
+const AI_KEY = AI_MODEL + ":v2:";  // saved fingerprints; bump when the fingerprint recipe changes
+const AI = { ext:null, loading:null, failed:false, device:"", refs:[], learned:new Set(), camLoaded:new Set() };
 async function aiLoad(){
   if (AI.ext) return AI.ext;
   if (AI.failed) return null;
@@ -2006,17 +2038,21 @@ async function aiLoad(){
   }
   return AI.loading || AI.ext;
 }
-// One normalized fingerprint per image (the model's summary token)
+// One fingerprint per image: the model's summary token plus the average of its detail tokens (each normalized).
+// The pair holds up better than the summary alone when part of the art is covered by glare or a sleeve edge.
 async function aiEmbed(canvases){
   const ext = await aiLoad(); if (!ext || !canvases.length) return null;
   const out = await ext(canvases);
-  const d = out.data, dims = out.dims, n = dims[0], D = dims[dims.length - 1], stride = dims.length === 3 ? dims[1] * D : D;
+  const d = out.data, dims = out.dims, n = dims[0], D = dims[dims.length - 1], T = dims.length === 3 ? dims[1] : 1;
+  const unit = v => { let ss = 0; for (let j = 0; j < v.length; j++) ss += v[j] * v[j]; const k = 1 / Math.sqrt(ss || 1); for (let j = 0; j < v.length; j++) v[j] *= k; return v; };
   const res = [];
   for (let i = 0; i < n; i++) {
-    const v = new Float32Array(D); let ss = 0;
-    for (let j = 0; j < D; j++) { v[j] = d[i * stride + j]; ss += v[j] * v[j]; }
-    const k = 1 / Math.sqrt(ss || 1); for (let j = 0; j < D; j++) v[j] *= k;
-    res.push(v);
+    const base = i * T * D, cls = unit(Float32Array.from(d.subarray(base, base + D)));
+    if (T < 2) { res.push(cls); continue; }
+    const mean = new Float32Array(D);
+    for (let t = 1; t < T; t++) for (let j = 0; j < D; j++) mean[j] += d[base + t * D + j];
+    const v = new Float32Array(D * 2); v.set(cls); v.set(unit(mean), D);
+    res.push(unit(v));
   }
   return res;
 }
@@ -2034,11 +2070,17 @@ const idb = (() => {
   };
 })();
 async function aiLearn(name, prints){
+  prints.forEach(p => { if (p.art) artThumbs.set(p.id, p.art); });
+  if (!AI.camLoaded.has(name)) {
+    AI.camLoaded.add(name);
+    const cam = await idb.get(AI_KEY + "cam:" + norm(name));
+    if (Array.isArray(cam)) cam.forEach(c => { if (c?.v instanceof Float32Array) AI.refs.push({ id:c.id, name, v:c.v, cam:true }); });
+  }
   const todo = [];
-  for (const p of prints.slice(0, 4)) {
+  for (const p of prints.slice(0, 5)) {
     if (!p.art || AI.learned.has(p.id)) continue;
     AI.learned.add(p.id);
-    const cached = await idb.get(AI_MODEL + ":" + p.id);
+    const cached = await idb.get(AI_KEY + p.id);
     if (cached instanceof Float32Array) AI.refs.push({ id:p.id, name, v:cached }); else todo.push(p);
   }
   if (!todo.length) return;
@@ -2052,48 +2094,66 @@ async function aiLearn(name, prints){
     canvases.push(cv); ids.push(p.id);
   }
   const vecs = await aiEmbed(canvases); if (!vecs) return;
-  vecs.forEach((v, i) => { AI.refs.push({ id:ids[i], name, v }); idb.set(AI_MODEL + ":" + ids[i], v); });
+  vecs.forEach((v, i) => { AI.refs.push({ id:ids[i], name, v }); idb.set(AI_KEY + ids[i], v); });
 }
-// Cut a box out of the video and turn it upright (rot = quarter turns clockwise, same as the color matcher)
-function cropArt(video, b, size = 240){
+// Cut a box out of an image and turn it upright (rot = quarter turns clockwise, same as the color matcher)
+function cropArt(src, b, size = 240){
   const aw = b.rot % 2 ? b.h : b.w, ah = b.rot % 2 ? b.w : b.h, k = size / aw;
   const cv = document.createElement("canvas"); cv.width = size; cv.height = Math.max(1, Math.round(ah * k));
-  const ctx = cv.getContext("2d"); ctx.imageSmoothingQuality = "high";
+  const ctx = cv.getContext("2d", { willReadFrequently:true }); ctx.imageSmoothingQuality = "high";
   const W = cv.width, H = cv.height;
   if (b.rot === 1) { ctx.translate(0, H); ctx.rotate(-Math.PI / 2); }
   else if (b.rot === 2) { ctx.translate(W, H); ctx.rotate(Math.PI); }
   else if (b.rot === 3) { ctx.translate(W, 0); ctx.rotate(Math.PI / 2); }
-  ctx.drawImage(video, b.x, b.y, b.w, b.h, 0, 0, b.w * k, b.h * k);
+  ctx.drawImage(src, b.x, b.y, b.w, b.h, 0, 0, b.w * k, b.h * k);
   return cv;
 }
-async function aiMatch(video, pt, rot, seat, color){
-  if (!AI.refs.length || AI.failed) return null;
-  const vw = video.videoWidth, vh = video.videoHeight, c = toVideo(video, pt.x, pt.y, rot);
-  if (c.x < 0 || c.y < 0 || c.x > vw || c.y > vh) return null;
-  const boxes = [...(color?.cands || [])];
-  // Plus a few card sizes centered on the click, in every orientation (tapped cards are sideways)
-  for (const f of [0.1, 0.16, 0.24]) for (let r = 0; r < 4; r++) {
-    const aw = vw * f, ah = aw / ART_ASPECT, bw = r % 2 ? ah : aw, bh = r % 2 ? aw : ah;
-    const x = Math.max(0, Math.min(vw - bw, c.x - bw / 2)), y = Math.max(0, Math.min(vh - bh, c.y - bh / 2));
-    if (bw <= vw && bh <= vh) boxes.push({ x, y, w:bw, h:bh, rot:r });
-  }
-  const qs = await aiEmbed(boxes.map(b => cropArt(video, b)));
-  if (!qs) return null;
+function aiRank(qs, boxes, seat){
   const seatsOf = new Map(); for (const v of deckPool().values()) seatsOf.set(v.name, v.seats);
   const byName = new Map();
   qs.forEach((q, qi) => {
     for (const r of AI.refs) {
       const sc = dotv(q, r.v) + (seatsOf.get(r.name)?.has(seat) ? 0.01 : 0);
       const cur = byName.get(r.name);
-      if (!cur || sc > cur.score) byName.set(r.name, { name:r.name, id:r.id, score:sc, box:boxes[qi] });
+      if (!cur || sc > cur.score) byName.set(r.name, { name:r.name, id:r.cam ? (cur?.id || r.id) : r.id, score:sc, box:boxes[qi], qi });
     }
   });
-  const ranked = [...byName.values()].sort((a, b) => b.score - a.score);
+  return [...byName.values()].sort((a, b) => b.score - a.score);
+}
+async function aiMatch(fr, c, seat, color){
+  if (!AI.refs.length || AI.failed) return null;
+  const vw = fr.w, vh = fr.h;
+  if (c.x < 0 || c.y < 0 || c.x > vw || c.y > vh) return null;
+  const boxes = [...(color?.cands || [])];
+  // Plus card sizes from small (far camera) to large (close camera) centered on the click, in every orientation (tapped cards are sideways)
+  for (const f of [0.08, 0.12, 0.17, 0.24, 0.32]) for (let r = 0; r < 4; r++) {
+    const aw = vw * f, ah = aw / ART_ASPECT, bw = r % 2 ? ah : aw, bh = r % 2 ? aw : ah;
+    if (bw > vw || bh > vh) continue;
+    boxes.push({ x:Math.max(0, Math.min(vw - bw, c.x - bw / 2)), y:Math.max(0, Math.min(vh - bh, c.y - bh / 2)), w:bw, h:bh, rot:r });
+  }
+  return aiMatchBoxes(fr, boxes, seat, color);
+}
+async function aiMatchBoxes(fr, boxes, seat, color){
+  if (!AI.refs.length || AI.failed || !boxes.length) return null;
+  const inFrame = b => b.x >= 0 && b.y >= 0 && b.x + b.w <= fr.w && b.y + b.h <= fr.h;
+  let qs = await aiEmbed(boxes.map(b => cropArt(fr.src, b)));
+  if (!qs) return null;
+  let ranked = aiRank(qs, boxes, seat);
+  // Second look: nudge the best box around so it lines up with the art, then score everything again
+  const b0 = ranked[0]?.box;
+  if (b0) {
+    const more = [[-.08, 0, 1], [.08, 0, 1], [0, -.08, 1], [0, .08, 1], [0, 0, .88], [0, 0, 1.12], [-.05, -.05, .94], [.05, .05, 1.06]]
+      .map(([dx, dy, k]) => { const w = b0.w * k, h = b0.h * k; return { x:b0.x + (b0.w - w) / 2 + dx * b0.w, y:b0.y + (b0.h - h) / 2 + dy * b0.h, w, h, rot:b0.rot }; })
+      .filter(inFrame);
+    const q2 = more.length ? await aiEmbed(more.map(b => cropArt(fr.src, b))) : null;
+    if (q2) { qs = [...qs, ...q2]; boxes = [...boxes, ...more]; ranked = aiRank(qs, boxes, seat); }
+  }
   const best = ranked[0]; if (!best) return null;
   const margin = best.score - (ranked[1]?.score ?? 0);
   // Confident on its own, or a closer call that the color matcher agrees with
   const ok = (best.score >= 0.55 && margin >= 0.06) || (best.score >= 0.45 && margin >= 0.02 && color?.name === best.name);
-  return { ok, name:best.name, id:best.id, score:best.score, vbox:best.box };
+  return { ok, name:best.name, id:best.id, score:best.score, vbox:best.box, q:qs[best.qi],
+           top:ranked.slice(0, 4).map(r => ({ name:r.name, id:r.id, score:r.score })) };
 }
 function fromVideo(video, x, y, rot){
   const r = video.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
@@ -2104,17 +2164,13 @@ function fromVideo(video, x, y, rot){
 }
 
 /* =====================================================================
-   Card recognition (uses decklists when players provide them)
+   Card recognition by picture: click a card (or drag a box around it) and the AI
+   matcher finds the closest match among the cards it knows: every decklist at the
+   table, every commander, and every card anyone looked up. When it isn't sure it
+   still shows its closest match plus runners-up; picking the right one teaches it
+   how that card looks on your camera.
    ===================================================================== */
-let ocrWorker = null, ocrBusy = false;
-async function getWorker(){
-  if (!ocrWorker) {
-    setStatus("Loading text reader (first time only)...");
-    ocrWorker = await Tesseract.createWorker("eng");
-    await ocrWorker.setParameters({ tessedit_pageseg_mode:"7", tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,'-" });
-  }
-  return ocrWorker;
-}
+let lookBusy = false;
 function attachLookup(el, s){
   const hit = el.querySelector(".hit"), video = el.querySelector("video");
   let start = null, box = null;
@@ -2146,92 +2202,158 @@ function toVideo(video, cx, cy, rot){
   if (rot) { x = vw - x; y = vh - y; }
   return { x, y, scale };
 }
+/* A still of a player's camera at the best quality available. For your own camera that's your camera itself.
+   For another player's, their browser sends a full-quality still of their camera, because the live video
+   you receive is compressed and loses the fine detail card names need. Falls back to your copy of the video. */
+function snapshot(src, w, h){ const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d").drawImage(src, 0, 0, w, h); return cv; }
+const snapWait = new Map();
+let snapLast = 0;
+function requestSnap(seat){
+  const c = conns[seat]?.conn;
+  if (!c?.open) return Promise.resolve(null);
+  return new Promise(res => {
+    const id = uid().slice(0, 16);
+    const t = setTimeout(() => { snapWait.delete(id); res(null); }, 3000);
+    snapWait.set(id, { seat, done:v => { clearTimeout(t); snapWait.delete(id); res(v); } });
+    send(c, { type:"snap", id });
+  });
+}
+async function answerSnap(s, id){
+  const c = conns[s]?.conn;
+  if (!c || typeof id !== "string" || id.length > 20) return;
+  if (Date.now() - snapLast < 400) { send(c, { type:"snapr", id }); return; }
+  snapLast = Date.now();
+  const v = document.querySelector(`#grid .tile[data-seat="${mySeat}"] video`);
+  if (!v?.videoWidth || (camHidden && !me.camStream)) { send(c, { type:"snapr", id }); return; }
+  const cv = snapshot(v, v.videoWidth, v.videoHeight);
+  const blob = await new Promise(r => cv.toBlob(r, "image/jpeg", 0.92));
+  if (!blob) { send(c, { type:"snapr", id }); return; }
+  send(c, { type:"snapr", id, w:cv.width, h:cv.height, jpg:await blob.arrayBuffer() });
+}
+async function takeSnap(s, msg){
+  const w = snapWait.get(msg.id); if (!w || w.seat !== s) return;
+  const bytes = msg.jpg instanceof ArrayBuffer || ArrayBuffer.isView(msg.jpg) ? msg.jpg : null;
+  if (!bytes || bytes.byteLength > 8e6) { w.done(null); return; }
+  try {
+    const bmp = await createImageBitmap(new Blob([bytes], { type:"image/jpeg" }));
+    w.done(bmp.width === int(msg.w, 1, 8192) && bmp.height === int(msg.h, 1, 8192) ? { src:bmp, w:bmp.width, h:bmp.height } : null);
+  } catch { w.done(null); }
+}
+async function grabFrame(video, seat){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (seat !== mySeat) {
+    const r = await requestSnap(seat);
+    if (r && Math.abs(r.w / r.h - vw / vh) < 0.02 && r.w >= vw * 0.99) return { src:r.src, w:r.w, h:r.h, k:r.w / vw, sharp:true };
+  }
+  return { src:snapshot(video, vw, vh), w:vw, h:vh, k:1, sharp:seat === mySeat };
+}
+// Part of an upright rectangle, as a box in the image. u and v are fractions of the rectangle's upright width and height.
+function partOf(fr, b, u0, v0, u1, v1){
+  const aw = b.rot % 2 ? b.h : b.w, ah = b.rot % 2 ? b.w : b.h;
+  const map = (u, v) => {
+    u *= aw; v *= ah;
+    if (b.rot === 1) return [b.x + b.w - v, b.y + u];
+    if (b.rot === 2) return [b.x + b.w - u, b.y + b.h - v];
+    if (b.rot === 3) return [b.x + v, b.y + b.h - u];
+    return [b.x + u, b.y + v];
+  };
+  const [ax, ay] = map(u0, v0), [bx, by] = map(u1, v1);
+  const x = Math.max(0, Math.min(ax, bx)), y = Math.max(0, Math.min(ay, by));
+  const x2 = Math.min(fr.w, Math.max(ax, bx)), y2 = Math.min(fr.h, Math.max(ay, by));
+  return x2 - x < 8 || y2 - y < 8 ? null : { x, y, w:x2 - x, h:y2 - y, rot:b.rot };
+}
+// Where the art sits in a standard card frame, as fractions of the card
+const ART_IN_CARD = [0.085, 0.113, 0.915, 0.555];
+// A dragged box could hold the whole card (upright or tapped) or just its art: try every reading
+function boxesForRegion(fr, box){
+  const out = [], land = box.w > box.h;
+  for (const r of land ? [0, 2] : [1, 3]) out.push({ ...box, rot:r });                 // the box is the art
+  for (const r of land ? [1, 3] : [0, 2]) { const a = partOf(fr, { ...box, rot:r }, ...ART_IN_CARD); if (a) out.push(a); }  // the box is the whole card
+  return out;
+}
+async function fetchCard(id, name){ return (id && await scry(`/cards/${id}`)) || await scry("/cards/named?exact=" + encodeURIComponent(name)); }
 async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
   if (!video.videoWidth) { setStatus("That camera has not started yet."); return; }
-  if (ocrBusy) return;
-  if (!rect && (ART.entries.length || AI.refs.length)) {
-    ocrBusy = true;
-    try {
-      setStatus("Matching card art...");
-      await sleep(16);  // let the status paint before the search runs
-      const color = artMatch(video, pt, rot, seat);
-      let m = null;
-      try { m = await aiMatch(video, pt, rot, seat, color); } catch (e) { console.warn("AI matcher:", e); }
-      const how = m?.ok ? "AI picture match" : "Matched by picture";
-      if (!m?.ok) m = color;
-      if (m?.ok) {
-        const a = fromVideo(video, m.vbox.x, m.vbox.y, rot), b = fromVideo(video, m.vbox.x + m.vbox.w, m.vbox.y + m.vbox.h, rot);
-        const er = tileEl.getBoundingClientRect();
-        Object.assign(boxEl.style, { left:(Math.min(a.x, b.x) - er.left) + "px", top:(Math.min(a.y, b.y) - er.top) + "px", width:Math.abs(b.x - a.x) + "px", height:Math.abs(b.y - a.y) + "px" });
-        const card = await scry(`/cards/${m.id}`) || await scry("/cards/named?exact=" + encodeURIComponent(m.name));
-        if (card) { showCard(card, { share:true }); setStatus(`${how} (${Math.min(99, Math.round(m.score * 100))}% similar).`); return; }
-      }
-      setStatus("No confident picture match. Reading the name instead...");
-    } catch (e) {
-      if (e?.name === "SecurityError") { ART.blocked = true; artStat(); }
-    } finally { ocrBusy = false; }
+  if (lookBusy) return;
+  if (!AI.refs.length && !ART.entries.length) {
+    setStatus(ART.running ? "Still learning the table's cards. Try again in a moment."
+      : "Picture matching doesn't know any cards yet. Paste your decklist in the lobby, or look a card up by name once.");
+    return;
   }
-  const vw = video.videoWidth, vh = video.videoHeight;
-  let x1, y1, x2, y2;
-  if (rect) {
-    const a = toVideo(video, rect.x1, rect.y1, rot), b = toVideo(video, rect.x2, rect.y2, rot);
-    x1 = Math.min(a.x, b.x); y1 = Math.min(a.y, b.y); x2 = Math.max(a.x, b.x); y2 = Math.max(a.y, b.y);
-  } else {
-    const c = toVideo(video, pt.x, pt.y, rot);
-    const w = vw * 0.26, h = vh * 0.07;
-    x1 = c.x - w / 2; x2 = c.x + w / 2; y1 = c.y - h / 2; y2 = c.y + h / 2;
-    const er = tileEl.getBoundingClientRect(), s = c.scale;
-    Object.assign(boxEl.style, { left:(pt.x - er.left - w * s / 2) + "px", top:(pt.y - er.top - h * s / 2) + "px", width:(w * s) + "px", height:(h * s) + "px" });
-  }
-  x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(vw, x2); y2 = Math.min(vh, y2);
-  const w = x2 - x1, h = y2 - y1;
-  if (w < 8 || h < 6) { setStatus("That box is too small. Drag around the whole card name."); return; }
-
-  const scale = Math.min(4, Math.max(1, 110 / h));
-  const cv = document.createElement("canvas");
-  cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
-  const ctx = cv.getContext("2d", { willReadFrequently:true });
-  if (rot) { ctx.translate(cv.width, cv.height); ctx.rotate(Math.PI); }
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(video, x1, y1, w, h, 0, 0, cv.width, cv.height);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const img = ctx.getImageData(0, 0, cv.width, cv.height), d = img.data;
-  let lo = 255, hi = 0;
-  for (let i = 0; i < d.length; i += 4) { const g = d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114; d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g; }
-  const span = Math.max(1, hi - lo);
-  for (let i = 0; i < d.length; i += 4) { const g = (d[i] - lo) * 255 / span; d[i] = d[i + 1] = d[i + 2] = g; }
-  ctx.putImageData(img, 0, 0);
-
-  ocrBusy = true;
+  lookBusy = true; showAlts(null);
   try {
-    const worker = await getWorker();
-    setStatus("Reading card...");
-    await worker.setParameters({ tessedit_pageseg_mode:rect && h > vh * 0.12 ? "6" : "7" });
-    const { data } = await worker.recognize(cv);
-    const guess = cleanName(data.text);
-    if (!guess) { setStatus("Could not read a name there. Try dragging a box around just the name."); return; }
-    const fromDeck = poolMatch(guess, seat);
-    setStatus(fromDeck ? `Read "${guess}". Matched ${fromDeck} from a decklist.` : `Read "${guess}". Looking it up...`);
-    const card = fromDeck ? (await scry("/cards/named?exact=" + encodeURIComponent(fromDeck)) || await findCard(fromDeck)) : await findCard(guess);
-    if (!card) { setStatus(`No card matched "${guess}". Drag a tighter box, or type the name above.`); return; }
+    setStatus(seat === mySeat ? "Looking closely..." : "Getting a sharp picture from their camera...");
+    const fr = await grabFrame(video, seat);
+    const vid = (x, y) => { const c = toVideo(video, x, y, rot); return { x:c.x * fr.k, y:c.y * fr.k }; };
+    const showBox = b => {
+      const a = fromVideo(video, b.x / fr.k, b.y / fr.k, rot), z = fromVideo(video, (b.x + b.w) / fr.k, (b.y + b.h) / fr.k, rot);
+      const er = tileEl.getBoundingClientRect();
+      Object.assign(boxEl.style, { left:(Math.min(a.x, z.x) - er.left) + "px", top:(Math.min(a.y, z.y) - er.top) + "px", width:Math.abs(z.x - a.x) + "px", height:Math.abs(z.y - a.y) + "px" });
+    };
+    setStatus("Matching card art...");
+    await sleep(16);  // let the status paint before the search runs
+    let color = null, ai = null;
+    if (rect) {
+      const a = vid(rect.x1, rect.y1), z = vid(rect.x2, rect.y2);
+      const x = Math.max(0, Math.min(a.x, z.x)), y = Math.max(0, Math.min(a.y, z.y));
+      const box = { x, y, w:Math.min(fr.w, Math.max(a.x, z.x)) - x, h:Math.min(fr.h, Math.max(a.y, z.y)) - y, rot:0 };
+      if (box.w < 12 || box.h < 12) { setStatus("That box is too small. Drag around the whole card or its art."); return; }
+      try { ai = await aiMatchBoxes(fr, boxesForRegion(fr, box), seat, null); } catch (e) { console.warn("AI matcher:", e); }
+      if (!ai) color = artMatch(fr, { x:box.x + box.w / 2, y:box.y + box.h / 2 }, seat);
+    } else {
+      const P = vid(pt.x, pt.y);
+      if (P.x < 0 || P.y < 0 || P.x > fr.w || P.y > fr.h) { setStatus("Click on the camera picture itself."); return; }
+      color = artMatch(fr, P, seat);
+      try { ai = await aiMatch(fr, P, seat, color); } catch (e) { console.warn("AI matcher:", e); }
+    }
+    // The closest match, always: the AI's when it ran, otherwise the color matcher's
+    const m = ai || (color?.name ? color : null);
+    if (!m) { setStatus("Couldn't find a card there. Click right on the card's art."); return; }
+    showBox(m.vbox);
+    const card = await fetchCard(m.id, m.name);
+    if (!card) { setStatus(`Couldn't load ${m.name}. Check your connection.`); return; }
     showCard(card, { share:true });
-    learnLater(card.name);
-  } catch {
-    setStatus("The text reader failed to load. Check your connection and try again.");
-  } finally { ocrBusy = false; }
+    const pct = Math.max(0, Math.min(99, Math.round(m.score * 100)));
+    setStatus(m.ok ? `${ai ? "AI picture match" : "Picture match"} (${pct}% similar).` : `Closest match (${pct}% similar). Not it? Pick the right card below.`);
+    showAlts({ list:(m.top || []).filter(x => x.name !== m.name).slice(0, 3), q:ai?.q || null, sure:m.ok });
+  } catch (e) {
+    if (e?.name === "SecurityError") { ART.blocked = true; artStat(); setStatus("This browser blocked reading the camera picture."); }
+    else { console.warn(e); setStatus("Something went wrong matching that card. Try again."); }
+  } finally { lookBusy = false; }
 }
-// Cards identified by name get learned by picture too, so the next click on them is instant
+// Runners-up under the status line. Picking one shows it and teaches the matcher this camera's view of that card.
+function showAlts(info){
+  const box = $("#alts"); box.innerHTML = "";
+  box.classList.toggle("hidden", !info?.list?.length);
+  if (!info?.list?.length) return;
+  const lab = document.createElement("span"); lab.textContent = info.sure ? "Wrong card? Maybe:" : "Other close matches:"; box.appendChild(lab);
+  info.list.forEach(x => {
+    const b = document.createElement("button"); b.type = "button"; b.title = `${x.name} (${Math.round(x.score * 100)}% similar)`;
+    const im = document.createElement("img"); im.alt = ""; im.src = artThumb(x.id); if (im.src) b.appendChild(im);
+    b.append(x.name);
+    b.onclick = async () => {
+      setStatus("Looking it up...");
+      const card = await fetchCard(x.id, x.name);
+      if (!card) { setStatus(`Couldn't load ${x.name}.`); return; }
+      showCard(card, { share:true }); showAlts(null);
+      if (info.q) { teach(card.name, card.id, info.q); setStatus(`Got it. Picture matching will recognize ${card.name} better on this camera now.`); }
+      else setStatus("");
+    };
+    box.appendChild(b);
+  });
+}
+const artThumbs = new Map();  // printing id -> art_crop url, filled as cards are learned
+function artThumb(id){ return artThumbs.get(id) || ""; }
+// Save what a card looked like on a real camera as an extra picture of it (a few per card, newest kept)
+async function teach(name, id, q){
+  AI.refs.push({ id, name, v:q, cam:true });
+  const key = AI_KEY + "cam:" + norm(name), list = (await idb.get(key)) || [];
+  list.unshift({ id, v:q }); idb.set(key, list.slice(0, 6));
+}
+// Every card anyone looks up gets learned by picture too, so the next click on it matches
 function learnLater(name){
   if (!name || ART.names.has(name) || BASICS.has(norm(name))) return;
   ART.names.set(name, { state:"todo", count:0 }); artSync();
-}
-function cleanName(text){
-  const lines = text.split("\n")
-    .map(l => l.replace(/[^A-Za-z ,'\-]/g, " ").replace(/\s+/g, " ").trim())
-    .map(l => { const t = l.split(" "); while (t.length && t[t.length - 1].length < 3) t.pop(); while (t.length && t[0].length < 2) t.shift(); return t.join(" "); })
-    .filter(l => l.length >= 3);
-  lines.sort((a, b) => b.length - a.length);
-  return lines[0] || "";
 }
 
 /* Decklist pool: every card any player at the table pasted in */
@@ -2253,19 +2375,6 @@ function similarity(a, b){
   let hit = 0; A.forEach(x => { const c = m.get(x); if (c) { hit++; m.set(x, c - 1); } });
   return 2 * hit / (A.length + B.length);
 }
-// OCR text is often slightly wrong or cut off, so compare it to the decklists before searching all of Magic
-function poolMatch(guess, seat){
-  const g = norm(guess); if (g.length < 3) return null;
-  let best = null, bs = 0;
-  for (const [k, v] of deckPool()) {
-    let sc = similarity(g, k);
-    if (k.length > g.length + 2) sc = Math.max(sc, similarity(g, k.slice(0, g.length + 1)) * 0.95);
-    if (v.seats.has(seat)) sc += 0.05;
-    if (sc > bs) { bs = sc; best = v.name; }
-  }
-  return bs >= 0.55 ? best : null;
-}
-
 async function scry(path){
   try { const r = await fetch("https://api.scryfall.com" + path, { headers:{ Accept:"application/json" } }); return r.ok ? r.json() : null; }
   catch { return null; }
@@ -2282,8 +2391,10 @@ async function findCard(q){
   }
   return null;
 }
-function showCard(card, { share = false, from = null } = {}){
+function showCard(card, { share = false, from = null, fromHistory = false } = {}){
   const view = $("#cardView"); view.innerHTML = "";
+  cardCache.set(card.id, card); remember(card, fromHistory); learnLater(card.name);
+  if (!from) focusCardView();  // you asked for it, so bring the card into view; cards others show don't move your panel
   if (from) { const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
   const faces = card.card_faces && !card.image_uris ? card.card_faces : [card];
   faces.forEach(f => {
@@ -2308,6 +2419,52 @@ function showCard(card, { share = false, from = null } = {}){
   setStatus("");
   if (share) { broadcast({ type:"card", name:card.name }); log("You looked at ", card.name); }
 }
+// Scroll the side panel (or the page, on narrow screens) up to the Card section and flash it
+function focusCardView(){
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $("#cardSec").scrollIntoView({ behavior:reduce ? "auto" : "smooth", block:"start" });
+  const v = $("#cardView"); v.classList.remove("flash"); void v.offsetWidth; v.classList.add("flash");
+}
+
+/* Recent cards: every card you looked up, newest first, saved in this browser */
+const HIST_MAX = 60;
+const cardCache = new Map();
+let cardHist = [], histOn = "";
+try { cardHist = JSON.parse(store.get("kt-history", "[]")).filter(x => x && typeof x.id === "string" && typeof x.name === "string").slice(0, HIST_MAX); } catch { cardHist = []; }
+function remember(card, keepOrder){
+  histOn = card.id;
+  if (!keepOrder || !cardHist.some(x => x.id === card.id)) {
+    const iu = card.image_uris || card.card_faces?.[0]?.image_uris;
+    const thumb = /^https:\/\/cards\.scryfall\.io\//.test(iu?.art_crop || "") ? iu.art_crop : "";
+    cardHist = [{ id:card.id, name:card.name, thumb }, ...cardHist.filter(x => x.id !== card.id && x.name !== card.name)].slice(0, HIST_MAX);
+    store.set("kt-history", JSON.stringify(cardHist));
+  }
+  renderHistory();
+}
+function renderHistory(){
+  const box = $("#histBox"), list = $("#histList");
+  box.classList.toggle("hidden", !cardHist.length);
+  $("#histCount").textContent = cardHist.length;
+  list.innerHTML = "";
+  cardHist.forEach(x => {
+    const b = document.createElement("button"); b.type = "button"; b.title = x.name;
+    if (x.id === histOn) { b.classList.add("on"); b.setAttribute("aria-current", "true"); }
+    if (x.thumb) { const im = document.createElement("img"); im.src = x.thumb; im.alt = ""; im.loading = "lazy"; b.appendChild(im); }
+    const t = document.createElement("span"); t.textContent = x.name; b.appendChild(t);
+    b.onclick = async () => {
+      let c = cardCache.get(x.id);
+      if (!c) { setStatus("Looking it up..."); c = await scry(`/cards/${x.id}`) || await scry("/cards/named?exact=" + encodeURIComponent(x.name)); }
+      if (c) showCard(c, { fromHistory:true }); else setStatus(`Couldn't load ${x.name}.`);
+    };
+    list.appendChild(b);
+  });
+}
+$("#histClear").onclick = e => {
+  e.preventDefault();  // it sits in the summary; don't fold the list
+  if (!confirm("Clear your list of recent cards?")) return;
+  cardHist = []; histOn = ""; store.set("kt-history", "[]"); renderHistory();
+};
+renderHistory();
 let acTimer = null, acItems = [], acOn = -1, acSeq = 0;
 function hideAc(){ $("#acBox").classList.add("hidden"); $("#searchIn").setAttribute("aria-expanded", "false"); acItems = []; acOn = -1; }
 function drawAc(){
@@ -2497,7 +2654,7 @@ const KW = new Map(); let kwMax = 1;
 KEYWORDS.forEach(([name, def, flag]) => kwForms(norm(name), flag).forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } }));
 ["equipped", "equipping"].forEach(f => KW.set(f, KW.get("equip")));
 function showKeyword(k){
-  const view = $("#cardView"); view.innerHTML = "";
+  const view = $("#cardView"); view.innerHTML = ""; focusCardView();
   const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
   const d = document.createElement("p"); d.className = "oracle"; d.textContent = k.def; view.appendChild(d);
   const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
@@ -2505,7 +2662,8 @@ function showKeyword(k){
 }
 
 /* Sound-alike matching against the table's decklists, for names speech recognition gets wrong (like "smog" for Smaug) */
-const STOP = new Set(["the", "of", "a", "an", "with", "and", "to", "in", "on", "for", "from", "my", "his", "her", "their", "your", "that"]);
+const STOP = new Set(["the", "of", "a", "an", "with", "and", "to", "in", "on", "for", "from", "my", "his", "her", "their", "your", "that",
+  "se", "wis", "seir", "sat"]);  // the last four: "the", "with", "their", "that" after lisp-friendly matching
 function phon(w){
   w = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (!w) return "";
   w = w.replace(/^(kn|gn|pn|wr)/, m => m[1]).replace(/ph/g, "f").replace(/ck/g, "k").replace(/q/g, "k").replace(/x/g, "ks").replace(/z/g, "s")
@@ -2514,11 +2672,29 @@ function phon(w){
   return (first + w.slice(1).replace(/[aeiouyhw]/g, "")).replace(/(.)\1+/g, "$1");
 }
 // Looser version for player names: treats sound pairs like g/k and b/p as the same
-function phonLoose(w){ return phon(w).replace(/g/g, "k").replace(/b/g, "p").replace(/d/g, "t").replace(/v/g, "f").replace(/j/g, "k").replace(/(.)\1+/g, "$1"); }
+function phonLoose(w){ return phon(w).replace(/[0x]/g, "s").replace(/g/g, "k").replace(/b/g, "p").replace(/d/g, "t").replace(/v/g, "f").replace(/j/g, "k").replace(/(.)\1+/g, "$1"); }
 function codeOf(words){ return words.filter(w => !STOP.has(w)).map(phon).filter(Boolean).join(" "); }
 let poolCache = { sig:null, list:[] };
-function poolList(){
+/* Lisp-friendly matching: "th", "sh" and "z" all count as "s", on both the words heard and the card names,
+   so "Thol Ring" still links Sol Ring. Used for players marked as having a lisp. */
+const lispNorm = k => String(k).replace(/th|sh|z/g, "s").replace(/(.)\1+/g, "$1");
+const lispLocal = {};  // players you marked on your screen, by name
+function lispFor(s){ return s === mySeat ? !!me?.lisp : !!(players[s]?.lisp || lispLocal[norm(nm(s))] || store.get("kt-lisp:" + norm(nm(s)), "") === "1"); }
+function lispPool(){ const m = new Map(); for (const [k, v] of deckPool()) { const l = lispNorm(k); if (!m.has(l)) m.set(l, v); } return m; }
+let lispIndex = null, lispKW = null;
+function lispMaps(){
+  if (!lispKW) { lispKW = new Map(); for (const [k, v] of KW) { const l = lispNorm(k); if (!lispKW.has(l)) lispKW.set(l, v); } }
+  if (!lispIndex && cardIndex) { lispIndex = new Map(); for (const [k, v] of cardIndex) { const l = lispNorm(k); if (!lispIndex.has(l)) lispIndex.set(l, v); } }
+  return { idx:lispIndex, kw:lispKW };
+}
+let lispPoolCache = { sig:null, list:[] };
+function poolList(lisp){
   const pool = deckPool(), sig = [...pool.keys()].join("|");
+  if (lisp) {
+    if (lispPoolCache.sig === sig) return lispPoolCache.list;
+    const list = poolList(false).map(e => { const k = lispNorm(e.k), w = k.split(" "); return { ...e, k, code:codeOf(w), first:w[0], last:w[w.length - 1] }; });
+    lispPoolCache = { sig, list }; return list;
+  }
   if (poolCache.sig === sig) return poolCache.list;
   const list = [], mk = (k, name) => { const w = k.split(" "); list.push({ k, name, n:w.length, code:codeOf(w), first:w[0], last:w[w.length - 1] }); };
   for (const [k, v] of pool) {
@@ -2528,9 +2704,9 @@ function poolList(){
   poolCache = { sig, list };
   return list;
 }
-function fuzzyPool(keys, i){
+function fuzzyPool(keys, i, lisp){
   let best = null;
-  for (const e of poolList()) {
+  for (const e of poolList(lisp)) {
     if (!e.code) continue;
     for (let n = Math.max(1, e.n - 1); n <= e.n + 3 && i + n <= keys.length; n++) {
       const win = keys.slice(i, i + n).join(" ").split(" ").filter(Boolean);
@@ -2547,9 +2723,10 @@ function fuzzyPool(keys, i){
 }
 
 // Split a sentence into plain words, card names, and keywords
-function linkify(text){
-  const words = text.split(/\s+/).filter(Boolean), keys = words.map(norm), out = [];
-  const oneWord = $("#oneWord").checked, pool = deckPool();
+function linkify(text, lisp){
+  const words = text.split(/\s+/).filter(Boolean), raw = words.map(norm), keys = lisp ? raw.map(lispNorm) : raw, out = [];
+  const oneWord = $("#oneWord").checked, pool = lisp ? lispPool() : deckPool();
+  const L = lisp ? lispMaps() : null, index = lisp ? L.idx : cardIndex, kw = lisp ? L.kw : KW;
   let mw = maxWords; for (const k of pool.keys()) mw = Math.max(mw, Math.min(10, k.split(" ").length));
   const span = (i, n) => words.slice(i, i + n).join(" ");
   const key = (i, n) => keys.slice(i, i + n).filter(Boolean).join(" ");
@@ -2560,13 +2737,13 @@ function linkify(text){
     // 1. exact match to a card in someone's decklist
     for (let n = Math.min(mw, words.length - i); n >= 1 && !seg; n--) { const hit = pool.get(key(i, n)); if (hit) seg = { card:hit.name, t:span(i, n), n }; }
     // 2. sound-alike match to a decklist card
-    if (!seg) { const f = fuzzyPool(keys, i); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
+    if (!seg) { const f = fuzzyPool(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
     // 3. exact multi-word card name from all of Magic
-    for (let n = Math.min(maxWords, words.length - i); n >= 2 && !seg && cardIndex; n--) { const name = cardIndex.get(key(i, n)); if (name) seg = { card:name, t:span(i, n), n }; }
+    for (let n = Math.min(maxWords, words.length - i); n >= 2 && !seg && index; n--) { const name = index.get(key(i, n)); if (name) seg = { card:name, t:span(i, n), n }; }
     // 4. keyword
-    for (let n = Math.min(kwMax, words.length - i); n >= 1 && !seg; n--) { const k = KW.get(key(i, n)); if (k) seg = { kw:k, t:span(i, n), n }; }
+    for (let n = Math.min(kwMax, words.length - i); n >= 1 && !seg; n--) { const k = kw.get(key(i, n)); if (k) seg = { kw:k, t:span(i, n), n }; }
     // 5. one-word card name from all of Magic
-    if (!seg && oneWord && cardIndex) { const k1 = keys[i], name = cardIndex.get(k1); if (name && k1.length >= 5 && !NOT_ALONE.has(k1)) seg = { card:name, t:words[i], n:1 }; }
+    if (!seg && oneWord && index) { const k1 = keys[i], name = index.get(k1); if (name && k1.length >= 5 && !NOT_ALONE.has(k1) && !NOT_ALONE.has(raw[i])) seg = { card:name, t:words[i], n:1 }; }
     if (seg) { out.push(seg); i += seg.n; } else { out.push({ t:words[i] }); i++; }
   }
   return out;
@@ -2580,7 +2757,7 @@ async function addCaption(seat, text){
   who.style.color = SEAT_HEX[seat - 1] || "inherit";
   who.textContent = (seat === mySeat ? "You" : nm(seat)) + ":";
   li.appendChild(who);
-  linkify(text).forEach((seg, idx) => {
+  linkify(text, lispFor(seat)).forEach((seg, idx) => {
     if (idx) li.append(" ");
     if (seg.kw) {
       const b = document.createElement("button"); b.className = "kwlink"; b.textContent = seg.t; b.title = `${seg.kw.name}: ${seg.kw.def}`;
@@ -2697,7 +2874,44 @@ $("#engineSel").onchange = async e => {
   } else setCapHint(engine === "device" ? "Captions are running on this computer. Only the caption text goes to your table." : "");
   capOn = true; startRec(); updateCapBtn();
 };
-function updateCapBtn(){ const b = $("#capBtn"); b.textContent = capOn ? "Captions on" : "Captions off"; b.classList.toggle("off", !capOn); b.disabled = !SR; }
+function updateCapBtn(){
+  const b = $("#capBtn"); b.textContent = capOn ? "Captions on" : "Captions off"; b.classList.toggle("off", !capOn); b.disabled = !SR;
+  if (me) pushState();  // the table sees whether your captions are running
+}
+// What the table sees about your captions: running, switched off, mic muted, or not possible in this browser
+function capState(){ return !SR ? "none" : !micLive() ? "muted" : capOn ? "on" : "off"; }
+/* Each player's own browser turns their speech into text and sends it to the table, so someone's words only
+   show up here if captions are running on their computer. This shows who is and isn't sending. */
+const capAsked = {};
+function renderCapPeers(){
+  const box = $("#capPeers"), seats = presentSeats().filter(s => s !== mySeat && players[s]?.name);
+  const sig = JSON.stringify(seats.map(s => [s, nm(s), players[s].cap, !!capAsked[s], lispFor(s)]));
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig; box.innerHTML = "";
+  seats.forEach(s => {
+    const st = players[s].cap, row = document.createElement("div"), t = document.createElement("span");
+    t.textContent = {
+      on:`${nm(s)}: captions on.`,
+      off:`${nm(s)}: captions are off on their screen, so their words won't show here.`,
+      muted:`${nm(s)}: their microphone is muted.`,
+      none:`${nm(s)}: their browser can't do captions. They need Chrome or Edge.`
+    }[st] || `${nm(s)}: captions unknown (they may be on an older version of the page, ask them to reload).`;
+    if (st === "on") t.className = "ok";
+    row.appendChild(t);
+    const ll = document.createElement("label"); ll.className = "small";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = lispFor(s); cb.disabled = !!players[s].lisp;
+    cb.onchange = () => { const k = norm(nm(s)); lispLocal[k] = cb.checked; store.set("kt-lisp:" + k, cb.checked ? "1" : "0"); box.dataset.sig = ""; renderCapPeers(); };
+    ll.append(cb, players[s].lisp ? " Has a lisp (they set this)" : " Has a lisp"); ll.title = "Card names in their captions get matched with a lisp in mind";
+    row.appendChild(ll);
+    if (st === "off") {
+      const b = document.createElement("button"); b.className = "linkbtn small";
+      b.textContent = capAsked[s] ? "Asked" : "Ask them to turn on captions"; b.disabled = !!capAsked[s];
+      b.onclick = () => { send(conns[s]?.conn || {}, { type:"capask" }); capAsked[s] = true; setTimeout(() => { delete capAsked[s]; renderCapPeers(); }, 20000); renderCapPeers(); };
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  });
+}
 function setCapHint(t){ $("#capHint").textContent = t; }
 $("#capBtn").onclick = () => {
   capOn = !capOn; quickEnds = 0;
@@ -2706,6 +2920,7 @@ $("#capBtn").onclick = () => {
   updateCapBtn();
 };
 $("#voiceIn").onchange = e => store.set("kt-voice", e.target.checked ? "1" : "0");
+$("#lispIn").onchange = e => { store.set("kt-lisp-me", e.target.checked ? "1" : "0"); if (me) { me.lisp = e.target.checked; pushState(); } };
 $("#oneWord").onchange = e => store.set("kt-oneword", e.target.checked ? "1" : "0");
 
 /* Voice commands: only your own speech, only finished sentences, always undoable */
@@ -2732,8 +2947,14 @@ function matchSource(rest){
   }
   return null;
 }
+// For a lisp: swap heard words back to the command words they sound like ("thix" to "six", "path" to "pass")
+const VOICE_WORDS = ["six", "sixteen", "sixty", "seven", "seventeen", "seventy", "pass", "passing", "yes", "poison", "first", "coin", "since",
+  "set", "sacrifice", "colorless", "spend", "spending", "use", "using", "cast", "damage", "less", "lose", "loss", "lost", "is", "this", "its", "it's", "so"];
+const VOICE_LISP = new Map(VOICE_WORDS.map(w => [lispNorm(w.replace(/'/g, "")), w]));
+function delisp(text){ return text.split(/\s+/).map(w => { const k = w.toLowerCase().replace(/[^a-z']/g, ""); return VOICE_WORDS.includes(k) ? w : (VOICE_LISP.get(lispNorm(k.replace(/'/g, ""))) || w); }).join(" "); }
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
+  if (me.lisp) raw = delisp(raw);
   const t = raw.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim()
     .replace(/\b(maga|manna|mona|mono)\b/g, "mana").replace(/\b(read|reed)(?= mana\b)/g, "red").replace(/\bblew(?= mana\b)/g, "blue");
   let m;
@@ -2800,10 +3021,10 @@ function runVoice(raw){
    Helpers
    ===================================================================== */
 let toastTimer = null;
-function toast(text, undo){
+function toast(text, undo, label = "Undo"){
   const t = $("#toast"); t.innerHTML = "";
   const s = document.createElement("span"); s.textContent = text; t.appendChild(s);
-  if (undo) { const b = document.createElement("button"); b.className = "btn"; b.style.padding = "4px 10px"; b.textContent = "Undo"; b.onclick = () => { undo(); t.classList.add("hidden"); }; t.appendChild(b); }
+  if (undo) { const b = document.createElement("button"); b.className = "btn"; b.style.padding = "4px 10px"; b.textContent = label; b.onclick = () => { undo(); t.classList.add("hidden"); }; t.appendChild(b); }
   t.classList.remove("hidden");
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hidden"), 7000);
 }
