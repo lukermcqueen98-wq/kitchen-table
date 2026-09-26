@@ -2806,6 +2806,11 @@ async function aiMatch(fr, c, seat, color, { finder = true } = {}){
   if (c.x < 0 || c.y < 0 || c.x > vw || c.y > vh) return null;
   // The card's own outline, when the card finder can see it; the guesses below stay as a fallback
   const readings = finder ? await quadReadings(fr, await findQuads(fr, c).catch(() => [])) : [];
+  // A clear match on the card's own outline is the answer: skip the guesses (much quicker without a graphics card)
+  if (readings.length) {
+    const r = await aiMatchBoxes(fr, readings, seat, color);
+    if (r && r.score >= 0.78 && r.margin >= 0.05) return r;
+  }
   const boxes = [...readings, ...(color?.cands || [])];
   // Plus card sizes from small (far camera) to large (close camera) centered on the click, in every orientation (tapped cards are sideways)
   for (const f of [0.08, 0.12, 0.17, 0.24, 0.32]) for (let r = 0; r < 4; r++) {
@@ -2818,8 +2823,11 @@ async function aiMatch(fr, c, seat, color, { finder = true } = {}){
 async function aiMatchBoxes(fr, boxes, seat, color){
   if ((!AI.refs.length && !IDX.n) || AI.failed || !boxes.length) return null;
   const inFrame = b => b.x >= 0 && b.y >= 0 && b.x + b.w <= fr.w && b.y + b.h <= fr.h;
-  let qs = await aiEmbed(boxes.map(b => b.canvas || cropArt(fr.src, b)));
-  if (!qs) return null;
+  // Each box's fingerprint is kept on it, so a box looked at before (the found outlines) isn't worked out again
+  const todo = boxes.filter(b => !b.q), fresh = todo.length ? await aiEmbed(todo.map(b => b.canvas || cropArt(fr.src, b))) : [];
+  if (!fresh) return null;
+  todo.forEach((b, i) => { b.q = fresh[i]; });
+  let qs = boxes.map(b => b.q);
   aiRank.found = new Set();
   let ranked = aiRank(qs, boxes, seat);
   const found = aiRank.found; aiRank.found = null;
@@ -2830,7 +2838,7 @@ async function aiMatchBoxes(fr, boxes, seat, color){
   if (b0?.art) {
     const a = b0.art, grow = (du, dv, k) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([su, sv]) => quadAt(a, 0.5 + du + su * k / 2, 0.5 + dv + sv * k / 2));
     more = [[-.05, 0, 1], [.05, 0, 1], [0, -.06, 1], [0, .06, 1], [0, 0, .9], [0, 0, 1.08], [0, -.03, .94], [0, .03, .94]]
-      .map(([du, dv, k]) => { const art = grow(du, dv, k); return { ...b0, art }; });
+      .map(([du, dv, k]) => { const art = grow(du, dv, k); return { ...b0, art, q:null, canvas:null }; });
     warpQuads(fr, more.map(m => m.art)).forEach((cvs, i) => { more[i].canvas = cvs; });
   }
   else if (b0) {
