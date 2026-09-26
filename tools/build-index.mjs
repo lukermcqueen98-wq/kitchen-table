@@ -32,20 +32,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function getJSON(url){
   for (let i = 0; ; i++) {
-    try {
-      const r = await fetch(url, { headers:{ "User-Agent":UA, Accept:"application/json" } });
-      if (r.ok) return await r.json();
-      if (r.status < 500 && r.status !== 429) throw new Error(`HTTP ${r.status} for ${url}`);
-    } catch (e) { if (i >= 4) throw e; }
+    let r;
+    try { r = await fetch(url, { headers:{ "User-Agent":UA, Accept:"application/json" } }); }
+    catch (e) { if (i >= 4) throw e; await sleep(2000 * 2 ** i); continue; }  // network hiccup: retry
+    if (r.ok) return await r.json();
+    if ((r.status < 500 && r.status !== 429) || i >= 4) throw new Error(`HTTP ${r.status} for ${url}`);  // retry only busy or server errors
     await sleep(2000 * 2 ** i);
   }
+}
+
+// Scryfall's catalog of bulk downloads; the "unique_artwork" one has one entry per illustration
+async function artworkListUrl(){
+  const bulk = await getJSON("https://api.scryfall.com/bulk-data");
+  const entry = (bulk?.data || []).find(b => b.type === "unique_artwork");
+  if (!entry?.download_uri) throw new Error(`Scryfall's bulk data list has no unique_artwork download (types: ${(bulk?.data || []).map(b => b.type).join(", ") || "none"})`);
+  console.log(`Downloading Scryfall's artwork list (${entry.size ? Math.round(entry.size / 1e6) + " MB, " : ""}updated ${entry.updated_at || "unknown"}).`);
+  return entry.download_uri;
 }
 
 // Every unique artwork printed on paper. Double-faced cards get one entry per face.
 async function artworks(){
   const list = process.env.SCRYFALL_BULK_FILE
     ? JSON.parse(fs.readFileSync(process.env.SCRYFALL_BULK_FILE, "utf8"))
-    : await getJSON((await getJSON("https://api.scryfall.com/bulk-data/unique-artwork")).download_uri);
+    : await getJSON(await artworkListUrl());
   const out = new Map();
   for (const c of list) {
     if (c.digital || c.layout === "art_series" || !(c.games || []).includes("paper")) continue;
