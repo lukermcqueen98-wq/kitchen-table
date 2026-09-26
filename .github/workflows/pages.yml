@@ -3,6 +3,9 @@
 # processes new cards. The first build takes a few hours; if it hits the time limit it deploys what it has
 # and the next run continues. It also runs weekly to pick up new sets.
 #
+# The app itself is published first (the "app" job, about a minute) with whatever index already exists, so app
+# changes go live right away; then the index is updated and the site is published again.
+#
 # One-time setup: repo Settings > Pages > Build and deployment > Source: GitHub Actions.
 name: Deploy site and card index
 
@@ -23,7 +26,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  app:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.app-deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the card index from the last run
+        uses: actions/cache/restore@v4
+        with:
+          path: site/index
+          key: card-index-${{ github.run_id }}
+          restore-keys: card-index-
+
+      - name: Keep the published card index
+        if: hashFiles('site/index/cards.json') == ''
+        run: |
+          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          mkdir -p site/index
+          curl -fsSL "$site/index/cards.json" -o site/index/cards.json && curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin \
+            || rm -f site/index/cards.json site/index/cards.bin
+
+      - name: Assemble the site
+        run: cp index.html README.md site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          name: app
+          path: site
+
+      - id: app-deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: app
+
   build:
+    needs: app
     runs-on: ubuntu-latest
     timeout-minutes: 340
     steps:
