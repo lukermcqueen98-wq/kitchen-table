@@ -198,6 +198,8 @@ console.log(`${all.size} artworks on Scryfall, ${all.size - todo.length} already
 if (todo.length) {
   const fetchChunk = i => mapPool(todo.slice(i, i + BATCH), CONC, e => loadArt(e.art));
   let added = 0, failed = 0, lastSave = Date.now(), nextImgs = fetchChunk(0);
+  // A cancelled run gets a few seconds' notice: save what's done so the next run carries on from here
+  for (const sig of ["SIGINT", "SIGTERM"]) process.once(sig, () => { console.log(`Stopped (${sig}). Saving progress.`); if (dims) save(entries, dims); process.exit(1); });
   for (let i = 0; i < todo.length; i += BATCH) {
     const imgs = await nextImgs;
     if (i + BATCH < todo.length) nextImgs = fetchChunk(i + BATCH);  // download the next batch while this one runs

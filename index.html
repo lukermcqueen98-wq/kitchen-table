@@ -512,7 +512,7 @@ function runPhoneCam(){
    ===================================================================== */
 let localStream = null, peer = null, mySeat = 0, roomCode = "", me = null;
 const calls = {}, conns = {}, camCalls = {}, players = {};
-const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off", mode:"cmdr", turns:{} };  // turns: seat -> turns taken this game
+const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off", mode:"cmdr", turns:{}, gameId:"" };  // gameId: new for every game  // turns: seat -> turns taken this game
 let turnStartAt = null, gameStartAt = null, tableKnown = false, joinedAt = 0;
 let damageLog = [], pending = null, camHidden = false;
 const shown = new Set();
@@ -630,6 +630,7 @@ $("#joinBtn").onclick = async () => {
   if (!LOCAL) { try { history.replaceState(null, "", `?room=${roomCode}`); } catch {} }
   // Your pick applies if you started the table; joiners switch to the host's mode when it arrives
   table.mode = MODES[$("#modeSel").value] ? $("#modeSel").value : "cmdr";
+  table.gameId = uid();  // replaced by the table's own game when someone is already there
   const startLife = modeOf(table.mode).life;
   joinedAt = Date.now();
   me = { name, startLife, life:startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, rot:$("#rotIn").checked,
@@ -643,12 +644,17 @@ $("#joinBtn").onclick = async () => {
    Networking
    ===================================================================== */
 function seatOf(id){ const m = /-(\d)(-cam)?$/.exec(id); return m ? +m[1] : 0; }
+/* Each page load is its own session. A connection from a different session than the one we know for a seat means
+   that player came back (refresh, new device) while we still held their old, dead connection: replace it rather than
+   letting the tie-break below (for two players dialing each other at once) turn the new one away. */
+const SID = uid();
+const newSession = (s, meta) => !!(players[s]?.sid && meta?.sid && players[s].sid !== meta.sid);
 function wirePeer(){
   peer.on("call", call => {
     if (call.peer.endsWith("-cam")) { handleCamCall(call); return; }
     const s = seatOf(call.peer); if (!s) { call.close(); return; }
     const ex = calls[s];
-    if (ex && ex.outgoing && mySeat < s) { call.close(); return; }
+    if (ex && ex.outgoing && mySeat < s && !newSession(s, call.metadata)) { call.close(); return; }
     if (ex) ex.call.close();
     call.answer(localStream);
     setupCall(s, call, false);
@@ -656,7 +662,7 @@ function wirePeer(){
   peer.on("connection", conn => {
     const s = seatOf(conn.peer); if (!s || conn.peer.endsWith("-cam")) { conn.close(); return; }
     const ex = conns[s];
-    if (ex && ex.outgoing && mySeat < s) { conn.close(); return; }
+    if (ex && ex.outgoing && mySeat < s && !newSession(s, conn.metadata)) { conn.close(); return; }
     if (ex) ex.conn.close();
     setupConn(s, conn, false);
   });
@@ -673,8 +679,8 @@ function wirePeer(){
   for (let s = 1; s <= MAX; s++) {
     if (s === mySeat) continue;
     const id = `${PREFIX}-${roomCode}-${s}`;
-    setupConn(s, peer.connect(id, { reliable:true }), true);
-    setupCall(s, peer.call(id, localStream), true);
+    setupConn(s, peer.connect(id, { reliable:true, metadata:{ sid:SID } }), true);
+    setupCall(s, peer.call(id, localStream, { metadata:{ sid:SID } }), true);
   }
 }
 function setupCall(s, call, outgoing){
@@ -692,7 +698,8 @@ function setupCall(s, call, outgoing){
 function setupConn(s, conn, outgoing){
   conns[s] = { conn, outgoing };
   watchLink(s, () => conn.peerConnection);
-  conn.on("open", () => send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog }));
+  conn.on("open", () => send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog,
+                                     fresh:!restored && Date.now() - joinedAt < 30000, sid:SID }));
   conn.on("data", msg => { try { onMessage(s, msg); } catch (e) { console.warn(e); } });
   const drop = () => { if (conns[s]?.conn === conn) { delete conns[s]; removeIfGone(s); } };
   conn.on("close", drop); conn.on("error", drop);
@@ -743,12 +750,14 @@ function updateNetWarn(){
 function blankPlayer(){ return { name:"", life:0, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, deck:[], manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } }; }
 function removeIfGone(s){
   if (!calls[s] && !conns[s] && players[s]) {
-    log(`${players[s].name || "A player"} left the table.`);
+    const p = players[s];
+    // Remember them, so their life and counters come back if they rejoin this game (from any device)
+    if (p.name) departed[norm(p.name)] = { gameId:table.gameId, at:Date.now(), state:{ life:p.life, startLife:p.startLife, poison:p.poison, exp:p.exp,
+      energy:p.energy, blessing:p.blessing, emblems:p.emblems, custom:p.custom, cmd:p.cmd, cmdrs:p.cmdrs, manaOn:p.manaOn, mana:p.mana } };
+    const theirTurn = table.turnSeat === s;
+    log(`${p.name || "A player"} left the table.${theirTurn ? " It's still their turn; pass the turn if they don't come back." : ""} If they rejoin, their life and counters come back.`);
     try { camCalls[s]?.close(); } catch {}
     delete players[s];
-    if (table.turnSeat === s) table.turnSeat = nextSeat(s);
-    if (table.monarch === s) table.monarch = 0;
-    if (table.initiative === s) table.initiative = 0;
     render();
   }
 }
@@ -786,6 +795,7 @@ function pushState(){
   if (lastLife !== null && me.life !== lastLife) noteLife(mySeat, lastLife, me.life);
   lastLife = me.life;
   broadcast({ type:"state", state:publicState() });
+  saveLocal();
 }
 /* Life changes go in the table log. Clicks are grouped: after 2 quiet seconds, one line with the net change. */
 const lifeTrack = {};  // seat -> { from, timer }
@@ -812,9 +822,64 @@ function tableSnap(){
   const now = Date.now();
   return { ...table, turnElapsed:turnStartAt ? now - turnStartAt : null, gameElapsed:gameStartAt ? now - gameStartAt : null };
 }
-function pushTable(){ broadcast({ type:"table", table:tableSnap() }); render(); }
+function pushTable(){ broadcast({ type:"table", table:tableSnap() }); render(); saveLocal(); }
 const int = (v, lo, hi) => { v = Math.round(Number(v)); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : 0; };
 
+/* Rejoining a game: your life, counters, and the turn come back.
+   This browser saves your part of the game for each table code, and the other players remember you when you drop,
+   so it works after a refresh, after leaving, or from another device. Each game has its own id, so a new game
+   never brings back old numbers. */
+const departed = {};  // name -> what the table last saw of a player who left
+let restored = false, tableFromPeer = false, saveTimer = null, heldState = null;
+let saveReady = false;  // off until we've checked for a game to resume, so a fresh seat can't overwrite the save first
+const saveKey = () => "kt-save:" + roomCode;
+function saveLocal(now){
+  if (!me || !roomCode || !table.gameId || !saveReady) return;
+  clearTimeout(saveTimer);
+  const names = {}; for (const s of Object.keys(players)) names[s] = nm(+s);
+  const write = () => store.set(saveKey(), JSON.stringify({ at:Date.now(), gameId:table.gameId, me:publicState(), table:tableSnap(), dmg:damageLog.slice(-300), names }));
+  if (now) write(); else saveTimer = setTimeout(write, 400);
+}
+function tryRestoreLocal(adoptTable){
+  if (restored) return;
+  let sv = null;
+  try { sv = JSON.parse(store.get(saveKey(), "null")); } catch {}
+  if (!sv || typeof sv !== "object" || !(Date.now() - sv.at < 12 * 36e5) || typeof sv.gameId !== "string") return;
+  if (adoptTable) {
+    // First one back: the table's turn, clocks, and damage history come from this browser
+    table.gameId = sv.gameId.slice(0, 40);
+    if (sv.names && typeof sv.names === "object") for (const [k, v] of Object.entries(sv.names)) { const seat = int(k, 1, MAX); if (seat && seat !== mySeat) lastNames[seat] = String(v).slice(0, 24); }
+    if (sv.table) applyTable(sv.table);
+    for (const raw of Array.isArray(sv.dmg) ? sv.dmg.slice(-300) : []) { const e = cleanEntry(raw); if (e && !damageLog.some(x => x.id === e.id)) damageLog.push(e); }
+    renderDmg(); pushTable();
+  }
+  if (sv.gameId === table.gameId) restoreMe(sv.me, "this browser");
+}
+function restoreMe(st, from){
+  if (restored || !st || typeof st !== "object" || Date.now() - joinedAt > 30000) return;
+  restored = true; saveReady = true;
+  quietLife();
+  me.startLife = int(st.startLife, 1, 999) || me.startLife;
+  me.life = int(st.life, -999, 999); me.poison = int(st.poison, 0, 99); me.exp = int(st.exp, 0, 999); me.energy = int(st.energy, 0, 999);
+  me.blessing = !!st.blessing;
+  me.emblems = Array.isArray(st.emblems) ? st.emblems.slice(0, 10).map(x => String(x).slice(0, 140)) : [];
+  me.custom = Array.isArray(st.custom) ? st.custom.slice(0, MAX_CUSTOM).filter(c => c && typeof c === "object")
+    .map(c => ({ id:String(c.id || uid()).slice(0, 24), name:String(c.name || "").slice(0, 80), v:int(c.v, 0, 999) })).filter(c => c.name) : [];
+  me.cmd = {}; if (st.cmd && typeof st.cmd === "object") for (const [k, v] of Object.entries(st.cmd)) { const kk = int(k, 1, MAX); if (kk) me.cmd[kk] = int(v, 0, 999); }
+  const cm = cleanCmdrs(st.cmdrs); if (cm.length) me.cmdrs = cm;
+  me.manaOn = !!st.manaOn;
+  me.mana = { W:0, U:0, B:0, R:0, G:0, C:0 }; if (st.mana && typeof st.mana === "object") for (const c of MANA) me.mana[c] = int(st.mana[c], 0, 999);
+  lastLife = me.life; pending = null;
+  pushState(); render(true);
+  if (cm.length && modalKind === "cmdr") closeModal();  // your commander came back too, no need to ask
+  log(`Welcome back. Your life (${me.life}) and counters were restored from ${from}.`);
+}
+
+function cleanTurns(t){
+  const out = {};
+  for (const [k, n] of Object.entries(t)) { const seat = int(k, 1, MAX), c = int(n, 0, 999); if (seat && c) out[seat] = c; }
+  return out;
+}
 function setTable(patch){
   for (const k of ["turnSeat", "monarch", "initiative"]) {
     if (!(k in patch)) continue;
@@ -824,21 +889,19 @@ function setTable(patch){
     if (k === "monarch") log(v ? `${nm(v)} is the monarch.` : "No one is the monarch.");
     if (k === "initiative") log(v ? `${nm(v)} has the initiative.` : "No one has the initiative.");
     if (k === "turnSeat" && v) {
-      // Everyone counts turns as the turn passes; a count sent with the table (below) settles any difference
-      table.turns = { ...table.turns, [v]:(table.turns[v] || 0) + 1 };
+      // Everyone counts turns as the turn passes; when the table's own counts come along, those are used instead
+      if (patch.turns && typeof patch.turns === "object") table.turns = cleanTurns(patch.turns);
+      else table.turns = { ...table.turns, [v]:(table.turns[v] || 0) + 1 };
       const all = Object.values(table.turns).reduce((a, b) => a + b, 0);
       log(`${nm(v)}'s turn ${table.turns[v]} (game turn ${all}).`);
     }
   }
-  if (patch.turns && typeof patch.turns === "object") {
-    const t = {};
-    for (const [k, n] of Object.entries(patch.turns)) { const seat = int(k, 1, MAX), c = int(n, 0, 999); if (seat && c) t[seat] = c; }
-    table.turns = t;
-  }
+  if (patch.turns && typeof patch.turns === "object") table.turns = cleanTurns(patch.turns);
   if ("dayNight" in patch && ["", "day", "night"].includes(patch.dayNight) && patch.dayNight !== table.dayNight) {
     table.dayNight = patch.dayNight; log(table.dayNight ? `It is now ${table.dayNight}.` : "Day and night cleared.");
   }
   if ("clockMode" in patch && CLOCKS.includes(String(patch.clockMode))) table.clockMode = String(patch.clockMode);
+  if (typeof patch.gameId === "string" && patch.gameId) table.gameId = patch.gameId.slice(0, 40);
   if ("mode" in patch && MODES[patch.mode] && patch.mode !== table.mode) { table.mode = patch.mode; applyMode(); }
 }
 /* Game mode: set by the host (the lowest occupied seat) and synced to everyone */
@@ -887,6 +950,10 @@ function onMessage(s, msg){
     case "state": {
       const st = msg.state || {};
       const isNew = !p.name;
+      // Same player reconnecting before we noticed they dropped: what we last saw of them, to hand back
+      const before = msg.type === "hello" && msg.fresh && p.name && norm(p.name) === norm(String(st.name || ""))
+        ? { life:p.life, startLife:p.startLife, poison:p.poison, exp:p.exp, energy:p.energy, blessing:p.blessing, emblems:p.emblems,
+            custom:p.custom, cmd:p.cmd, cmdrs:p.cmdrs, manaOn:p.manaOn, mana:p.mana } : null;
       const oldKey = p.camKey, oldLife = p.life;
       p.name = String(st.name || "Player").slice(0, 24); lastNames[s] = p.name;
       p.life = int(st.life, -999, 999); p.poison = int(st.poison, 0, 99); p.exp = int(st.exp, 0, 999); p.energy = int(st.energy, 0, 999);
@@ -911,10 +978,20 @@ function onMessage(s, msg){
       p.camKey = typeof st.camKey === "string" ? st.camKey.slice(0, 40) : "";
       if (oldKey && oldKey !== p.camKey && camCalls[s]) { try { camCalls[s].close(); } catch {} }
       if (msg.type === "hello") {
+        if (typeof msg.sid === "string") p.sid = msg.sid.slice(0, 40);
         if (Array.isArray(msg.deck)) { p.deck = msg.deck.slice(0, 300).map(x => String(x).slice(0, 141)); if (p.deck.length) setTimeout(artSync, 500); }
         if (isNew) log(`${p.name} sat down.`);
-        if (!tableKnown && msg.known && msg.table) applyTable(msg.table);
+        if (!tableKnown && msg.known && msg.table) {
+          applyTable(msg.table); tableFromPeer = true; tryRestoreLocal(false);
+          if (heldState?.gameId === table.gameId) restoreMe(heldState.state, "the table");
+          heldState = null;
+        }
         checkSeatLimit();
+        // A player coming back to this game: hand them the life and counters we remembered
+        const back = departed[norm(p.name)];
+        const theirs = msg.fresh && back && back.gameId === table.gameId && Date.now() - back.at < 12 * 36e5 ? back.state : before;
+        if (msg.fresh && theirs && table.gameId) send(conns[s]?.conn || {}, { type:"yourstate", gameId:table.gameId, state:theirs });
+        delete departed[norm(p.name)];
         if (Array.isArray(msg.dmg)) {
           let added = false;
           for (const raw of msg.dmg.slice(0, 2000)) { const e = cleanEntry(raw); if (e && !damageLog.some(x => x.id === e.id)) { damageLog.push(e); added = true; } }
@@ -950,7 +1027,12 @@ function onMessage(s, msg){
       break;
     case "snapr": takeSnap(s, msg); break;
     case "rolloff": playRollOff(msg); break;
-    case "newgame": applyNewGame(p.name); break;
+    case "newgame": applyNewGame(p.name, typeof msg.gameId === "string" ? msg.gameId.slice(0, 40) : ""); break;
+    case "yourstate":
+      if (typeof msg.gameId !== "string") break;
+      if (msg.gameId === table.gameId) restoreMe(msg.state, "the table");
+      else if (!tableFromPeer) heldState = msg;  // the table's game id hasn't arrived yet
+      break;
   }
 }
 function nextSeat(from){
@@ -974,7 +1056,8 @@ function enterTable(){
   setTimeout(artSync, 1500);
   setTimeout(loadCardIndex, 2500);
   log(`You took seat ${mySeat}.`);
-  setTimeout(() => { tableKnown = true; }, 3500);
+  // Nobody else here: if you were in a game at this table, pick it back up from this browser
+  setTimeout(() => { if (!tableFromPeer) tryRestoreLocal(true); tableKnown = true; saveReady = true; saveLocal(); }, 3500);
   setInterval(updateClocks, 1000);
   loadIndex().catch(() => {});
   $("#engineSel").value = engine;
@@ -1022,12 +1105,13 @@ $("#camBtn").onclick = e => {
 };
 $("#rotBtn").onclick = () => { me.rot = !me.rot; pushState(); render(); };
 $("#leaveBtn").onclick = () => {
-  if (!confirm("Leave the table? You can rejoin with the same code, but your life total and counters reset.")) return;
+  if (!confirm("Leave the table? Rejoin with the same code during this game and your life total, counters, and the turn pick up where you left off.")) return;
+  saveLocal(true);
   Object.values(calls).forEach(c => c.call.close()); Object.values(conns).forEach(c => c.conn.close());
   peer?.destroy(); localStream?.getTracks().forEach(t => t.stop());
   location.href = location.pathname;
 };
-window.addEventListener("beforeunload", () => peer?.destroy());
+window.addEventListener("beforeunload", () => { if (me) saveLocal(true); peer?.destroy(); });
 
 /* ---------- Game clock, turn clock, new game ---------- */
 function gameSeconds(){ return gameStartAt ? (Date.now() - gameStartAt) / 1000 : 0; }
@@ -1035,10 +1119,11 @@ function ensureGameStarted(){ if (!gameStartAt) { gameStartAt = Date.now(); tabl
 $("#startBtn").onclick = () => { if (!gameStartAt) { gameStartAt = Date.now(); if (table.turnSeat) turnStartAt = Date.now(); tableKnown = true; pushTable(); log("Game clock started."); } };
 $("#newBtn").onclick = () => {
   if (!confirm("Start a new game for everyone?\n\nThis resets every player's life, counters, and commander damage, clears the board state, stops the game clock, and erases the damage history. Click Export CSV first if you want to keep the history.")) return;
-  broadcast({ type:"newgame" }); applyNewGame("You");
+  const id = uid(); broadcast({ type:"newgame", gameId:id }); applyNewGame("You", id);
 };
-function applyNewGame(by){
+function applyNewGame(by, id){
   quietLife();
+  table.gameId = id || uid(); restored = true;  // a fresh game: nothing to bring back
   me.startLife = modeOf(table.mode).life;
   Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
   lastLife = me.life; pending = null; shown.clear();
@@ -1058,7 +1143,7 @@ function turnText(s){
   return left >= 0 ? [`${base}, ${fmt(left)} left`, false] : [`${base}, ${fmt(-left)} over`, true];
 }
 function updateClocks(){
-  updateNetWarn();
+  updateNetWarn(); syncRemoteCaps();
   $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "Game not started";
   $("#startBtn").classList.toggle("hidden", !!gameStartAt);
   document.querySelectorAll("#grid .tile").forEach(el => {
@@ -1398,6 +1483,7 @@ function undoDamage(id){
 
 /* ---------- Damage history ---------- */
 function renderDmg(){
+  saveLocal();
   const sel = $("#dmgFilter");
   const seen = new Map();
   presentSeats().forEach(s => seen.set(s, nm(s)));
@@ -1472,7 +1558,7 @@ $("#tblMode").onchange = e => {
   if (inGame && !confirm(`Switch everyone to ${m.short}?\n\nThis starts a new game for everyone at ${m.life} life and erases the damage history.`)) { e.target.value = table.mode; return; }
   changeTable({ mode:v });
   store.set("kt-mode", v);
-  if (inGame) { broadcast({ type:"newgame" }); applyNewGame("You"); }
+  if (inGame) { const id = uid(); broadcast({ type:"newgame", gameId:id }); applyNewGame("You", id); }
 };
 $("#monSel").onchange = e => changeTable({ monarch:+e.target.value });
 $("#iniSel").onchange = e => changeTable({ initiative:+e.target.value });
@@ -2832,7 +2918,8 @@ function linkify(text, lisp){
   }
   return out;
 }
-async function addCaption(seat, text){
+async function addCaption(seat, text, heardHere){
+  if (seat !== mySeat && !heardHere) lastCapFrom[seat] = Date.now();
   try { await loadIndex(); } catch {}
   const ul = $("#captions");
   const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
@@ -2841,6 +2928,7 @@ async function addCaption(seat, text){
   who.style.color = SEAT_HEX[seat - 1] || "inherit";
   who.textContent = (seat === mySeat ? "You" : nm(seat)) + ":";
   li.appendChild(who);
+  if (heardHere) li.title = "Captioned on this computer from their audio";
   linkify(text, lispFor(seat)).forEach((seg, idx) => {
     if (idx) li.append(" ");
     if (seg.kw) {
@@ -2960,7 +3048,7 @@ $("#engineSel").onchange = async e => {
 };
 function updateCapBtn(){
   const b = $("#capBtn"); b.textContent = capOn ? "Captions on" : "Captions off"; b.classList.toggle("off", !capOn); b.disabled = !SR;
-  if (me) pushState();  // the table sees whether your captions are running
+  if (me) { pushState(); syncRemoteCaps(); }  // the table sees whether your captions are running
 }
 // What the table sees about your captions: running, switched off, mic muted, or not possible in this browser
 function capState(){ return !SR ? "none" : !micLive() ? "muted" : capOn ? "on" : "off"; }
@@ -2969,7 +3057,7 @@ function capState(){ return !SR ? "none" : !micLive() ? "muted" : capOn ? "on" :
 const capAsked = {};
 function renderCapPeers(){
   const box = $("#capPeers"), seats = presentSeats().filter(s => s !== mySeat && players[s]?.name);
-  const sig = JSON.stringify(seats.map(s => [s, nm(s), players[s].cap, !!capAsked[s], lispFor(s)]));
+  const sig = JSON.stringify([seats.map(s => [s, nm(s), players[s].cap, !!capAsked[s], lispFor(s), !!remoteCap[s], skipHere(s)]), !!ASR.loading, ASR.failed]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig; box.innerHTML = "";
   seats.forEach(s => {
@@ -2982,6 +3070,13 @@ function renderCapPeers(){
     }[st] || `${nm(s)}: captions unknown (they may be on an older version of the page, ask them to reload).`;
     if (st === "on") t.className = "ok";
     row.appendChild(t);
+    const hl = document.createElement("label"); hl.className = "small";
+    const hb = document.createElement("input"); hb.type = "checkbox"; hb.checked = !skipHere(s);
+    hb.onchange = () => { const k = norm(nm(s)); noHere[k] = !hb.checked; store.set("kt-nohere:" + k, hb.checked ? "0" : "1"); syncRemoteCaps(); box.dataset.sig = ""; renderCapPeers(); };
+    hl.append(hb, remoteCap[s] ? (ASR.failed ? " Caption them from here (the speech model couldn't load)" : ASR.loading ? " Captioning them from here (loading the speech model)..." : " Captioning them from here")
+      : " Caption them from here when their captions aren't coming through");
+    hl.title = "Turns their voice into captions on this computer, from the audio you already hear";
+    row.appendChild(hl);
     const ll = document.createElement("label"); ll.className = "small";
     const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = lispFor(s); cb.disabled = !!players[s].lisp;
     cb.onchange = () => { const k = norm(nm(s)); lispLocal[k] = cb.checked; store.set("kt-lisp:" + k, cb.checked ? "1" : "0"); box.dataset.sig = ""; renderCapPeers(); };
@@ -2997,6 +3092,101 @@ function renderCapPeers(){
   });
 }
 function setCapHint(t){ $("#capHint").textContent = t; }
+
+/* Captioning other players on this computer. Normally each player's own browser captions their speech and sends
+   the text. When that isn't happening (captions off, a browser without speech to text, or a speech service that's
+   blocked), this turns their voice into captions from the audio you already hear, with Whisper (an open speech
+   model) running in your browser. It steps aside as soon as their own captions arrive. */
+const ASR_MODELS = ["Xenova/whisper-base.en", "onnx-community/whisper-base.en"];
+const ASR = { pipe:null, loading:false, failed:false, busy:false, queue:[] };
+const remoteCap = {}, lastCapFrom = {}, noHere = {};  // noHere: players you asked not to caption from here, by name
+const skipHere = s => { const k = norm(nm(s)); return noHere[k] ?? store.get("kt-nohere:" + k, "0") === "1"; };
+async function asrLoad(){
+  if (ASR.pipe || ASR.failed) return ASR.pipe;
+  if (!ASR.loading) ASR.loading = (async () => {
+    const T = await import(TJS_URL);
+    T.env.allowLocalModels = false;
+    for (const m of ASR_MODELS) {
+      try { return ASR.pipe = await T.pipeline("automatic-speech-recognition", m, { device:"wasm", dtype:"q8" }); }
+      catch (e) { console.warn("Speech model", m, "didn't load:", e); }
+    }
+    throw new Error("no speech model loaded");
+  })().catch(() => { ASR.failed = true; return null; }).finally(() => { ASR.loading = false; $("#capPeers").dataset.sig = ""; renderCapPeers(); });
+  return ASR.loading;
+}
+function wantHere(s){
+  const p = players[s];
+  if (!capOn || !p?.name || !p.stream?.getAudioTracks().length || skipHere(s) || ASR.failed) return false;
+  return !(p.cap === "on" && Date.now() - (lastCapFrom[s] || 0) < 60000);  // their own captions are arriving
+}
+function syncRemoteCaps(){
+  for (const s of Object.keys(players).map(Number)) {
+    if (s === mySeat) continue;
+    if (wantHere(s) && !remoteCap[s]) startRemoteCap(s);
+    else if (!wantHere(s) && remoteCap[s]) stopRemoteCap(s);
+  }
+  for (const s of Object.keys(remoteCap).map(Number)) if (!players[s]) stopRemoteCap(s);
+}
+function startRemoteCap(s){
+  const track = players[s].stream.getAudioTracks()[0];
+  try {
+    const ctx = new AudioContext({ sampleRate:16000 });
+    const src = ctx.createMediaStreamSource(new MediaStream([track]));
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    const rc = remoteCap[s] = { ctx, src, node, chunks:[], pre:null, speaking:false, silence:0, len:0, levels:[] };
+    node.onaudioprocess = e => hearChunk(s, rc, e.inputBuffer.getChannelData(0));
+    src.connect(node); node.connect(ctx.destination);  // the processor only runs when connected; it outputs silence
+    ctx.resume?.().catch(() => {});
+    asrLoad();
+    $("#capPeers").dataset.sig = ""; renderCapPeers();
+  } catch (e) { console.warn("Couldn't listen to", nm(s), e); }
+}
+function stopRemoteCap(s){
+  const rc = remoteCap[s]; delete remoteCap[s];
+  try { rc.src.disconnect(); rc.node.disconnect(); rc.ctx.close(); } catch {}
+  $("#capPeers").dataset.sig = ""; renderCapPeers();
+}
+// Cut their audio into spoken phrases: loud enough above the room's background to be speech, ending at a short pause
+function hearChunk(s, rc, data){
+  let e = 0; for (let i = 0; i < data.length; i++) e += data[i] * data[i];
+  const rms = Math.sqrt(e / data.length), dur = data.length / 16000;
+  // Background level: the quiet end of the last ~10 seconds, so a lot of talking doesn't raise the bar
+  rc.levels.push(rms); if (rc.levels.length > 40) rc.levels.shift();
+  const noise = [...rc.levels].sort((a, b) => a - b)[Math.floor(rc.levels.length * 0.15)];
+  const loud = rms > Math.max(0.01, noise * 3);
+  if (loud && !rc.speaking) { rc.speaking = true; rc.chunks = rc.pre ? [rc.pre] : []; rc.len = rc.pre ? rc.pre.length / 16000 : 0; }
+  if (rc.speaking) {
+    rc.chunks.push(Float32Array.from(data)); rc.len += dur;
+    rc.silence = loud ? 0 : rc.silence + dur;
+    if (rc.silence > 0.75 || rc.len > 14) {
+      if (rc.len - rc.silence > 0.5) {
+        const audio = new Float32Array(rc.chunks.reduce((a, c) => a + c.length, 0));
+        let o = 0; for (const c of rc.chunks) { audio.set(c, o); o += c.length; }
+        ASR.queue.push({ s, audio }); if (ASR.queue.length > 6) ASR.queue.shift();
+        runAsr();
+      }
+      rc.speaking = false; rc.chunks = []; rc.len = 0; rc.silence = 0;
+    }
+  }
+  rc.pre = Float32Array.from(data);  // a moment of lead-in so the first word isn't clipped
+}
+async function runAsr(){
+  if (ASR.busy) return;
+  ASR.busy = true;
+  try {
+    while (ASR.queue.length) {
+      const { s, audio } = ASR.queue.shift();
+      const pipe = await asrLoad(); if (!pipe) { ASR.queue = []; break; }
+      if (!players[s] || !remoteCap[s]) continue;
+      const out = await pipe(audio);
+      // Whisper writes sound labels like [BLANK_AUDIO] or (music) for non-speech; drop those
+      const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
+      if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
+      addCaption(s, text, true);
+    }
+  } catch (e) { console.warn("Speech model failed:", e); }
+  finally { ASR.busy = false; }
+}
 $("#capBtn").onclick = () => {
   capOn = !capOn; quickEnds = 0;
   if (capOn) { startRec(); if (LOCAL) toast("Captions on. Because this page is a local file, Chrome may ask for the microphone each time captions restart."); }
