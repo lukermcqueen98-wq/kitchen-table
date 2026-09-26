@@ -15,7 +15,8 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { chromium } from "../tests/node_modules/@playwright/test/index.js";
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)("../tests/node_modules/@playwright/test");
 
 const ROOT = path.resolve(import.meta.dirname, ".."), OUT = path.join(ROOT, "eval-results");
 const N = +(process.argv[2] || 100), DTYPE = process.argv[3] || "q8", PORT = 8790;

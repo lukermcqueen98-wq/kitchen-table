@@ -12,6 +12,14 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator("#captions .cardlink", { hasText:"Thol Ring" })).toHaveAttribute("title", "Sol Ring");
   expect(await lifeOf(b, 2)).toBe(34);
 
+  // Misheard names of cards nobody has in their deck still link, and every Magic keyword (from Scryfall's lists) does too,
+  // but not everyday words that happen to be keywords
+  await say(a, "ristic study has offspring and trample so I cast it without fear");
+  await expect(a.locator("#captions .cardlink.fuzzy", { hasText:"Rhystic Study" })).toHaveAttribute("title", 'Heard "ristic study"');
+  await expect(a.locator("#captions .kwlink", { hasText:"offspring" })).toHaveCount(1);
+  await expect(a.locator("#captions .kwlink", { hasText:"trample" })).toHaveCount(1);
+  await expect(a.locator("#captions .kwlink", { hasText:/^(cast|fear)$/ })).toHaveCount(0);
+
   // Rick's speech service fails (as in Brave): Luke's screen says why his captions aren't arriving
   await b.evaluate(() => { window.__speechError = "network"; });
   await b.click("#capBtn"); await b.click("#capBtn");

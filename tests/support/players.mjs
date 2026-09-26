@@ -33,6 +33,9 @@ export async function newPlayer(browser, { lisp = false } = {}){
   await ctx.route(/api\.scryfall\.com/, r => {
     const u = decodeURIComponent(r.request().url()).toLowerCase(), byId = /\/cards\/(0{7}\d)/.exec(u);
     const k = NAMES.findIndex(n => u.includes(n.toLowerCase()));
+    if (u.includes("/catalog/keyword-abilities")) return json(r, { data:["Flying", "Offspring", "Fear"] });
+    if (u.includes("/catalog/keyword-actions")) return json(r, { data:["Forage", "Cast"] });
+    if (u.includes("/catalog/ability-words")) return json(r, { data:["Coven", "Eerie"] });
     if (u.includes("/catalog/")) return json(r, { data:NAMES });
     if (byId) return json(r, card(+byId[1].slice(-1)));
     if (k >= 0) return json(r, u.includes("/search") ? { data:[card(k)] } : card(k));

@@ -3412,7 +3412,9 @@ function loadIndex(){
       const k = norm(face); if (!k || m.has(k)) continue;
       m.set(k, face); maxWords = Math.max(maxWords, Math.min(10, k.split(" ").length));
     }
-    cardIndex = m; return m;
+    cardIndex = m; phonAll = null; lispPhonAll = null;
+    loadKeywordCatalogs().catch(() => {});
+    return m;
   })();
   indexLoading.catch(() => { indexLoading = null; });
   return indexLoading;
@@ -3506,6 +3508,40 @@ const KEYWORDS = [
   ["The Ring tempts you", "Choose a creature you control as your Ring-bearer. Your Ring gains its next ability, up to four."],
   ["Energy", "Counters a player can get, shown as {E}, and spend to pay costs.", "p"],
   ["Poison", "A player with ten or more poison counters loses the game."],
+  // Game terms people say all the time
+  ["Graveyard", "Where cards go when they're destroyed, sacrificed, discarded, countered, or finish resolving. Face up; anyone can look.", "p"],
+  ["Exile", "A zone for cards removed from the game. Cards there usually stay there unless something lets you play them or return them.", "v"],
+  ["Library", "Your deck during the game. Cards are drawn from the top.", "p"],
+  ["Battlefield", "Where permanents are: lands, creatures, artifacts, enchantments, planeswalkers, and battles in play."],
+  ["The stack", "Where spells and abilities wait to resolve. The last one added resolves first, and players can respond before each one does."],
+  ["Upkeep", "The step after untap at the start of each turn. Upkeep triggers happen here, before the draw.", "p"],
+  ["Draw step", "The step where the active player draws a card, after upkeep."],
+  ["End step", "The first part of the end of a turn. \"At the beginning of the end step\" triggers happen here."],
+  ["Combat damage", "Damage dealt by attacking and blocking creatures during the combat damage step."],
+  ["Commander damage", "A player dealt 21 or more combat damage by the same commander over the game loses."],
+  ["Sacrifice", "Move a permanent you control to its owner's graveyard. It can't be prevented, and it isn't destroying.", "v"],
+  ["Token", "A permanent that isn't a card, made by an effect. It stops existing when it leaves the battlefield.", "p"],
+  ["Planeswalker", "A permanent type with loyalty. You can activate one of its loyalty abilities once per turn, when you could cast a sorcery.", "p"],
+  ["Loyalty", "Counters on a planeswalker. Damage to it removes that many; it's put into the graveyard at 0."],
+  ["Mulligan", "Shuffle your opening hand back and draw a new one. In Commander your first mulligan is free; after that, put one card on the bottom for each mulligan.", "v"],
+  ["Enters the battlefield", "Triggers when a permanent comes into play (often shortened to ETB)."],
+  ["ETB", "Short for \"enters the battlefield\": abilities that trigger when a permanent comes into play."],
+  ["Summoning sickness", "A creature can't attack or use {T} abilities unless you've controlled it continuously since your most recent turn began."],
+  ["Priority", "The right to cast a spell or activate an ability. Players pass priority back and forth; when all pass in a row, the top of the stack resolves."],
+  ["Instant", "A spell you can cast any time you have priority, even during other players' turns.", "p"],
+  ["Sorcery", "A spell you can cast only during your main phase when the stack is empty.", "p"],
+  ["Legendary", "You can control only one permanent with the same name that's legendary. If you get a second, choose one and put the other into the graveyard."],
+  ["Colorless", "Having no color. Colorless mana, shown as {C}, can only be made by certain sources."],
+  ["Main phase", "The phases before and after combat where you can play a land and cast sorceries and permanents.", "p"],
+  ["Untap", "Turn a tapped permanent upright. Everything you control untaps at the start of your turn.", "v"],
+  ["Triggered ability", "An ability that starts with \"when,\" \"whenever,\" or \"at.\" It goes on the stack when its event happens.", "p"],
+  ["Activated ability", "An ability written as \"cost: effect.\" You can activate it any time you could cast an instant, unless it says otherwise.", "p"],
+  ["Counterspell", "A spell that counters another spell, so it has no effect and goes to the graveyard.", "p"],
+  ["Board wipe", "A spell that destroys or removes all or most creatures (or other permanents), like Wrath of God.", "p"],
+  ["Ramp", "Getting extra mana early, like extra lands or mana rocks, so you can cast big spells sooner."],
+  ["Tutor", "Search your library for a card. Named after Demonic Tutor.", "v"],
+  ["Mana rock", "An artifact that makes mana, like Sol Ring or Arcane Signet.", "p"],
+  ["Mana dork", "A creature that makes mana, like Llanowar Elves or Birds of Paradise.", "p"],
   ["Day and night", "If it's day and the active player casts no spells during their turn, it becomes night next turn. If it's night and a player casts two or more spells in a turn, it becomes day next turn."]
 ];
 function kwForms(base, flag){
@@ -3523,6 +3559,30 @@ function kwForms(base, flag){
 const KW = new Map(); let kwMax = 1;
 KEYWORDS.forEach(([name, def, flag]) => kwForms(norm(name), flag).forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } }));
 ["equipped", "equipping"].forEach(f => KW.set(f, KW.get("equip")));
+/* Every other keyword Magic has, from Scryfall's lists, so new sets are covered too. They link to MTG Wiki for the rules.
+   Single common English words are left out ("fear", "gift", "plot"), or everyday talk would light up. */
+const KW_COMMON = new Set(("fear shadow gift craft backup station sneak companion bargain discover plot suspect manifest adapt bolster support " +
+  "meld clash learn seek explore fateseal attach cast counter create destroy discard double exchange fight play reveal search shuffle " +
+  "tap vote activate transform domain alliance survival valiant eerie heroic revolt raid celebration descend coven delirium morbid " +
+  "threshold formidable ferocious kinship radiance join grandeur hero will chroma landship open vanishing fading level assist offering " +
+  "partner warp harmonize mobilize saddle exhaust impending specialize visit role ring solved max speed start squad cleave spree").split(" "));
+async function loadKeywordCatalogs(){
+  let lists = null;
+  try { const c = JSON.parse(store.get("kt-kw", "null")); if (c && Date.now() - c.t < 7 * 864e5) lists = c.l; } catch {}
+  if (!lists) {
+    const got = await Promise.all(["keyword-abilities", "keyword-actions", "ability-words"].map(c => scry("/catalog/" + c)));
+    if (got.some(g => !Array.isArray(g?.data))) return;
+    lists = got.map(g => g.data.filter(x => typeof x === "string").slice(0, 600));
+    store.set("kt-kw", JSON.stringify({ t:Date.now(), l:lists }));
+  }
+  const what = ["A Magic keyword ability.", "A Magic keyword action.", "An ability word: it has no rules meaning of its own, it labels abilities that work alike."];
+  lists.forEach((list, j) => list.forEach(name => {
+    const k = norm(name); if (!k || KW.has(k) || (!k.includes(" ") && KW_COMMON.has(k))) return;
+    const def = what[j] + " Open MTG Wiki below for the full rules.";
+    kwForms(k, j === 1 ? "v" : "").forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } });
+  }));
+  lispKW = null;  // rebuilt with these next time it's needed
+}
 function showKeyword(k){
   const view = $("#cardView"); view.innerHTML = ""; focusCardView();
   const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
@@ -3551,7 +3611,7 @@ const lispNorm = k => String(k).replace(/th|sh|z/g, "s").replace(/(.)\1+/g, "$1"
 const lispLocal = {};  // players you marked on your screen, by name
 function lispFor(s){ return s === mySeat ? !!me?.lisp : !!(players[s]?.lisp || lispLocal[norm(nm(s))] || store.get("kt-lisp:" + norm(nm(s)), "") === "1"); }
 function lispPool(){ const m = new Map(); for (const [k, v] of deckPool()) { const l = lispNorm(k); if (!m.has(l)) m.set(l, v); } return m; }
-let lispIndex = null, lispKW = null;
+var lispIndex = null, lispKW = null;  // var: the name list can load before this line runs
 function lispMaps(){
   if (!lispKW) { lispKW = new Map(); for (const [k, v] of KW) { const l = lispNorm(k); if (!lispKW.has(l)) lispKW.set(l, v); } }
   if (!lispIndex && cardIndex) { lispIndex = new Map(); for (const [k, v] of cardIndex) { const l = lispNorm(k); if (!lispIndex.has(l)) lispIndex.set(l, v); } }
@@ -3592,6 +3652,36 @@ function fuzzyPool(keys, i, lisp){
   return best;
 }
 
+/* Sound-alike lookup over every card name (two or more words), for names speech recognition spells wrong even when
+   the card isn't in anyone's decklist: "soul ring" finds Sol Ring, "ristic study" Rhystic Study. Names that sound
+   the same as another name are left out, since they can't be told apart by sound. */
+var phonAll = null, lispPhonAll = null;
+function phonMap(lisp){
+  if (!cardIndex) return null;
+  if (lisp ? lispPhonAll : phonAll) return lisp ? lispPhonAll : phonAll;
+  const m = new Map();
+  for (const [k, name] of cardIndex) {
+    const w = (lisp ? lispNorm(k) : k).split(" "), code = codeOf(w);
+    if (!code || code.split(" ").length < 2) continue;
+    m.set(code, m.has(code) && m.get(code) !== name ? "" : name);
+  }
+  if (lisp) lispPhonAll = m; else phonAll = m;
+  return m;
+}
+function fuzzyAll(keys, i, lisp){
+  const m = phonMap(lisp); if (!m) return null;
+  for (let n = Math.min(maxWords + 1, keys.length - i); n >= 2; n--) {
+    const win = keys.slice(i, i + n).join(" ").split(" ").filter(Boolean);
+    if (win.length < 2) continue;
+    const name = m.get(codeOf(win)); if (!name) continue;
+    const nk = norm(name), nw = nk.split(" ");
+    // don't swallow a "the" or "of" around the name, and the words must look like the name, not just sound like it
+    if ((STOP.has(win[0]) && !STOP.has(nw[0])) || (STOP.has(win[win.length - 1]) && !STOP.has(nw[nw.length - 1]))) continue;
+    if (similarity(win.join(" "), lisp ? lispNorm(nk) : nk) < 0.5) continue;
+    return { name, n };
+  }
+  return null;
+}
 // Split a sentence into plain words, card names, and keywords
 function linkify(text, lisp){
   const words = text.split(/\s+/).filter(Boolean), raw = words.map(norm), keys = lisp ? raw.map(lispNorm) : raw, out = [];
@@ -3610,6 +3700,8 @@ function linkify(text, lisp){
     if (!seg) { const f = fuzzyPool(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
     // 3. exact multi-word card name from all of Magic
     for (let n = Math.min(maxWords, words.length - i); n >= 2 && !seg && index; n--) { const name = index.get(key(i, n)); if (name) seg = { card:name, t:span(i, n), n }; }
+    // 3b. sound-alike card name from all of Magic
+    if (!seg && index) { const f = fuzzyAll(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
     // 4. keyword
     for (let n = Math.min(kwMax, words.length - i); n >= 1 && !seg; n--) { const k = kw.get(key(i, n)); if (k) seg = { kw:k, t:span(i, n), n }; }
     // 5. one-word card name from all of Magic
@@ -3660,12 +3752,14 @@ function startBrowserRec(){
   rec = new SR();
   rec.continuous = true; rec.interimResults = true; rec.lang = speechLang();
   if (engine === "device") { if ("processLocally" in rec) rec.processLocally = true; else if ("mode" in rec) rec.mode = "ondevice-only"; }
-  // Newer Chrome can be told which phrases to expect: the table's card names, commanders, and player names
+  // Newer Chrome can be told which phrases to expect: the table's card names, commanders, player names, and game terms
   if (window.SpeechRecognitionPhrase && "phrases" in rec && !noPhrases) {
     try {
       const names = [...new Set([...deckPool().values()].map(v => v.name))].slice(0, 400);
       const people = presentSeats().filter(s => s !== mySeat).map(nm).filter(Boolean);
-      rec.phrases = [...names.map(n => new SpeechRecognitionPhrase(n, 5)), ...people.map(n => new SpeechRecognitionPhrase(n, 3))];
+      const terms = KEYWORDS.map(k => k[0]).filter(t => t.length > 3).slice(0, 150);
+      rec.phrases = [...names.map(n => new SpeechRecognitionPhrase(n, 5)), ...people.map(n => new SpeechRecognitionPhrase(n, 3)),
+                     ...terms.map(t => new SpeechRecognitionPhrase(t, 2))];
     } catch { noPhrases = true; }
   }
   rec.onresult = e => {
