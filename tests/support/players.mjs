@@ -21,7 +21,7 @@ export async function launchBrowser({ camera, mic } = {}){
 }
 
 export async function newPlayer(browser, { lisp = false } = {}){
-  const ctx = await browser.newContext({ permissions:["camera", "microphone"], viewport:{ width:1400, height:900 } });
+  const ctx = await browser.newContext({ permissions:["camera", "microphone", "clipboard-read", "clipboard-write"], viewport:{ width:1400, height:900 } });
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:"" }));
   await ctx.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/, r => {
     const url = r.request().url();
@@ -46,7 +46,12 @@ export async function newPlayer(browser, { lisp = false } = {}){
     let P; Object.defineProperty(window, "Peer", { configurable:true, get(){ return P; },
       set(v){ P = class extends v { constructor(id, o = {}){ super(id, { ...o, host:"127.0.0.1", port:peerPort, path:"/", secure:false }); } }; } });
     // Speech recognition stand-in: whatever the test puts in window.__say is "heard" the next time captions start
-    class FakeSR { start(){ const t = window.__say; if (t) { window.__say = null; setTimeout(() => this.onresult?.({ resultIndex:0, results:[Object.assign([{ transcript:t }], { isFinal:true })] }), 400); } } stop(){} }
+    // and an error the test puts in window.__speechError is reported the next time it starts (like Brave's "network")
+    class FakeSR { start(){
+      const t = window.__say, err = window.__speechError;
+      if (err) { window.__speechError = null; setTimeout(() => this.onerror?.({ error:err }), 200); }
+      if (t) { window.__say = null; setTimeout(() => this.onresult?.({ resultIndex:0, results:[Object.assign([{ transcript:t }], { isFinal:true })] }), 400); }
+    } stop(){} }
     window.SpeechRecognition = FakeSR;
     if (lisp) try { localStorage.setItem("kt-lisp-me", "1"); } catch {}
   }, [PEER_PORT, lisp]);

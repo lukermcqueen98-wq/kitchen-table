@@ -3,7 +3,8 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createRequire } from "node:module";
 import { makeFixtures, OUT } from "./fixtures.mjs";
 
@@ -28,7 +29,9 @@ export default async function globalSetup(){
   const { PeerServer } = createRequire(import.meta.url)("peer");
   const peer = PeerServer({ port:PEER_PORT, path:"/", host:"127.0.0.1" });
   // The all-cards index, built with the builder's stand-in model (same fingerprint recipe as the page's test stub)
-  execFileSync(process.execPath, [path.join(ROOT, "tools", "build-index.mjs"), path.join(OUT, "index"), "--fake-model"],
-    { env:{ ...process.env, SCRYFALL_BULK_FILE:path.join(OUT, "bulk.jsonl") }, stdio:"pipe" });
+  // (not execFileSync: the builder downloads the art from the web server above, which has to keep answering)
+  fs.rmSync(path.join(OUT, "index"), { recursive:true, force:true });
+  await promisify(execFile)(process.execPath, [path.join(ROOT, "tools", "build-index.mjs"), path.join(OUT, "index"), "--fake-model"],
+    { env:{ ...process.env, SCRYFALL_BULK_FILE:path.join(OUT, "bulk.jsonl") }, timeout:120000 });
   return async () => { server.close(); peer.close?.(); };
 }

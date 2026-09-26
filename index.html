@@ -181,6 +181,8 @@ aside section+section{margin-top:22px}
 #capPeers{font-size:13px;color:var(--muted);margin:0 0 6px}
 #capPeers div{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:2px 0}
 #capPeers .ok{color:var(--parchment)}
+#capPeers .caplive{flex-basis:100%;padding-left:2px}
+#capDiag{margin:0 0 6px}
 #captions{list-style:none;padding:0;margin:6px 0 0;font-size:14px;max-height:240px;overflow:auto;border:1px solid var(--felt-edge);border-radius:8px}
 #captions li{padding:6px 10px;border-top:1px solid rgba(255,255,255,.05)}
 #captions li:first-child{border-top:0}
@@ -379,6 +381,7 @@ button.mpip{cursor:pointer}
       <h2>Captions</h2>
       <p class="hint" id="capHint"></p>
       <div id="capPeers"></div>
+      <button class="linkbtn small" id="capDiag" type="button">Copy caption diagnostics</button>
       <ul id="captions"></ul>
       <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
       <label class="opts-line">Speech engine
@@ -907,7 +910,7 @@ function applyWebcam(){ const t = localStream?.getVideoTracks()[0]; if (t) t.ena
 function send(conn, msg){ try { if (conn.open) conn.send(msg); } catch {} }
 function broadcast(msg){ Object.values(conns).forEach(c => send(c.conn, msg)); }
 function publicState(){
-  return { name:me.name, life:me.life, startLife:me.startLife, cap:capState(), lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
+  return { name:me.name, life:me.life, startLife:me.startLife, cap:capState(), capErr:capErr, lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
            emblems:me.emblems, custom:me.custom, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
 }
 let lastLife = null;
@@ -1087,6 +1090,7 @@ function onMessage(s, msg){
       p.cmd = {}; if (st.cmd && typeof st.cmd === "object") for (const [k, v] of Object.entries(st.cmd)) { const kk = int(k, 1, MAX); if (kk) p.cmd[kk] = int(v, 0, 999); }
       p.rot = !!st.rot;
       p.cap = ["on", "off", "muted", "none"].includes(st.cap) ? st.cap : "";
+      p.capErr = typeof st.capErr === "string" ? st.capErr.slice(0, 30) : "";
       p.lisp = !!st.lisp;
       p.manaOn = !!st.manaOn;
       const oldCmdr = (p.cmdrs || []).map(c => c.name).join(" and ");
@@ -1180,6 +1184,8 @@ function enterTable(){
   setTimeout(() => askCommander(), 500);
   setTimeout(artSync, 1500);
   setTimeout(loadCardIndex, 2500);
+  // Start downloading the AI card matcher (and the index, which it loads first) now, so the first click is quick
+  setTimeout(() => { if (!LOCAL) aiLoad(); }, 4000);
   log(`You took seat ${mySeat}.`);
   // Nobody else here: if you were in a game at this table, pick it back up from this browser
   setTimeout(() => { if (!tableFromPeer) tryRestoreLocal(true); tableKnown = true; saveReady = true; saveLocal(); }, 3500);
@@ -2321,6 +2327,7 @@ const aiKey = () => (AI.model || AI_MODELS[0]) + ":v3:";  // saved fingerprints;
 const AI = { ext:null, loading:null, failed:false, device:"", model:"", refs:[], learned:new Set(), camLoaded:new Set() };
 async function aiLoad(){
   if (AI.ext) return AI.ext;
+  if (AI.failed && Date.now() - AI.failedAt > 120000) AI.failed = false;  // a failed download is tried again after two minutes
   if (AI.failed) return null;
   if (!AI.loading) {
     AI.loading = (async () => {
@@ -2338,8 +2345,8 @@ async function aiLoad(){
           AI.device = device; AI.model = model; return AI.ext;
         } catch (e) { console.warn("AI matcher: couldn't load", model, "on", device, dtype, e); }
       }
-      throw new Error("model failed to load");
-    })().catch(e => { console.warn(e); AI.failed = true; return null; }).finally(() => { AI.loading = null; artStat(); });
+      throw new Error("model failed to load");  // after every model and device; clicks try again after two minutes
+    })().catch(e => { console.warn(e); AI.failed = true; AI.failedAt = Date.now(); return null; }).finally(() => { AI.loading = null; artStat(); });
     artStat();
   }
   return AI.loading || AI.ext;
@@ -2378,7 +2385,11 @@ function loadCardIndex(){
       const meta = await (await fetch("index/cards.json", { cache:"no-cache" })).json();
       if (!AI_MODELS.includes(meta?.model) || !Array.isArray(meta.cards) || !(meta.dims > 0)) throw new Error("index was built with a model this page doesn't use");
       artStat();
-      const buf = await (await fetch("index/cards.bin?v=" + encodeURIComponent(meta.built || ""))).arrayBuffer();
+      // The fingerprints (about 20 MB) are kept in this browser's own storage, which clearing the browser cache
+      // doesn't touch, and downloaded again only when a new build is published
+      const saved = await idb.get("card-index");
+      let buf = saved?.built && saved.built === meta.built && saved.buf instanceof ArrayBuffer ? saved.buf : null;
+      if (!buf) { buf = await (await fetch("index/cards.bin?v=" + encodeURIComponent(meta.built || ""))).arrayBuffer(); idb.set("card-index", { built:meta.built, buf }); }
       const n = meta.cards.length;
       if (buf.byteLength !== n * 4 + n * meta.dims) throw new Error("index file is incomplete");
       // Layout: n float32 scales, then n fingerprints of dims signed bytes (value = byte / scale)
@@ -3201,12 +3212,15 @@ function startBrowserRec(){
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i], t = r[0].transcript.trim();
-      if (r.isFinal) { if (t) onFinalSpeech(t); }
+      if (r.isFinal) { if (t) { onFinalSpeech(t); setCapErr(""); } }
       else interim += t + " ";
     }
     showInterim(interim.trim());
   };
   rec.onerror = e => {
+    if (CAP_ERRORS[e.error]) setCapErr(e.error);
+    // Some browsers can't take the lobby's microphone directly; use the default microphone from then on
+    if (e.error === "audio-capture" && trackInput) { trackInput = false; return; }
     if (engine === "device" && (e.error === "language-not-supported" || e.error === "service-not-allowed")) {
       engine = "browser"; $("#engineSel").value = "browser";
       setCapHint("Chrome's on-device speech couldn't start, so captions switched to Chrome or Edge speech.");
@@ -3229,9 +3243,10 @@ function startBrowserRec(){
   };
   // Chrome can listen to the microphone track you already picked in the lobby (no extra permission prompt).
   // Browsers without that support ignore the argument and use the default microphone.
-  const track = localStream?.getAudioTracks()[0];
-  try { rec.start(track); } catch { try { rec.start(); } catch { rec = null; } }
+  const track = trackInput ? localStream?.getAudioTracks()[0] : null;
+  try { if (track) rec.start(track); else rec.start(); } catch { try { rec.start(); } catch { rec = null; } }
 }
+let trackInput = true;
 function stopBrowserRec(){ const r = rec; rec = null; if (r) { r.onend = null; try { r.stop(); } catch {} } showInterim(""); }
 
 /* Speech engine: Chrome and Edge have speech to text built in. "browser" uses their online service (most accurate).
@@ -3281,13 +3296,21 @@ function updateCapBtn(){
   if (me) { pushState(); syncRemoteCaps(); }  // the table sees whether your captions are running
 }
 // What the table sees about your captions: running, switched off, mic muted, or not possible in this browser
+// The last problem your own speech to text reported ("" once captions come through again), shared with the table
+let capErr = "";
+function setCapErr(code){ if (capErr === code) return; capErr = code; if (me) pushState(); }
+const CAP_ERRORS = {
+  network:"their browser can't reach its speech service (common in Brave, or behind a strict network)",
+  "not-allowed":"speech to text is blocked in their browser", "service-not-allowed":"speech to text is blocked in their browser",
+  "audio-capture":"their browser can't get audio from their microphone", "language-not-supported":"their browser doesn't support speech to text in their language"
+};
 function capState(){ return !SR ? "none" : !micLive() ? "muted" : capOn ? "on" : "off"; }
 /* Each player's own browser turns their speech into text and sends it to the table, so someone's words only
    show up here if captions are running on their computer. This shows who is and isn't sending. */
 const capAsked = {};
 function renderCapPeers(){
   const box = $("#capPeers"), seats = presentSeats().filter(s => s !== mySeat && players[s]?.name);
-  const sig = JSON.stringify([seats.map(s => [s, nm(s), players[s].cap, !!capAsked[s], lispFor(s), !!remoteCap[s], skipHere(s)]), !!ASR.loading, ASR.failed]);
+  const sig = JSON.stringify([seats.map(s => [s, nm(s), players[s].cap, players[s].capErr, !!capAsked[s], lispFor(s), !!remoteCap[s], skipHere(s)]), !!ASR.loading, ASR.failed]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig; box.innerHTML = "";
   seats.forEach(s => {
@@ -3298,7 +3321,8 @@ function renderCapPeers(){
       muted:`${nm(s)}: their microphone is muted.`,
       none:`${nm(s)}: their browser can't do captions. They need Chrome or Edge.`
     }[st] || `${nm(s)}: captions unknown (they may be on an older version of the page, ask them to reload).`;
-    if (st === "on") t.className = "ok";
+    if (players[s].capErr && CAP_ERRORS[players[s].capErr]) t.textContent += ` Their speech to text reports a problem: ${CAP_ERRORS[players[s].capErr]}.`;
+    if (st === "on" && !players[s].capErr) t.className = "ok";
     row.appendChild(t);
     const hl = document.createElement("label"); hl.className = "small";
     const hb = document.createElement("input"); hb.type = "checkbox"; hb.checked = !skipHere(s);
@@ -3307,6 +3331,7 @@ function renderCapPeers(){
       : " Caption them from here when their captions aren't coming through");
     hl.title = "Turns their voice into captions on this computer, from the audio you already hear";
     row.appendChild(hl);
+    if (remoteCap[s]) { const live = document.createElement("span"); live.className = "small caplive"; live.dataset.seat = s; row.appendChild(live); }
     const ll = document.createElement("label"); ll.className = "small";
     const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = lispFor(s); cb.disabled = !!players[s].lisp;
     cb.onchange = () => { const k = norm(nm(s)); lispLocal[k] = cb.checked; store.set("kt-lisp:" + k, cb.checked ? "1" : "0"); box.dataset.sig = ""; renderCapPeers(); };
@@ -3322,6 +3347,21 @@ function renderCapPeers(){
   });
 }
 function setCapHint(t){ $("#capHint").textContent = t; }
+// A text summary of how captions are doing on this screen, to paste to whoever is helping
+$("#capDiag").onclick = async () => {
+  const brand = navigator.userAgentData?.brands?.filter(b => !/not.?a.?brand/i.test(b.brand)).map(b => `${b.brand} ${b.version}`).join(", ") || navigator.userAgent;
+  const lines = [`Kitchen Table caption diagnostics, ${new Date().toISOString()}`,
+    `This browser: ${brand}. Page opened as ${LOCAL ? "a local file" : location.origin}. Speech to text available: ${!!SR}. Engine: ${engine}. Captions on: ${capOn}. Mic live: ${micLive()}. Mic hand-off: ${trackInput}. Last speech problem: ${capErr || "none"}.`,
+    `Speech model for captioning others: ${ASR.pipe ? "loaded" : ASR.loading ? "downloading" : ASR.failed ? "failed: " + (ASR.err || "unknown") : "not needed yet"}.`];
+  for (const s of presentSeats().filter(x => x !== mySeat)) {
+    const p = players[s], rc = remoteCap[s];
+    lines.push(`${nm(s)}: their captions ${p.cap || "unknown (old page?)"}, their problem ${p.capErr || "none"}, last caption from them ${lastCapFrom[s] ? Math.round((Date.now() - lastCapFrom[s]) / 1000) + "s ago" : "never"}, ` +
+      `their audio track ${p.stream?.getAudioTracks()[0]?.readyState || "missing"}, captioning here ${rc ? `on (audio ${rc.ctx.state}, level ${rc.level.toFixed(3)}, heard ${rc.heard}, captioned ${rc.captioned}, for ${Math.round((Date.now() - rc.since) / 1000)}s)` : skipHere(s) ? "turned off" : "off"}.`);
+  }
+  const text = lines.join("\n");
+  try { await navigator.clipboard.writeText(text); toast("Caption diagnostics copied. Paste them to whoever is helping you."); }
+  catch { prompt("Copy these caption diagnostics:", text); }
+};
 
 /* Captioning other players on this computer. Normally each player's own browser captions their speech and sends
    the text. When that isn't happening (captions off, a browser without speech to text, or a speech service that's
@@ -3336,20 +3376,29 @@ async function asrLoad(){
   if (!ASR.loading) ASR.loading = (async () => {
     const T = await import(TJS_URL);
     T.env.allowLocalModels = false;
-    for (const m of ASR_MODELS) {
-      try { return ASR.pipe = await T.pipeline("automatic-speech-recognition", m, { device:"wasm", dtype:"q8" }); }
-      catch (e) { console.warn("Speech model", m, "didn't load:", e); }
+    for (const m of ASR_MODELS) for (let attempt = 1; attempt <= 3; attempt++) {
+      try { ASR.pipe = await T.pipeline("automatic-speech-recognition", m, { device:"wasm", dtype:"q8" }); ASR.err = ""; return ASR.pipe; }
+      catch (e) { console.warn("Speech model", m, "didn't load:", e); ASR.err = String(e?.message || e).slice(0, 160); if (attempt < 3) await sleep(4000 * attempt); }
     }
     throw new Error("no speech model loaded");
-  })().catch(() => { ASR.failed = true; return null; }).finally(() => { ASR.loading = false; $("#capPeers").dataset.sig = ""; renderCapPeers(); });
+  })().catch(() => { ASR.failed = true; ASR.failedAt = Date.now(); return null; }).finally(() => { ASR.loading = false; $("#capPeers").dataset.sig = ""; renderCapPeers(); });
   return ASR.loading;
 }
 function wantHere(s){
   const p = players[s];
+  if (ASR.failed && Date.now() - ASR.failedAt > 120000) ASR.failed = false;  // try the download again after two minutes
   if (!capOn || !p?.name || !p.stream?.getAudioTracks().length || skipHere(s) || ASR.failed) return false;
   return !(p.cap === "on" && Date.now() - (lastCapFrom[s] || 0) < 60000);  // their own captions are arriving
 }
+// The live part of each "captioning here" line: is their audio arriving, and is it being turned into captions
+function capLive(s){
+  const rc = remoteCap[s]; if (!rc) return "";
+  const bars = "\u25AE".repeat(Math.min(5, Math.round(rc.level * 25))) || "silent";
+  const model = ASR.pipe ? "" : ASR.loading ? " Speech model downloading." : ASR.failed ? ` Speech model didn't load (${ASR.err || "unknown error"}); retrying soon.` : "";
+  return `Their audio: ${bars}. Phrases heard ${rc.heard}, captioned ${rc.captioned}.${rc.ctx.state !== "running" ? " Audio is paused: click anywhere on the page." : ""}${model}`;
+}
 function syncRemoteCaps(){
+  document.querySelectorAll("#capPeers .caplive").forEach(el => { el.textContent = capLive(+el.dataset.seat); });
   for (const s of Object.keys(players).map(Number)) {
     if (s === mySeat) continue;
     if (wantHere(s) && !remoteCap[s]) startRemoteCap(s);
@@ -3363,7 +3412,7 @@ function startRemoteCap(s){
     const ctx = new AudioContext({ sampleRate:16000 });
     const src = ctx.createMediaStreamSource(new MediaStream([track]));
     const node = ctx.createScriptProcessor(4096, 1, 1);
-    const rc = remoteCap[s] = { ctx, src, node, chunks:[], pre:null, speaking:false, silence:0, len:0, levels:[] };
+    const rc = remoteCap[s] = { ctx, src, node, chunks:[], pre:null, speaking:false, silence:0, len:0, levels:[], level:0, heard:0, captioned:0, since:Date.now() };
     node.onaudioprocess = e => hearChunk(s, rc, e.inputBuffer.getChannelData(0));
     src.connect(node); node.connect(ctx.destination);  // the processor only runs when connected; it outputs silence
     ctx.resume?.().catch(() => {});
@@ -3371,6 +3420,7 @@ function startRemoteCap(s){
     $("#capPeers").dataset.sig = ""; renderCapPeers();
   } catch (e) { console.warn("Couldn't listen to", nm(s), e); }
 }
+document.addEventListener("pointerdown", () => { for (const rc of Object.values(remoteCap)) if (rc.ctx.state === "suspended") rc.ctx.resume().catch(() => {}); });
 function stopRemoteCap(s){
   const rc = remoteCap[s]; delete remoteCap[s];
   try { rc.src.disconnect(); rc.node.disconnect(); rc.ctx.close(); } catch {}
@@ -3382,6 +3432,7 @@ function hearChunk(s, rc, data){
   const rms = Math.sqrt(e / data.length), dur = data.length / 16000;
   // Background level: the quiet end of the last ~10 seconds, so a lot of talking doesn't raise the bar
   rc.levels.push(rms); if (rc.levels.length > 40) rc.levels.shift();
+  rc.level = Math.max(rms, rc.level * 0.8);
   const noise = [...rc.levels].sort((a, b) => a - b)[Math.floor(rc.levels.length * 0.15)];
   const loud = rms > Math.max(0.01, noise * 3);
   if (loud && !rc.speaking) { rc.speaking = true; rc.chunks = rc.pre ? [rc.pre] : []; rc.len = rc.pre ? rc.pre.length / 16000 : 0; }
@@ -3393,6 +3444,7 @@ function hearChunk(s, rc, data){
         const audio = new Float32Array(rc.chunks.reduce((a, c) => a + c.length, 0));
         let o = 0; for (const c of rc.chunks) { audio.set(c, o); o += c.length; }
         ASR.queue.push({ s, audio }); if (ASR.queue.length > 6) ASR.queue.shift();
+        rc.heard++;
         runAsr();
       }
       rc.speaking = false; rc.chunks = []; rc.len = 0; rc.silence = 0;
@@ -3413,6 +3465,7 @@ async function runAsr(){
       const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
       if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
       addCaption(s, text, true);
+      if (remoteCap[s]) remoteCap[s].captioned++;
     }
   } catch (e) { console.warn("Speech model failed:", e); }
   finally { ASR.busy = false; }

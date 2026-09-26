@@ -1,0 +1,39 @@
+# TEMPORARY: checks which newer versions of the GitHub actions exist and which still run on Node.js 20.
+# Runs only on the working branch; deleted before merging.
+name: Probe action versions
+on:
+  push:
+    branches: ["claude/**"]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  checkout-v5: { runs-on: ubuntu-latest, steps: [ { uses: actions/checkout@v5 } ] }
+  checkout-v6: { runs-on: ubuntu-latest, steps: [ { uses: actions/checkout@v6 } ] }
+  setup-node-v5: { runs-on: ubuntu-latest, steps: [ { uses: actions/setup-node@v5, with: { node-version: 22 } } ] }
+  setup-node-v6: { runs-on: ubuntu-latest, steps: [ { uses: actions/setup-node@v6, with: { node-version: 22 } } ] }
+  cache-v5:
+    runs-on: ubuntu-latest
+    steps:
+      - run: mkdir -p probe && echo hi > probe/x
+      - { uses: actions/cache/restore@v5, with: { path: probe, key: probe-none, lookup-only: true } }
+      - { uses: actions/cache/save@v5, with: { path: probe, key: "probe-${{ github.run_id }}" } }
+  upload-artifact-v5:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi > x.txt
+      - { uses: actions/upload-artifact@v5, with: { name: probe-v5, path: x.txt, retention-days: 1 } }
+  upload-artifact-v6:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi > x.txt
+      - { uses: actions/upload-artifact@v6, with: { name: probe-v6, path: x.txt, retention-days: 1 } }
+  configure-pages-v6: { runs-on: ubuntu-latest, steps: [ { uses: actions/configure-pages@v6 } ] }
+  upload-pages-artifact-v4:
+    runs-on: ubuntu-latest
+    steps:
+      - run: mkdir -p s && echo hi > s/index.html
+      - { uses: actions/upload-pages-artifact@v4, with: { name: probe-pages, path: s, retention-days: 1 } }
+  # Deploying for real would publish the probe page, so this job only checks the version resolves
+  deploy-pages-v5: { runs-on: ubuntu-latest, steps: [ { if: "${{ false }}", uses: actions/deploy-pages@v5 }, { run: "echo resolved" } ] }

@@ -8,7 +8,10 @@ test("picture matching finds a card on another player's camera from the all-card
   await a.addInitScript(() => { const f = window.createImageBitmap; window.__stills = 0; window.createImageBitmap = (...x) => { window.__stills++; return f(...x); }; });
   const room = await sitDown(a, "Luke", { deck:"" }); await settle(a);
   await sitDown(b, "Rick", { room, deck:"" });
+  let binDownloads = 0; a.on("request", r => { if (r.url().includes("cards.bin")) binDownloads++; });
   await expect(a.locator("#artStat")).toHaveText(/ready for all 5/, { timeout:30000 });
+  // The matcher downloads right after sitting down, before any click
+  expect(await a.evaluate(() => window.__tjs?.task)).toBe("image-feature-extraction");
 
   // No decklists anywhere: the index finds it, using a full-quality still from Rick's browser
   let r = await clickCamera(a, 2, 640, 290);
@@ -29,6 +32,13 @@ test("picture matching finds a card on another player's camera from the all-card
 
   // Recent cards lists what was looked at
   await expect(a.locator("#histList button").first()).toBeVisible();
+
+  // After a reload the index comes from the browser's storage, not another download
+  const before = binDownloads;
+  expect(before).toBe(1);
+  await a.reload(); await a.click("#joinBtn");
+  await expect(a.locator("#artStat")).toHaveText(/ready for all 5/, { timeout:30000 });
+  expect(binDownloads).toBe(before);
   expect(a.errors).toEqual([]);
   await b1.close(); await b2.close();
 });
