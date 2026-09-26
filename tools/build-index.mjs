@@ -61,6 +61,12 @@ async function artworkListUrl(){
   console.log(`Downloading Scryfall's artwork list from ${url} (${entry.size ? Math.round(entry.size / 1e6) + " MB, " : ""}updated ${entry.updated_at || "unknown"}).`);
   return url;
 }
+// A JSON array of cards, or JSON Lines (one card per line, what Scryfall's .jsonl files hold)
+function parseCards(text){
+  const t = text.trimStart();
+  if (t.startsWith("[")) return JSON.parse(t);
+  return t.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
+}
 // The artwork list, which may come gzip-compressed
 async function getBigJSON(url){
   for (let i = 0; ; i++) {
@@ -69,7 +75,7 @@ async function getBigJSON(url){
       if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
       let buf = Buffer.from(await r.arrayBuffer());
       if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);  // gzip file, not undone by the transfer
-      return JSON.parse(buf.toString("utf8"));
+      return parseCards(buf.toString("utf8"));
     } catch (e) { if (i >= 3) throw e; await sleep(5000 * 2 ** i); }
   }
 }
@@ -77,7 +83,7 @@ async function getBigJSON(url){
 // Every unique artwork printed on paper. Double-faced cards get one entry per face.
 async function artworks(){
   const list = process.env.SCRYFALL_BULK_FILE
-    ? JSON.parse(fs.readFileSync(process.env.SCRYFALL_BULK_FILE, "utf8"))
+    ? parseCards(fs.readFileSync(process.env.SCRYFALL_BULK_FILE, "utf8"))
     : await getBigJSON(await artworkListUrl());
   if (!Array.isArray(list)) throw new Error(`Scryfall's artwork list isn't a list of cards (got ${typeof list}: ${JSON.stringify(list).slice(0, 300)})`);
   const out = new Map();
