@@ -12,13 +12,11 @@ Use **Chrome or Edge** on a computer. Captions, voice commands, and the AI card 
 
 1. On GitHub, open this repo's **Settings > Pages**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-3. Open the **Actions** tab, pick **Deploy site and card index**, and click **Run workflow** (after that it runs on every push to `main` and weekly).
-4. When it finishes, the page is live at `https://<your-username>.github.io/kitchen-table/`.
+3. Every push to `main` runs **Deploy site**, which publishes the page in about a minute. To publish without a change, open **Actions > Deploy site > Run workflow**.
+4. The page is live at `https://<your-username>.github.io/kitchen-table/`.
 5. Open it, click **Sit down**, then **Copy invite link** and send it to your friends.
 
-The first run builds a picture index of every Magic card, which takes a few hours. The page is usable as soon as that run deploys. If the build runs out of time it deploys what it has, and the next run carries on from there.
-
-After that, runs only add cards the index doesn't have yet, so a new set takes minutes. The workflow runs every Monday; to pick up a set sooner, open **Actions > Deploy site and card index > Run workflow**. GitHub pauses scheduled workflows in a repository with no activity for 60 days; a manual run turns the schedule back on.
+**The all-cards picture index** (so clicks can find any card, not just ones in decklists) is only built when you ask: open **Actions > Build card index > Run workflow**. The first build covers every Magic card and takes a few hours; it saves progress as it goes, so you can stop it and run it again later to carry on. After that, a run only adds cards the index doesn't have yet, so picking up a new set takes minutes. Deploy site keeps whatever index was built last.
 
 Hosting matters. The phone camera QR code and the all-cards index only work from the hosted page, and Chrome remembers the microphone permission there. Opened as a local file, captions may ask for the mic every time they restart.
 
@@ -48,4 +46,4 @@ Double-click `index.html`. Players each open their own copy and type the same ta
 
 - **A friend sees the table but never gets video**: one of you is behind a strict network. Add a TURN relay (Metered, Twilio) under **Connection settings** in the lobby. Both players do this, then rejoin.
 - **The AI matcher says it couldn't load**: the basic color-based picture matcher still works. The model downloads from huggingface.co and the library from cdn.jsdelivr.net, so check that neither is blocked.
-- **Clicks only find cards from decklists**: the all-cards index isn't published yet. Check the **Actions** tab: the workflow's log says how many artworks are indexed, and which model it used.
+- **Clicks only find cards from decklists**: the all-cards index hasn't been built yet, or only partly. Run **Actions > Build card index**; its log says how many artworks are indexed and which model it used.
