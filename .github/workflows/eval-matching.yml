@@ -1,0 +1,53 @@
+# Measures how often a click finds the right card, on webcam-like pictures of real cards (tools/eval-matching.mjs).
+# Run it from Actions > Matching benchmark > Run workflow. It also runs when a branch changes the matcher.
+name: Matching benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      cards:
+        description: How many cards to test
+        default: "100"
+  push:
+    branches: ["claude/**"]
+    paths: ["index.html", "tools/eval-matching.mjs", "tools/eval/**", ".github/workflows/eval-matching.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-matching-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        dtype: [q8, fp32]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci --prefix tests
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests
+      - name: Get the published card index
+        run: |
+          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          mkdir -p site/index
+          curl -fsSL "$site/index/cards.json" -o site/index/cards.json
+          curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin
+      - name: Run the benchmark
+        run: node tools/eval-matching.mjs "${{ github.event.inputs.cards || '100' }}" "${{ matrix.dtype }}"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: matching-benchmark-${{ matrix.dtype }}
+          path: eval-results
+          retention-days: 14
