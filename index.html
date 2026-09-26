@@ -36,6 +36,9 @@ button{cursor:pointer}
 .field input,.field select,.field textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
 .field textarea{min-height:110px;resize:vertical;font-size:14px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.deckbar{gap:6px;margin-bottom:6px}
+.deckbar select,.deckbar input{flex:1;min-width:120px;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+.deckbar .btn{padding:8px 12px}
 .btn{padding:10px 16px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.2)}
 .btn.primary{background:var(--brass);border-color:var(--brass);color:#1b1608;font-weight:600}
 .btn:disabled{opacity:.5;cursor:default}
@@ -147,6 +150,12 @@ aside section+section{margin-top:22px}
 #cardView.flash{animation:cardFlash .9s ease-out}
 @keyframes cardFlash{from{box-shadow:0 0 0 3px var(--brass);border-radius:6px}to{box-shadow:0 0 0 3px transparent}}
 #histBox{margin:0 0 10px;font-size:13px}
+#matchStats{margin:0 0 8px;color:var(--muted)}
+.rechead{cursor:pointer;display:flex;align-items:baseline;gap:8px}
+.rechead h2{display:inline;margin:0}
+#recBox .btn{padding:5px 10px}
+#matchStats summary{cursor:pointer}
+#matchStats .btn{padding:4px 10px}
 #histBox summary{cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:8px}
 #histBox summary .spacer{flex:1}
 #histList{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;max-height:132px;overflow:auto}
@@ -242,6 +251,19 @@ button.mpip{cursor:pointer}
     <label class="field"><span>Microphone</span><select id="micSel"></select></label>
     <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
       <select id="modeSel"></select></label>
+    <div class="field"><span>Your decks (saved in this browser)</span>
+      <div class="row deckbar">
+        <select id="deckSel" aria-label="Saved decks"></select>
+        <input id="deckName" maxlength="40" placeholder="Deck name" aria-label="Deck name">
+        <button class="btn" id="deckSave" type="button">Save deck</button>
+        <button class="btn" id="deckDel" type="button">Delete</button>
+      </div>
+      <div class="row deckbar">
+        <input id="deckUrl" placeholder="Or paste a Moxfield or Archidekt deck link" aria-label="Deck link">
+        <button class="btn" id="deckImport" type="button">Import</button>
+      </div>
+      <p class="hint" id="deckMsg" role="status"></p>
+    </div>
     <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
       <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
     <p class="hint" id="deckCount"></p>
@@ -321,6 +343,11 @@ button.mpip{cursor:pointer}
       </div>
       <div id="status" aria-live="polite"></div>
       <p class="hint" id="artStat"></p>
+      <details id="matchStats" class="small">
+        <summary>Matching log (<span id="msCount">0</span>)</summary>
+        <p class="hint" id="msText"></p>
+        <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
+      </details>
       <details id="histBox" class="hidden" open>
         <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
         <div id="histList"></div>
@@ -360,7 +387,15 @@ button.mpip{cursor:pointer}
           <option value="device">Chrome on-device (private, audio stays on this computer)</option>
         </select></label>
       <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
-      <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn")</label>
+      <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
+    </section>
+    <section>
+      <details id="recBox">
+        <summary class="rechead"><h2>Game records</h2><span class="hint">(<span id="recCount">0</span>)</span></summary>
+        <p class="hint" id="recTotals"></p>
+        <ul class="list" id="recList"></ul>
+        <div class="row" style="margin-top:8px"><button class="btn small" id="recWin" type="button">Record a winner</button><button class="btn small" id="recCsv" type="button">Export CSV</button><button class="linkbtn small" id="recClear" type="button">Clear</button></div>
+      </details>
     </section>
     <section>
       <h2>Table log</h2>
@@ -561,6 +596,90 @@ function parseDeck(txt){
 function showDeckCount(){ const n = parseDeck($("#deckIn").value).length; $("#deckCount").textContent = n ? `${n} unique cards recognized from your list.` : ""; }
 $("#deckIn").addEventListener("input", showDeckCount); showDeckCount();
 
+/* Saved decks: several decklists kept in this browser, picked in the lobby */
+let savedDecks = [];
+try { savedDecks = JSON.parse(store.get("kt-decks", "[]")).filter(d => d && typeof d.id === "string" && typeof d.text === "string").slice(0, 50); } catch { savedDecks = []; }
+const deckMsg = t => { $("#deckMsg").textContent = t; };
+function storeDecks(){ store.set("kt-decks", JSON.stringify(savedDecks)); }
+function renderDeckSel(pick){
+  const sel = $("#deckSel"); sel.innerHTML = "";
+  const o = document.createElement("option"); o.value = ""; o.textContent = savedDecks.length ? "New deck (not saved yet)" : "No saved decks yet"; sel.appendChild(o);
+  [...savedDecks].sort((a, b) => a.name.localeCompare(b.name)).forEach(d => { const x = document.createElement("option"); x.value = d.id; x.textContent = d.name; sel.appendChild(x); });
+  sel.value = savedDecks.some(d => d.id === pick) ? pick : "";
+  $("#deckDel").disabled = !sel.value;
+}
+function pickDeck(id){
+  const d = savedDecks.find(x => x.id === id);
+  store.set("kt-deck-last", id || "");
+  $("#deckName").value = d ? d.name : "";
+  if (d) $("#deckIn").value = d.text;
+  $("#deckDel").disabled = !d; showDeckCount();
+}
+$("#deckSel").onchange = e => { pickDeck(e.target.value); deckMsg(""); };
+function saveDeck(quiet){
+  const text = $("#deckIn").value.trim();
+  if (!text) { if (!quiet) deckMsg("Paste a decklist first."); return; }
+  const name = $("#deckName").value.trim() || deckCommanders(text)[0] || `Deck ${savedDecks.length + 1}`;
+  let d = savedDecks.find(x => x.id === $("#deckSel").value);
+  if (!d) { if (savedDecks.length >= 50) { deckMsg("You can save up to 50 decks. Delete one first."); return; } d = { id:uid() }; savedDecks.push(d); }
+  Object.assign(d, { name:name.slice(0, 40), text:text.slice(0, 30000), at:Date.now() });
+  storeDecks(); renderDeckSel(d.id); pickDeck(d.id);
+  if (!quiet) deckMsg(`Saved "${d.name}".`);
+}
+$("#deckSave").onclick = () => saveDeck(false);
+$("#deckDel").onclick = () => {
+  const d = savedDecks.find(x => x.id === $("#deckSel").value); if (!d) return;
+  if (!confirm(`Delete the saved deck "${d.name}"?`)) return;
+  savedDecks = savedDecks.filter(x => x !== d); storeDecks(); renderDeckSel(""); $("#deckName").value = ""; deckMsg(`Deleted "${d.name}".`);
+};
+renderDeckSel(store.get("kt-deck-last", ""));
+if ($("#deckSel").value) pickDeck($("#deckSel").value);
+
+// Import from a deck link. Works only if the site lets other pages read its decks; otherwise we say how to copy the text.
+async function fetchDeckFromLink(url){
+  let m;
+  const lines = (list) => list.filter(c => c.name && c.qty > 0).map(c => `${c.qty} ${c.name}`).join("\n");
+  const build = (name, cmdrs, main) => ({ name, text:(cmdrs.length ? "Commander\n" + lines(cmdrs) + "\n\nDeck\n" : "") + lines(main) });
+  if ((m = /moxfield\.com\/decks\/([A-Za-z0-9_-]+)/i.exec(url))) {
+    const r = await fetch(`https://api2.moxfield.com/v3/decks/all/${m[1]}`, { headers:{ Accept:"application/json" } });
+    if (!r.ok) throw new Error(r.status === 404 ? "That Moxfield deck wasn't found. Is it public?" : `Moxfield answered ${r.status}.`);
+    const j = await r.json();
+    const board = b => Object.values(b?.cards || b || {}).map(e => ({ qty:+e.quantity || 1, name:e.card?.name || "" }));
+    const bs = j.boards || {};
+    return build(j.name || "Moxfield deck", board(bs.commanders || j.commanders), [...board(bs.mainboard || j.mainboard), ...board(bs.companions || j.companions)]);
+  }
+  if ((m = /archidekt\.com\/(?:api\/)?decks\/(\d+)/i.exec(url))) {
+    const r = await fetch(`https://archidekt.com/api/decks/${m[1]}/`, { headers:{ Accept:"application/json" } });
+    if (!r.ok) throw new Error(r.status === 404 ? "That Archidekt deck wasn't found. Is it public?" : `Archidekt answered ${r.status}.`);
+    const j = await r.json(), cmdrs = [], main = [];
+    for (const c of j.cards || []) {
+      const cats = (c.categories || []).map(x => String(x).toLowerCase());
+      if (cats.includes("maybeboard") || cats.includes("sideboard")) continue;
+      const e = { qty:+c.quantity || 1, name:c.card?.oracleCard?.name || c.card?.name || "" };
+      (cats.includes("commander") ? cmdrs : main).push(e);
+    }
+    return build(j.name || "Archidekt deck", cmdrs, main);
+  }
+  throw new Error("That doesn't look like a Moxfield or Archidekt deck link.");
+}
+$("#deckImport").onclick = async () => {
+  const url = $("#deckUrl").value.trim(); if (!url) { deckMsg("Paste a deck link first."); return; }
+  const site = /moxfield/i.test(url) ? "Moxfield" : /archidekt/i.test(url) ? "Archidekt" : "that site";
+  $("#deckImport").disabled = true; deckMsg("Importing...");
+  try {
+    const d = await fetchDeckFromLink(url);
+    if (!parseDeck(d.text).length) throw new Error("The deck came back empty.");
+    $("#deckSel").value = ""; $("#deckName").value = d.name.slice(0, 40); $("#deckIn").value = d.text; showDeckCount();
+    saveDeck(true); $("#deckUrl").value = "";
+    deckMsg(`Imported and saved "${d.name}" (${parseDeck(d.text).length} unique cards).`);
+  } catch (e) {
+    // A blocked request shows up as a network TypeError: the site doesn't allow other pages to read its decks
+    deckMsg(e instanceof TypeError
+      ? `${site} didn't let this page read the deck. On ${site}, open the deck, use its Export option to copy the list as text, and paste it in the box below.`
+      : e.message || "Couldn't import that deck.");
+  } finally { $("#deckImport").disabled = false; }
+};
+
 async function startCamera(deviceId, micId){
   if (localStream) localStream.getTracks().forEach(t => t.stop());
   const video = { width:{ ideal:1920 }, height:{ ideal:1080 }, ...(deviceId ? { deviceId:{ exact:deviceId } } : {}) };
@@ -613,6 +732,7 @@ $("#joinBtn").onclick = async () => {
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
   store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-deck", $("#deckIn").value);
+  if ($("#deckSel").value) saveDeck(true);  // edits to a saved deck are kept
   store.set("kt-turn-url", $("#turnUrl").value.trim()); store.set("kt-turn-user", $("#turnUser").value.trim()); store.set("kt-turn-cred", $("#turnCred").value);
   roomCode = $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || randomCode();
   $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Finding a seat...";
@@ -1021,6 +1141,11 @@ function onMessage(s, msg){
       break;
     }
     case "dice": playDice(msg, s); break;
+    case "gameresult": {
+      const r = cleanRecord(msg.rec);
+      if (r) { saveRecord(r); log(r.winner ? `${p.name || "Someone"} recorded the game: ${r.winner} won.` : `${p.name || "Someone"} recorded the game with no winner.`); }
+      break;
+    }
     case "snap": answerSnap(s, msg.id); break;
     case "capask":
       if (!capOn && SR) toast(`${p.name || "Another player"} asked you to turn on captions so your words show up for the table.`, () => { capOn = true; quickEnds = 0; startRec(); updateCapBtn(); }, "Turn on");
@@ -1117,10 +1242,81 @@ window.addEventListener("beforeunload", () => { if (me) saveLocal(true); peer?.d
 function gameSeconds(){ return gameStartAt ? (Date.now() - gameStartAt) / 1000 : 0; }
 function ensureGameStarted(){ if (!gameStartAt) { gameStartAt = Date.now(); tableKnown = true; pushTable(); log("Game clock started."); } }
 $("#startBtn").onclick = () => { if (!gameStartAt) { gameStartAt = Date.now(); if (table.turnSeat) turnStartAt = Date.now(); tableKnown = true; pushTable(); log("Game clock started."); } };
+function startNewGame(){ const id = uid(); broadcast({ type:"newgame", gameId:id }); applyNewGame("You", id); }
 $("#newBtn").onclick = () => {
+  // A game was played and nobody has recorded it yet: ask who won, which also confirms the new game
+  if (gameStartAt && !gameRecords.some(r => r.id === table.gameId)) { askWinner(true); return; }
   if (!confirm("Start a new game for everyone?\n\nThis resets every player's life, counters, and commander damage, clears the board state, stops the game clock, and erases the damage history. Click Export CSV first if you want to keep the history.")) return;
-  const id = uid(); broadcast({ type:"newgame", gameId:id }); applyNewGame("You", id);
+  startNewGame();
 };
+
+/* Game records: who won each game, with commanders, length, and turns. Kept in each player's browser across sessions;
+   a result recorded by anyone at the table is saved by everyone. */
+let gameRecords = [];
+try { gameRecords = JSON.parse(store.get("kt-records", "[]")).slice(-500); } catch { gameRecords = []; }
+function cleanRecord(r){
+  if (!r || typeof r !== "object" || typeof r.id !== "string") return null;
+  const str = (v, n) => String(v ?? "").slice(0, n);
+  return { id:str(r.id, 40), at:int(r.at, 0, 1e14), mode:MODES[r.mode] ? r.mode : "cmdr", secs:int(r.secs, 0, 1e6), turns:int(r.turns, 0, 9999),
+           winner:str(r.winner, 24), room:str(r.room, 16),
+           players:(Array.isArray(r.players) ? r.players : []).slice(0, MAX).map(p => ({ name:str(p?.name, 24), life:int(p?.life, -999, 999),
+             cmdrs:(Array.isArray(p?.cmdrs) ? p.cmdrs : []).slice(0, 2).map(c => str(c, 141)) })).filter(p => p.name) };
+}
+function saveRecord(raw){
+  const r = cleanRecord(raw); if (!r) return;
+  gameRecords = [...gameRecords.filter(x => x.id !== r.id), r].sort((a, b) => a.at - b.at).slice(-500);
+  store.set("kt-records", JSON.stringify(gameRecords)); renderRecords();
+}
+function recordGame(winner){
+  const seats = presentSeats();
+  const rec = { id:table.gameId, at:Date.now(), mode:table.mode, secs:Math.round(gameSeconds()), room:roomCode, winner:winner || "",
+    turns:Object.values(table.turns).reduce((a, b) => a + b, 0),
+    players:seats.map(s => { const p = s === mySeat ? me : players[s]; return { name:nm(s), life:p.life, cmdrs:(p.cmdrs || []).map(c => c.name) }; }) };
+  saveRecord(rec); broadcast({ type:"gameresult", rec });
+  log(winner ? `Game recorded: ${winner} won.` : "Game recorded with no winner.");
+}
+function askWinner(thenNewGame){
+  const card = document.createElement("div"); card.className = "modal-card";
+  const h = document.createElement("h2"); h.textContent = "Who won?"; card.appendChild(h);
+  const sub = document.createElement("p"); sub.className = "hint";
+  sub.textContent = thenNewGame ? "The result goes in everyone's game records, then a new game starts for everyone." : "The result goes in everyone's game records.";
+  card.appendChild(sub);
+  const row = document.createElement("div"); row.className = "row"; row.style.justifyContent = "center"; card.appendChild(row);
+  const btn = (label, fn, cls = "btn") => { const b = document.createElement("button"); b.className = cls; b.textContent = label; b.onclick = () => { closeModal(); fn(); }; row.appendChild(b); };
+  presentSeats().forEach(s => btn(nm(s), () => { recordGame(nm(s)); if (thenNewGame) startNewGame(); }, "btn primary"));
+  btn("No winner", () => { recordGame(""); if (thenNewGame) startNewGame(); });
+  if (thenNewGame) btn("New game without recording", startNewGame);
+  btn("Cancel", () => {}, "linkbtn");
+  openModal(card);
+}
+function renderRecords(){
+  $("#recCount").textContent = gameRecords.length;
+  const wins = new Map();
+  gameRecords.forEach(r => { if (r.winner) wins.set(r.winner, (wins.get(r.winner) || 0) + 1); });
+  $("#recTotals").textContent = !gameRecords.length ? "No games recorded yet. When you start a new game, you're asked who won."
+    : "Wins: " + ([...wins].sort((a, b) => b[1] - a[1]).map(([n, w]) => `${n} ${w}`).join(", ") || "none yet");
+  const ul = $("#recList"); ul.innerHTML = "";
+  [...gameRecords].reverse().slice(0, 30).forEach(r => {
+    const li = document.createElement("li");
+    const t = document.createElement("span"); t.className = "t"; t.textContent = new Date(r.at).toLocaleDateString(); li.appendChild(t);
+    const who = r.players.map(p => p.name + (p.cmdrs.length ? ` (${p.cmdrs.join(" and ")})` : "")).join(", ");
+    li.append(`${r.winner ? r.winner + " won" : "No winner"}. ${modeOf(r.mode).short}, ${fmt(r.secs)}, ${r.turns} turns. ${who}`);
+    ul.appendChild(li);
+  });
+}
+$("#recWin").onclick = () => askWinner(false);
+$("#recClear").onclick = () => { if (confirm("Clear all game records in this browser?")) { gameRecords = []; store.set("kt-records", "[]"); renderRecords(); } };
+$("#recCsv").onclick = () => {
+  const safe = v => { v = String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return `"${v.replace(/"/g, '""')}"`; };
+  const rows = [["Date", "Mode", "Winner", "Players", "Commanders", "Final life", "Length", "Turns", "Table"]];
+  gameRecords.forEach(r => rows.push([new Date(r.at).toLocaleString(), modeOf(r.mode).short, r.winner || "No winner",
+    r.players.map(p => p.name).join("; "), r.players.map(p => p.cmdrs.join(" and ") || "-").join("; "), r.players.map(p => p.life).join("; "), fmt(r.secs), r.turns, r.room]));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.map(r => r.map(safe).join(",")).join("\r\n")], { type:"text/csv" }));
+  a.download = `kitchen-table-game-records-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+renderRecords();
 function applyNewGame(by, id){
   quietLife();
   table.gameId = id || uid(); restored = true;  // a fresh game: nothing to bring back
@@ -2101,7 +2297,7 @@ function artMatch(fr, c, seat){
   }
   if (!res.best) return { ok:false, cands:cands.map(toVid) };
   const margin = res.best.score - (res.second ? res.second.score : -1);
-  return { ok:res.best.score >= 0.75 && margin >= 0.05, name:res.best.name, id:res.best.id, score:res.best.score,
+  return { ok:res.best.score >= 0.75 && margin >= 0.05, name:res.best.name, id:res.best.id, score:res.best.score, margin,
            vbox:toVid(res.best.box), cands:cands.map(toVid), top:res.ranked.slice(0, 4).map(r => ({ name:r.name, id:r.id, score:r.score })) };
 }
 function boxIoU(a, b){
@@ -2315,7 +2511,7 @@ async function aiMatchBoxes(fr, boxes, seat, color){
   const margin = best.score - (ranked[1]?.score ?? 0);
   // Confident on its own, or a closer call that the color matcher agrees with
   const ok = (best.score >= 0.55 && margin >= 0.06) || (best.score >= 0.45 && margin >= 0.02 && color?.name === best.name);
-  return { ok, name:best.name, id:best.id, score:best.score, vbox:best.box, q:qs[best.qi],
+  return { ok, name:best.name, id:best.id, score:best.score, margin, vbox:best.box, q:qs[best.qi],
            top:ranked.slice(0, 4).map(r => ({ name:r.name, id:r.id, score:r.score })) };
 }
 function fromVideo(video, x, y, rot){
@@ -2478,11 +2674,38 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
     showCard(card, { share:true });
     const pct = Math.max(0, Math.min(99, Math.round(m.score * 100)));
     setStatus(m.ok ? `${ai ? "AI picture match" : "Picture match"} (${pct}% similar).` : `Closest match (${pct}% similar). Not it? Pick the right card below.`);
-    showAlts({ list:(m.top || []).filter(x => x.name !== m.name).slice(0, 3), q:ai?.q || null, sure:m.ok });
+    const entry = logMatch({ how:m === ai ? "ai" : "color", drag:!!rect, ok:!!m.ok, name:m.name, score:m.score, margin:m.margin ?? null,
+      second:(m.top || []).find(x => x.name !== m.name)?.score ?? null, seat, sharp:!!fr.sharp });
+    showAlts({ list:(m.top || []).filter(x => x.name !== m.name).slice(0, 3), q:ai?.q || null, sure:m.ok, entry });
   } catch (e) {
     if (e?.name === "SecurityError") { ART.blocked = true; artStat(); setStatus("This browser blocked reading the camera picture."); }
     else { console.warn(e); setStatus("Something went wrong matching that card. Try again."); }
   } finally { lookBusy = false; }
+}
+/* Matching log: one line per card click, kept only in this browser, to set the matcher's "sure enough" thresholds from
+   real games. It records how confident the matcher was and whether you corrected it by picking a runner-up. */
+let matchLog = [];
+try { matchLog = JSON.parse(store.get("kt-matchlog", "[]")).slice(-500); } catch { matchLog = []; }
+const r3 = v => v == null ? null : Math.round(v * 1000) / 1000;
+function saveMatchLog(){ store.set("kt-matchlog", JSON.stringify(matchLog.slice(-500))); renderMatchStats(); }
+function logMatch(e){
+  const entry = { at:Date.now(), ...e, score:r3(e.score), margin:r3(e.margin), second:r3(e.second), idx:IDX.n, model:AI.model || "", fix:null };
+  matchLog.push(entry); saveMatchLog(); return entry;
+}
+function renderMatchStats(){
+  const el = $("#msText"); if (!el) return;
+  const n = matchLog.length, fixed = matchLog.filter(e => e.fix).length, sure = matchLog.filter(e => e.ok);
+  const sureWrong = sure.filter(e => e.fix).length;
+  $("#msCount").textContent = n;
+  el.textContent = !n ? "No card clicks recorded yet." :
+    `${n} clicks recorded. The matcher was sure on ${sure.length} (${sureWrong} of those you corrected) and unsure on ${n - sure.length}. ` +
+    `You corrected ${fixed} in total. Export the log and send it over to fine-tune when the matcher calls itself sure.`;
+}
+function exportMatchLog(){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ exported:new Date().toISOString(), model:AI.model || "", indexSize:IDX.n, clicks:matchLog }, null, 1)], { type:"application/json" }));
+  a.download = `kitchen-table-matching-log-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 // Runners-up under the status line. Picking one shows it and teaches the matcher this camera's view of that card.
 function showAlts(info){
@@ -2499,6 +2722,7 @@ function showAlts(info){
       const card = await fetchCard(x.id, x.name);
       if (!card) { setStatus(`Couldn't load ${x.name}.`); return; }
       showCard(card, { share:true }); showAlts(null);
+      if (info.entry) { info.entry.fix = x.name; info.entry.fixScore = x.score; saveMatchLog(); }
       if (info.q) { teach(card.name, card.id, info.q); setStatus(`Got it. Picture matching will recognize ${card.name} better on this camera now.`); }
       else setStatus("");
     };
@@ -2635,6 +2859,9 @@ $("#histClear").onclick = e => {
   cardHist = []; histOn = ""; store.set("kt-history", "[]"); renderHistory();
 };
 renderHistory();
+$("#msExport").onclick = exportMatchLog;
+$("#msClear").onclick = () => { if (confirm("Clear the matching log?")) { matchLog = []; saveMatchLog(); } };
+renderMatchStats();
 let acTimer = null, acItems = [], acOn = -1, acSeq = 0;
 function hideAc(){ $("#acBox").classList.add("hidden"); $("#searchIn").setAttribute("aria-expanded", "false"); acItems = []; acOn = -1; }
 function drawAc(){
@@ -3226,12 +3453,30 @@ const VOICE_WORDS = ["six", "sixteen", "sixty", "seven", "seventeen", "seventy",
   "set", "sacrifice", "colorless", "spend", "spending", "use", "using", "cast", "damage", "less", "lose", "loss", "lost", "is", "this", "its", "it's", "so"];
 const VOICE_LISP = new Map(VOICE_WORDS.map(w => [lispNorm(w.replace(/'/g, "")), w]));
 function delisp(text){ return text.split(/\s+/).map(w => { const k = w.toLowerCase().replace(/[^a-z']/g, ""); return VOICE_WORDS.includes(k) ? w : (VOICE_LISP.get(lispNorm(k.replace(/'/g, ""))) || w); }).join(" "); }
+async function lookUpSpoken(q){
+  // First a card name the caption linker recognizes (decklists, sound-alikes, all of Magic), then Scryfall's fuzzy search
+  try { await loadIndex(); } catch {}
+  const seg = linkify(q, !!me.lisp).find(x => x.card);
+  let card = seg ? (await scry("/cards/named?exact=" + encodeURIComponent(seg.card)) || await findCard(seg.card)) : null;
+  if (!card) {
+    const c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
+    const said = me.lisp ? lispNorm(norm(q)) : norm(q), named = c ? norm(c.name.split(" // ")[0]) : "";
+    if (c && similarity(said, me.lisp ? lispNorm(named) : named) >= 0.6) card = c;
+  }
+  if (!card) { toast(`Heard "${q}", but no card matched.`); return; }
+  showCard(card, { share:true }); toast(`Heard: look up ${card.name}`);
+}
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
   if (me.lisp) raw = delisp(raw);
   const t = raw.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim()
     .replace(/\b(maga|manna|mona|mono)\b/g, "mana").replace(/\b(read|reed)(?= mana\b)/g, "red").replace(/\bblew(?= mana\b)/g, "blue");
   let m;
+  // Card lookup: "what does Rhystic Study do", "show me Sol Ring", "look up Smothering Tithe", "read Cyclonic Rift"
+  if ((m = t.match(/^(?:hey |ok |okay |so |um |uh )?(?:what does|what do|what's|whats|what is|show me|look up|lookup|pull up|read me|read|find|check)\s+(?:the card\s+|card\s+)?(.+?)(?:\s+(?:do|does|say|says|card|again))*$/))) {
+    const q = m[1].trim();
+    if (q.length >= 3 && !/^(my|your|his|her|their|our|it|that|this|life|mana|poison|everyone|the (turn|time|score|clock|board|game))\b/.test(q)) { lookUpSpoken(q); return; }
+  }
   if (/\broll (off|for first|to see who goes first|for who goes first)\b/.test(t)) { startRollOff(); toast("Heard: roll for first player"); return; }
   if (/\bflip (a )?coin\b/.test(t)) { rollDice("coin"); toast("Heard: flip a coin"); return; }
   if ((m = t.match(/\broll (?:a |an |the )?d ?(4|6|8|10|12|20|four|six|eight|ten|twelve|twenty)\b/))) {
