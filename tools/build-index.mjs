@@ -100,10 +100,16 @@ async function artworks(){
   return out;
 }
 
-function loadPrevious(){
+/* A rebuild (a new model or way of preparing art) goes into cards.next.json and cards.next.bin, so the page keeps
+   using the old, complete index until the new one has every card; then the new one takes its place. */
+const REBUILDING = (() => { try { const m = JSON.parse(fs.readFileSync(path.join(OUT, "cards.json"), "utf8"));
+  return (m.model !== undefined) && ((m.prep || "") !== PREP || (MODEL && m.model !== MODEL)); } catch { return false; } })();
+const base = next => next ? "cards.next" : "cards";
+function loadPrevious(){ const a = loadFiles(false); return a.dims ? a : loadFiles(true); }
+function loadFiles(next){
   try {
-    const meta = JSON.parse(fs.readFileSync(path.join(OUT, "cards.json"), "utf8"));
-    const bin = fs.readFileSync(path.join(OUT, "cards.bin"));
+    const meta = JSON.parse(fs.readFileSync(path.join(OUT, base(next) + ".json"), "utf8"));
+    const bin = fs.readFileSync(path.join(OUT, base(next) + ".bin"));
     const n = meta.cards.length, D = meta.dims;
     if (meta.model !== MODEL || (meta.prep || "") !== PREP || !!meta.fake !== FAKE || bin.length !== n * 4 + n * D) return { dims:0, map:new Map() };
     const scales = new Float32Array(bin.buffer.slice(bin.byteOffset, bin.byteOffset + n * 4));
@@ -113,7 +119,8 @@ function loadPrevious(){
   } catch { return { dims:0, map:new Map() }; }
 }
 
-function save(entries, dims){
+// done: every artwork is in (a rebuild then replaces the old index); otherwise progress is saved to carry on from
+function save(entries, dims, done = false){
   const list = [...entries.values()].filter(e => e.v);
   const n = list.length, bin = Buffer.alloc(n * 4 + n * dims);
   const scales = new Float32Array(n);
@@ -121,11 +128,13 @@ function save(entries, dims){
   bin.set(new Uint8Array(scales.buffer), 0);
   const meta = { model:MODEL, prep:PREP, ...(FAKE ? { fake:true } : {}), dims, n, built:new Date().toISOString(), cards:list.map(e => [e.id, e.name, e.face]) };
   fs.mkdirSync(OUT, { recursive:true });
+  const b = base(REBUILDING && !done);
   // Write both files beside the old ones, then swap, so a cut-off run never leaves a half-written index
-  fs.writeFileSync(path.join(OUT, "cards.bin.tmp"), bin);
-  fs.writeFileSync(path.join(OUT, "cards.json.tmp"), JSON.stringify(meta));
-  fs.renameSync(path.join(OUT, "cards.bin.tmp"), path.join(OUT, "cards.bin"));
-  fs.renameSync(path.join(OUT, "cards.json.tmp"), path.join(OUT, "cards.json"));
+  fs.writeFileSync(path.join(OUT, b + ".bin.tmp"), bin);
+  fs.writeFileSync(path.join(OUT, b + ".json.tmp"), JSON.stringify(meta));
+  fs.renameSync(path.join(OUT, b + ".bin.tmp"), path.join(OUT, b + ".bin"));
+  fs.renameSync(path.join(OUT, b + ".json.tmp"), path.join(OUT, b + ".json"));
+  if (b === "cards") for (const f of ["cards.next.json", "cards.next.bin"]) fs.rmSync(path.join(OUT, f), { force:true });
   return n;
 }
 
@@ -227,6 +236,7 @@ let dims = prev.dims;
 const todo = [...entries.values()].filter(e => !e.v);
 console.log(`${all.size} artworks on Scryfall, ${all.size - todo.length} already indexed, ${todo.length} to add.`);
 
+let timedOut = false;
 if (todo.length) {
   const fetchChunk = i => mapPool(todo.slice(i, i + BATCH), CONC, e => loadArt(e.art));
   let added = 0, failed = 0, lastSave = Date.now(), nextImgs = fetchChunk(0);
@@ -245,9 +255,12 @@ if (todo.length) {
     }
     if (Date.now() - lastSave > 5 * 60e3) { save(entries, dims); lastSave = Date.now(); }
     if ((i / BATCH) % 25 === 0) console.log(`${added} added, ${failed} failed, ${todo.length - i - chunk.length} left, ${Math.round((Date.now() - started) / 60e3)} min`);
-    if (Date.now() - started > MAX_MS) { console.log("Time limit reached. Saving; the next run continues from here."); break; }
+    if (Date.now() - started > MAX_MS) { console.log("Time limit reached. Saving; the next run continues from here."); timedOut = true; break; }
   }
   console.log(`Added ${added} artworks, ${failed} couldn't be downloaded.`);
 }
-if (dims) console.log(`Index has ${save(entries, dims)} artworks (${dims} values each) in ${OUT}.`);
+// (artworks that couldn't be downloaded don't hold a rebuild back; every run tries them again)
+if (REBUILDING && timedOut) console.log(`Rebuilding the index for a new way of preparing art: ${[...entries.values()].filter(e => e.v).length} of ${entries.size} done. ` +
+  "The site keeps the old index until the rest are done; run Build card index again to carry on.");
+if (dims) console.log(`Index has ${save(entries, dims, !timedOut)} artworks (${dims} values each) in ${OUT}.`);
 else console.log("Nothing to index.");
