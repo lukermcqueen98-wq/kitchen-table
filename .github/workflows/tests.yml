@@ -1,0 +1,48 @@
+# Runs the browser tests (tests/) on every pull request and every change to main:
+# two or three Chromium players on a local signaling server, with stand-ins for Scryfall, deck sites,
+# the AI models, and speech recognition. See tests/README.md.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            tools/package-lock.json
+            tests/package-lock.json
+      - name: Install the index builder and the test tools
+        run: |
+          npm ci --prefix tools --no-audit --no-fund
+          npm ci --prefix tests --no-audit --no-fund
+      - name: Install Chromium
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+      - name: Run the tests
+        working-directory: tests
+        run: npx playwright test
+      - name: Keep screenshots and traces of failures
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results
+          path: tests/test-results
+          retention-days: 7

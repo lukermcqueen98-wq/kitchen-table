@@ -28,6 +28,11 @@ button{cursor:pointer}
 /* Lobby and phone camera */
 .screen{min-height:100%;display:grid;place-items:center;padding:24px}
 .lobby-card{width:min(100%,480px)}
+#lobby .lobby-card{width:min(100%,940px)}
+.lobby-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 36px;align-items:start}
+@media (max-width:860px){.lobby-cols{grid-template-columns:1fr}}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:10px;cursor:pointer}
+.btn.big{width:100%;padding:13px 16px;font-size:17px;margin-top:4px}
 .lobby-card h1{font:700 clamp(40px,8vw,64px)/1 var(--serif);margin:0 0 8px;letter-spacing:-.01em}
 .lede{color:var(--muted);margin:0 0 24px;max-width:42ch}
 .preview{width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;margin:8px 0 14px;object-fit:contain}
@@ -50,10 +55,17 @@ details.adv summary{cursor:pointer}
 
 /* Table layout */
 #table{height:100%;display:grid;grid-template-columns:1fr 350px;grid-template-rows:auto 1fr}
-header.bar{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap;position:relative;z-index:20}
-header.bar .room{font:700 20px var(--serif);margin-right:4px}
-header.bar .spacer{flex:1}
-header.bar .btn{padding:6px 11px;font-size:14px}
+header.bar{grid-column:1/-1;display:flex;align-items:center;gap:8px 18px;padding:7px 14px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap;position:relative;z-index:30}
+header.bar .grp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+header.bar .grp.game{flex:1;justify-content:center}
+header.bar .room{font:700 19px var(--serif);margin-right:4px;white-space:nowrap}
+header.bar .btn{padding:6px 11px;font-size:14px;white-space:nowrap}
+header.bar .btn.primary{padding:6px 16px}
+#passBtn:not(.primary){background:rgba(0,0,0,.2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Side panel hidden: the cameras get the whole width */
+#table.nopanel{grid-template-columns:1fr}
+#table.nopanel aside{display:none}
 #waitNote{color:var(--muted);font-size:14px}
 #netWarn{flex-basis:100%;display:flex;gap:12px;align-items:flex-start;background:rgba(224,118,92,.14);border:1px solid var(--danger);border-radius:8px;padding:8px 12px;font-size:14px}
 #netWarn.slow{background:rgba(201,164,76,.12);border-color:var(--brass)}
@@ -89,6 +101,17 @@ header.bar .btn{padding:6px 11px;font-size:14px}
 .tile video.rot{transform:rotate(180deg)}
 .tile .hit{position:absolute;inset:0;cursor:crosshair;touch-action:none}
 .tile .sel{position:absolute;border:2px solid var(--brass);background:rgba(201,164,76,.12);pointer-events:none}
+/* Card click, SpellTable style: a pulsing ring where you clicked, which snaps to an outline of the card it found, then a scan sweep */
+.tile .sel.pulse{border-radius:50%;animation:selPulse 1s ease-in-out infinite}
+@keyframes selPulse{0%,100%{box-shadow:0 0 0 0 rgba(201,164,76,.7)}50%{box-shadow:0 0 0 12px rgba(201,164,76,0)}}
+.tile .sel.card{border-radius:4.8%/3.4%;background:rgba(201,164,76,.06);box-shadow:0 0 16px 2px rgba(201,164,76,.6);overflow:hidden;animation:none;
+  transition:left .25s ease-out,top .25s ease-out,width .25s ease-out,height .25s ease-out,border-radius .25s ease-out}
+.tile .sel.card::after{content:"";position:absolute;left:0;right:0;height:20%;top:-20%;background:linear-gradient(to bottom,transparent,rgba(255,232,160,.55),transparent);animation:selScan .5s .25s ease-in-out forwards}
+@keyframes selScan{to{top:100%}}
+.tile .sel.unsure{border-style:dashed;border-color:#e8a33c;box-shadow:0 0 14px 1px rgba(232,163,60,.5)}
+.tile .sel.miss{border-color:var(--danger);background:rgba(224,118,92,.18);animation:selMiss .6s ease-out forwards}
+@keyframes selMiss{to{opacity:0;transform:scale(1.3)}}
+.tile .sel.fade{opacity:0;transition:opacity .4s}
 .nocam{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;pointer-events:none;text-align:center;padding:20px}
 .plate{position:absolute;left:10px;top:10px;right:130px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:none}
 .prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -137,11 +160,17 @@ header.bar .btn{padding:6px 11px;font-size:14px}
 .dmgask .skip{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px}
 
 /* Side panel */
-aside{border-left:1px solid var(--felt-edge);min-height:0;overflow:auto;padding:14px}
+aside{border-left:1px solid var(--felt-edge);min-height:0;overflow:auto;padding:0 14px 14px}
 aside h2{font:700 18px var(--serif);margin:0 0 8px}
 aside section+section{margin-top:22px}
+.tabs{position:sticky;top:0;z-index:25;display:flex;gap:2px;margin:0 -14px 14px;padding:8px 10px 0;background:var(--felt-deep);border-bottom:1px solid var(--felt-edge)}
+.tabs button{flex:1;position:relative;background:none;border:0;border-bottom:3px solid transparent;padding:8px 4px 7px;color:var(--muted);font-weight:600;font-size:14px}
+.tabs button:hover{color:var(--parchment)}
+.tabs button[aria-selected="true"]{color:var(--parchment);border-bottom-color:var(--brass)}
+.tabs .badge{display:inline-block;min-width:18px;height:18px;margin-left:5px;padding:0 5px;border-radius:9px;background:var(--brass);color:#1b1608;font-size:11px;line-height:18px;vertical-align:1px}
 .search{display:flex;gap:6px;margin-bottom:10px}
 .search input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);min-width:0}
+#cardSec{scroll-margin-top:52px}
 #cardView img{width:100%;border-radius:4.75% / 3.5%;display:block;margin-bottom:10px}
 #cardView .type{color:var(--muted);font-size:14px;margin:0 0 6px}
 #cardView .oracle{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
@@ -181,6 +210,8 @@ aside section+section{margin-top:22px}
 #capPeers{font-size:13px;color:var(--muted);margin:0 0 6px}
 #capPeers div{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:2px 0}
 #capPeers .ok{color:var(--parchment)}
+#capPeers .caplive{flex-basis:100%;padding-left:2px}
+#capDiag{margin:0 0 6px}
 #captions{list-style:none;padding:0;margin:6px 0 0;font-size:14px;max-height:240px;overflow:auto;border:1px solid var(--felt-edge);border-radius:8px}
 #captions li{padding:6px 10px;border-top:1px solid rgba(255,255,255,.05)}
 #captions li:first-child{border-top:0}
@@ -232,9 +263,11 @@ button.mpip{cursor:pointer}
   #grid.n2,#grid.n3,#grid.n4{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto}
   #grid .tile{grid-column:auto !important;aspect-ratio:16/9}
   aside{border-left:0;border-top:1px solid var(--felt-edge)}
+  #panelBtn{display:none}
+  header.bar .grp.game{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){
-  .life output{transition:none}.tile.enter{animation:none}.die.rolling svg{animation:none}
+  .life output{transition:none}.tile.enter{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
 }
 </style>
 </head>
@@ -244,42 +277,46 @@ button.mpip{cursor:pointer}
   <div class="lobby-card">
     <h1>Kitchen Table</h1>
     <p class="lede">Play paper Magic over webcam. Point a camera at your playmat, share the table, and click any card on screen to read it.</p>
-    <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
-    <p class="hint hidden" id="noCam">No webcam found. You can still sit down and use your phone as the camera from the table.</p>
-    <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" placeholder="Luke"></label>
-    <label class="field"><span>Camera</span><select id="camSel"></select></label>
-    <label class="field"><span>Microphone</span><select id="micSel"></select></label>
-    <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
-      <select id="modeSel"></select></label>
-    <div class="field"><span>Your decks (saved in this browser)</span>
-      <div class="row deckbar">
-        <select id="deckSel" aria-label="Saved decks"></select>
-        <input id="deckName" maxlength="40" placeholder="Deck name" aria-label="Deck name">
-        <button class="btn" id="deckSave" type="button">Save deck</button>
-        <button class="btn" id="deckDel" type="button">Delete</button>
+    <div class="lobby-cols">
+      <div class="col">
+      <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
+      <p class="hint hidden" id="noCam">No webcam found. You can still sit down and use your phone as the camera from the table.</p>
+      <label class="field"><span>Camera</span><select id="camSel"></select></label>
+      <label class="field"><span>Microphone</span><select id="micSel"></select></label>
+      <label class="check"><input type="checkbox" id="rotIn"> My camera is upside down</label>
+      <details class="adv">
+        <summary>Connection settings (TURN relay)</summary>
+        <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
+        <label class="field"><span>TURN URL</span><input id="turnUrl" placeholder="turn:example.com:3478"></label>
+        <label class="field"><span>Username</span><input id="turnUser"></label>
+        <label class="field"><span>Credential</span><input id="turnCred" type="password"></label>
+      </details>
       </div>
-      <div class="row deckbar">
-        <input id="deckUrl" placeholder="Or paste a Moxfield or Archidekt deck link" aria-label="Deck link">
-        <button class="btn" id="deckImport" type="button">Import</button>
+      <div class="col">
+      <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" placeholder="Luke"></label>
+      <label class="field"><span>Table code (leave blank to start a new table)</span><input id="roomIn" maxlength="16" autocomplete="off"></label>
+      <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
+        <select id="modeSel"></select></label>
+      <div class="field"><span>Your decks (saved in this browser)</span>
+        <div class="row deckbar">
+          <select id="deckSel" aria-label="Saved decks"></select>
+          <input id="deckName" maxlength="40" placeholder="Deck name" aria-label="Deck name">
+          <button class="btn" id="deckSave" type="button">Save deck</button>
+          <button class="btn" id="deckDel" type="button">Delete</button>
+        </div>
+        <div class="row deckbar">
+          <input id="deckUrl" placeholder="Or paste a Moxfield or Archidekt deck link" aria-label="Deck link">
+          <button class="btn" id="deckImport" type="button">Import</button>
+        </div>
+        <p class="hint" id="deckMsg" role="status"></p>
       </div>
-      <p class="hint" id="deckMsg" role="status"></p>
+      <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
+        <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
+      <p class="hint" id="deckCount"></p>
+      <button class="btn primary big" id="joinBtn">Sit down</button>
+      <div id="lobbyErr" role="alert"></div>
+      </div>
     </div>
-    <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
-      <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
-    <p class="hint" id="deckCount"></p>
-    <label class="field"><span>Table code (leave blank to start a new table)</span><input id="roomIn" maxlength="16" autocomplete="off"></label>
-    <div class="row">
-      <button class="btn primary" id="joinBtn">Sit down</button>
-      <label class="btn"><input type="checkbox" id="rotIn"> Camera is upside down</label>
-    </div>
-    <div id="lobbyErr" role="alert"></div>
-    <details class="adv">
-      <summary>Connection settings (TURN relay)</summary>
-      <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
-      <label class="field"><span>TURN URL</span><input id="turnUrl" placeholder="turn:example.com:3478"></label>
-      <label class="field"><span>Username</span><input id="turnUser"></label>
-      <label class="field"><span>Credential</span><input id="turnCred" type="password"></label>
-    </details>
   </div>
 </section>
 
@@ -300,107 +337,133 @@ button.mpip{cursor:pointer}
 
 <section id="table" class="hidden">
   <header class="bar">
-    <span class="room" id="roomLabel"></span>
-    <button class="btn" id="copyBtn">Copy invite link</button>
-    <button class="btn" id="phoneBtn">Phone camera</button>
-    <span id="waitNote">Waiting for players to join</span>
-    <span class="clock" id="gameClock">Game not started</span>
-    <span class="daychip hidden" id="dayChip"></span>
-    <button class="btn" id="startBtn">Start game</button>
-    <button class="btn" id="newBtn">New game</button>
-    <span class="spacer"></span>
-    <button class="btn" id="rollBtn">Roll for first</button>
-    <details class="dd" id="diceDd">
-      <summary class="btn">Dice</summary>
-      <div class="menu">
-        <button data-kind="coin">Flip a coin</button>
-        <button data-kind="d4">Roll a d4</button>
-        <button data-kind="d6">Roll a d6</button>
-        <button data-kind="d8">Roll a d8</button>
-        <button data-kind="d10">Roll a d10</button>
-        <button data-kind="d12">Roll a d12</button>
-        <button data-kind="d20">Roll a d20</button>
-      </div>
-    </details>
-    <button class="btn" id="passBtn">Pass turn</button>
-    <button class="btn" id="capBtn">Captions on</button>
-    <button class="btn" id="micBtn">Mute mic</button>
-    <button class="btn" id="camBtn">Hide camera</button>
-    <button class="btn" id="rotBtn">Flip my camera</button>
-    <button class="btn" id="leaveBtn">Leave</button>
+    <div class="grp">
+      <span class="room" id="roomLabel"></span>
+      <button class="btn" id="copyBtn">Copy invite link</button>
+      <span id="waitNote">Waiting for players to join</span>
+    </div>
+    <div class="grp game">
+      <span class="clock" id="gameClock"></span>
+      <span class="daychip hidden" id="dayChip"></span>
+      <button class="btn" id="startBtn">Start game</button>
+      <button class="btn primary" id="passBtn" title="Pass the turn to the next player">Pass turn</button>
+      <details class="dd" id="diceDd">
+        <summary class="btn">Dice</summary>
+        <div class="menu">
+          <button id="rollBtn" type="button">Roll for who goes first</button>
+          <button data-kind="coin">Flip a coin</button>
+          <button data-kind="d4">Roll a d4</button>
+          <button data-kind="d6">Roll a d6</button>
+          <button data-kind="d8">Roll a d8</button>
+          <button data-kind="d10">Roll a d10</button>
+          <button data-kind="d12">Roll a d12</button>
+          <button data-kind="d20">Roll a d20</button>
+        </div>
+      </details>
+    </div>
+    <div class="grp mine">
+      <button class="btn" id="micBtn" title="Mute or unmute your microphone">Mic on</button>
+      <button class="btn" id="camBtn" title="Hide or show your camera">Camera on</button>
+      <button class="btn" id="capBtn">Captions on</button>
+      <details class="dd" id="moreDd">
+        <summary class="btn">More</summary>
+        <div class="menu">
+          <button id="phoneBtn" type="button">Use my phone as the camera</button>
+          <button id="rotBtn" type="button">Flip my camera</button>
+          <button id="newBtn" type="button">New game</button>
+          <button id="leaveBtn" type="button">Leave the table</button>
+        </div>
+      </details>
+      <button class="btn" id="panelBtn" type="button" aria-controls="side" aria-expanded="true">Hide panel</button>
+    </div>
     <div id="netWarn" class="hidden" role="alert"><span id="netText"></span><button id="netDismiss">Dismiss</button></div>
   </header>
   <div id="grid"></div>
-  <aside>
-    <section id="cardSec">
-      <h2>Card</h2>
-      <div class="search">
-        <div class="searchwrap">
-          <input id="searchIn" placeholder="Type a card name" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="acBox">
-          <div id="acBox" class="hidden" role="listbox"></div>
+  <aside id="side">
+    <nav class="tabs" role="tablist" aria-label="Side panel">
+      <button role="tab" id="tab-card" data-tab="card" aria-selected="true">Card<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-log" data-tab="log" aria-selected="false">Log<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-captions" data-tab="captions" aria-selected="false">Captions<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-table" data-tab="table" aria-selected="false">Table<span class="badge hidden"></span></button>
+    </nav>
+    <div class="pane" role="tabpanel" data-pane="card" aria-labelledby="tab-card">
+      <section id="cardSec">
+        <h2 class="sr">Card</h2>
+        <div class="search">
+          <div class="searchwrap">
+            <input id="searchIn" placeholder="Type a card name" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="acBox">
+            <div id="acBox" class="hidden" role="listbox"></div>
+          </div>
+          <button class="btn" id="searchBtn">Find</button>
         </div>
-        <button class="btn" id="searchBtn">Find</button>
+        <div id="status" aria-live="polite"></div>
+        <p class="hint" id="artStat"></p>
+        <details id="matchStats" class="small">
+          <summary>Matching log (<span id="msCount">0</span>)</summary>
+          <p class="hint" id="msText"></p>
+          <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
+        </details>
+        <details id="histBox" class="hidden" open>
+          <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
+          <div id="histList"></div>
+        </details>
+        <div id="alts" class="hidden"></div>
+        <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
+      </section>
       </div>
-      <div id="status" aria-live="polite"></div>
-      <p class="hint" id="artStat"></p>
-      <details id="matchStats" class="small">
-        <summary>Matching log (<span id="msCount">0</span>)</summary>
-        <p class="hint" id="msText"></p>
-        <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
-      </details>
-      <details id="histBox" class="hidden" open>
-        <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
-        <div id="histList"></div>
-      </details>
-      <div id="alts" class="hidden"></div>
-      <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
-    </section>
-    <section>
-      <h2>Table</h2>
-      <div class="tbl">
-        <label for="tblMode">Game mode</label><select id="tblMode"></select>
-        <span></span><span class="hint" id="modeHint"></span>
-        <label for="monSel">Monarch</label><select id="monSel"></select>
-        <label for="iniSel">Initiative</label><select id="iniSel"></select>
-        <label for="dnSel">Day or night</label>
-        <select id="dnSel"><option value="">Neither yet</option><option value="day">Day</option><option value="night">Night</option></select>
-        <label for="clockSel">Turn clock</label>
-        <select id="clockSel"><option value="off">Off</option><option value="up">Count up</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option></select>
+    <div class="pane hidden" role="tabpanel" data-pane="log" aria-labelledby="tab-log">
+      <section>
+        <h2>Table log</h2>
+        <ul class="list" id="log"></ul>
+      </section>
+        <section>
+        <div class="dmghead"><h2 style="margin:0">Damage history</h2><span class="spacer" style="flex:1"></span>
+          <select id="dmgFilter" aria-label="Filter damage history"></select>
+          <button class="btn small" id="csvBtn" style="padding:5px 10px">Export CSV</button></div>
+        <div id="dmgTotals"></div>
+        <ul class="list" id="dmgList"></ul>
+      </section>
       </div>
-    </section>
-    <section>
-      <div class="dmghead"><h2 style="margin:0">Damage history</h2><span class="spacer" style="flex:1"></span>
-        <select id="dmgFilter" aria-label="Filter damage history"></select>
-        <button class="btn small" id="csvBtn" style="padding:5px 10px">Export CSV</button></div>
-      <div id="dmgTotals"></div>
-      <ul class="list" id="dmgList"></ul>
-    </section>
-    <section>
-      <h2>Captions</h2>
-      <p class="hint" id="capHint"></p>
-      <div id="capPeers"></div>
-      <ul id="captions"></ul>
-      <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
-      <label class="opts-line">Speech engine
-        <select id="engineSel" style="padding:4px 6px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)">
-          <option value="browser">Chrome or Edge speech (most accurate)</option>
-          <option value="device">Chrome on-device (private, audio stays on this computer)</option>
-        </select></label>
-      <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
-      <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
-    </section>
-    <section>
-      <details id="recBox">
-        <summary class="rechead"><h2>Game records</h2><span class="hint">(<span id="recCount">0</span>)</span></summary>
-        <p class="hint" id="recTotals"></p>
-        <ul class="list" id="recList"></ul>
-        <div class="row" style="margin-top:8px"><button class="btn small" id="recWin" type="button">Record a winner</button><button class="btn small" id="recCsv" type="button">Export CSV</button><button class="linkbtn small" id="recClear" type="button">Clear</button></div>
-      </details>
-    </section>
-    <section>
-      <h2>Table log</h2>
-      <ul class="list" id="log"></ul>
-    </section>
+    <div class="pane hidden" role="tabpanel" data-pane="captions" aria-labelledby="tab-captions">
+      <section>
+        <h2>Captions</h2>
+        <p class="hint" id="capHint"></p>
+        <div id="capPeers"></div>
+        <button class="linkbtn small" id="capDiag" type="button">Copy caption diagnostics</button>
+        <ul id="captions"></ul>
+        <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
+        <label class="opts-line">Speech engine
+          <select id="engineSel" style="padding:4px 6px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)">
+            <option value="browser">Chrome or Edge speech (most accurate)</option>
+            <option value="device">Chrome on-device (private, audio stays on this computer)</option>
+          </select></label>
+        <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
+        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
+      </section>
+      </div>
+    <div class="pane hidden" role="tabpanel" data-pane="table" aria-labelledby="tab-table">
+      <section>
+        <h2>Table</h2>
+        <div class="tbl">
+          <label for="tblMode">Game mode</label><select id="tblMode"></select>
+          <span></span><span class="hint" id="modeHint"></span>
+          <label for="monSel">Monarch</label><select id="monSel"></select>
+          <label for="iniSel">Initiative</label><select id="iniSel"></select>
+          <label for="dnSel">Day or night</label>
+          <select id="dnSel"><option value="">Neither yet</option><option value="day">Day</option><option value="night">Night</option></select>
+          <label for="clockSel">Turn clock</label>
+          <select id="clockSel"><option value="off">Off</option><option value="up">Count up</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option></select>
+        </div>
+      </section>
+        <section>
+        <details id="recBox">
+          <summary class="rechead"><h2>Game records</h2><span class="hint">(<span id="recCount">0</span>)</span></summary>
+          <p class="hint" id="recTotals"></p>
+          <ul class="list" id="recList"></ul>
+          <div class="row" style="margin-top:8px"><button class="btn small" id="recWin" type="button">Record a winner</button><button class="btn small" id="recCsv" type="button">Export CSV</button><button class="linkbtn small" id="recClear" type="button">Clear</button></div>
+        </details>
+      </section>
+      </div>
   </aside>
 </section>
 
@@ -815,11 +878,14 @@ function setupCall(s, call, outgoing){
   const drop = () => { if (calls[s]?.call === call) { delete calls[s]; removeIfGone(s); } };
   call.on("close", drop); call.on("error", drop);
 }
+function sendHello(conn){
+  send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog,
+               fresh:!restored && Date.now() - joinedAt < 30000, sid:SID });
+}
 function setupConn(s, conn, outgoing){
   conns[s] = { conn, outgoing };
   watchLink(s, () => conn.peerConnection);
-  conn.on("open", () => send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog,
-                                     fresh:!restored && Date.now() - joinedAt < 30000, sid:SID }));
+  conn.on("open", () => sendHello(conn));
   conn.on("data", msg => { try { onMessage(s, msg); } catch (e) { console.warn(e); } });
   const drop = () => { if (conns[s]?.conn === conn) { delete conns[s]; removeIfGone(s); } };
   conn.on("close", drop); conn.on("error", drop);
@@ -907,7 +973,7 @@ function applyWebcam(){ const t = localStream?.getVideoTracks()[0]; if (t) t.ena
 function send(conn, msg){ try { if (conn.open) conn.send(msg); } catch {} }
 function broadcast(msg){ Object.values(conns).forEach(c => send(c.conn, msg)); }
 function publicState(){
-  return { name:me.name, life:me.life, startLife:me.startLife, cap:capState(), lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
+  return { name:me.name, life:me.life, startLife:me.startLife, cap:capState(), capErr:capErr, lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
            emblems:me.emblems, custom:me.custom, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
 }
 let lastLife = null;
@@ -1071,7 +1137,7 @@ function onMessage(s, msg){
       const st = msg.state || {};
       const isNew = !p.name;
       // Same player reconnecting before we noticed they dropped: what we last saw of them, to hand back
-      const before = msg.type === "hello" && msg.fresh && p.name && norm(p.name) === norm(String(st.name || ""))
+      const before = msg.type === "hello" && msg.fresh && p.greeted && norm(p.name) === norm(String(st.name || ""))
         ? { life:p.life, startLife:p.startLife, poison:p.poison, exp:p.exp, energy:p.energy, blessing:p.blessing, emblems:p.emblems,
             custom:p.custom, cmd:p.cmd, cmdrs:p.cmdrs, manaOn:p.manaOn, mana:p.mana } : null;
       const oldKey = p.camKey, oldLife = p.life;
@@ -1087,6 +1153,7 @@ function onMessage(s, msg){
       p.cmd = {}; if (st.cmd && typeof st.cmd === "object") for (const [k, v] of Object.entries(st.cmd)) { const kk = int(k, 1, MAX); if (kk) p.cmd[kk] = int(v, 0, 999); }
       p.rot = !!st.rot;
       p.cap = ["on", "off", "muted", "none"].includes(st.cap) ? st.cap : "";
+      p.capErr = typeof st.capErr === "string" ? st.capErr.slice(0, 30) : "";
       p.lisp = !!st.lisp;
       p.manaOn = !!st.manaOn;
       const oldCmdr = (p.cmdrs || []).map(c => c.name).join(" and ");
@@ -1100,7 +1167,7 @@ function onMessage(s, msg){
       if (msg.type === "hello") {
         if (typeof msg.sid === "string") p.sid = msg.sid.slice(0, 40);
         if (Array.isArray(msg.deck)) { p.deck = msg.deck.slice(0, 300).map(x => String(x).slice(0, 141)); if (p.deck.length) setTimeout(artSync, 500); }
-        if (isNew) log(`${p.name} sat down.`);
+        if (!p.greeted) { p.greeted = true; log(`${p.name} sat down.`); }
         if (!tableKnown && msg.known && msg.table) {
           applyTable(msg.table); tableFromPeer = true; tryRestoreLocal(false);
           if (heldState?.gameId === table.gameId) restoreMe(heldState.state, "the table");
@@ -1118,9 +1185,12 @@ function onMessage(s, msg){
           if (added) renderDmg();
         }
       }
+      // Their updates are arriving but their hello never did (it can get lost as a connection opens): ask again
+      else if (!p.greeted && !p.askedHello) { p.askedHello = true; send(conns[s]?.conn || {}, { type:"hellopls" }); }
       render();
       break;
     }
+    case "hellopls": if (conns[s]) sendHello(conns[s].conn); break;
     case "table": applyTable(msg.table); break;
     case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500)); break;
     case "card": if (typeof msg.name === "string") log(`${p.name || "Someone"} looked at `, msg.name.slice(0, 141)); break;
@@ -1180,6 +1250,8 @@ function enterTable(){
   setTimeout(() => askCommander(), 500);
   setTimeout(artSync, 1500);
   setTimeout(loadCardIndex, 2500);
+  // Start downloading the AI card matcher (and the index, which it loads first) now, so the first click is quick
+  setTimeout(() => { if (!LOCAL) aiLoad(); }, 4000);
   log(`You took seat ${mySeat}.`);
   // Nobody else here: if you were in a game at this table, pick it back up from this browser
   setTimeout(() => { if (!tableFromPeer) tryRestoreLocal(true); tableKnown = true; saveReady = true; saveLocal(); }, 3500);
@@ -1220,13 +1292,13 @@ function passTurn(){
 }
 $("#micBtn").onclick = e => {
   const t = localStream.getAudioTracks()[0]; if (!t) return;
-  t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mute mic" : "Unmute mic"; e.target.classList.toggle("off", !t.enabled);
+  t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mic on" : "Mic muted"; e.target.classList.toggle("off", !t.enabled);
   if (!t.enabled) stopRec(); else if (capOn) startRec();
   pushState();
 };
 $("#camBtn").onclick = e => {
   camHidden = !camHidden; applyWebcam();
-  e.target.textContent = camHidden ? "Show camera" : "Hide camera"; e.target.classList.toggle("off", camHidden);
+  e.target.textContent = camHidden ? "Camera hidden" : "Camera on"; e.target.classList.toggle("off", camHidden);
 };
 $("#rotBtn").onclick = () => { me.rot = !me.rot; pushState(); render(); };
 $("#leaveBtn").onclick = () => {
@@ -1340,7 +1412,7 @@ function turnText(s){
 }
 function updateClocks(){
   updateNetWarn(); syncRemoteCaps();
-  $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "Game not started";
+  $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "";
   $("#startBtn").classList.toggle("hidden", !!gameStartAt);
   document.querySelectorAll("#grid .tile").forEach(el => {
     const [txt, over] = turnText(+el.dataset.seat);
@@ -1358,6 +1430,7 @@ function render(bumpMine){
   grid.className = "n" + Math.max(1, Math.min(MAX, seats.length));
   $("#roomLabel").textContent = `Table ${roomCode}, ${modeOf(table.mode).short}`;
   $("#waitNote").classList.toggle("hidden", seats.length > 1);
+  $("#passBtn").classList.toggle("primary", !table.turnSeat || table.turnSeat === mySeat);
   [...grid.children].forEach(el => { if (!seats.includes(+el.dataset.seat)) el.remove(); });
   seats.forEach(s => {
     const p = players[s];
@@ -1584,12 +1657,12 @@ function addCounterDialog(){
   cancel.onclick = closeModal;
   card.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT" && !e.defaultPrevented) { e.preventDefault(); save.click(); } });
   openModal(card);
-  setTimeout(() => nameIn.focus(), 50);
+  setTimeout(() => { if (!card.contains(document.activeElement)) nameIn.focus(); }, 50);  // not if you already picked a type and moved on
 }
 function closeMenus(){ document.querySelectorAll(".tilemenu").forEach(m => m.remove()); }
 document.addEventListener("pointerdown", e => {
   if (!e.target.closest(".tilemenu") && !e.target.closest(".ctr.add")) closeMenus();
-  const dd = $("#diceDd"); if (dd?.open && !e.target.closest("#diceDd")) dd.open = false;
+  for (const dd of document.querySelectorAll("header details.dd")) if (dd.open && !dd.contains(e.target)) dd.open = false;
 });
 function openCounterMenu(el){
   closeMenus();
@@ -1792,7 +1865,7 @@ $("#phoneBtn").onclick = () => {
 };
 function updatePhoneUi(){
   const on = !!me.camStream;
-  $("#phoneBtn").textContent = on ? "Phone camera on" : "Phone camera";
+  $("#phoneBtn").textContent = on ? "Phone camera is on (tap to see its link)" : "Use my phone as the camera";
   const st = $("#phoneStat"); if (st) st.textContent = on ? "Your phone is connected." : "Waiting for your phone...";
   const stop = $("#phoneStop"); if (stop) stop.classList.toggle("hidden", !on);
 }
@@ -2000,7 +2073,8 @@ async function flicker(dies, kind, ms){
 }
 
 let rollActive = null;
-$("#rollBtn").onclick = () => startRollOff();
+$("#rollBtn").onclick = () => { $("#diceDd").open = false; startRollOff(); };
+document.querySelectorAll("#moreDd .menu button").forEach(b => b.addEventListener("click", () => { $("#moreDd").open = false; }));
 function startRollOff(){
   const seats = presentSeats().filter(s => s === mySeat || players[s].name);
   const names = {}; seats.forEach(s => { names[s] = nm(s); });
@@ -2060,7 +2134,7 @@ async function playRollOff(msg){
   setTimeout(() => { if (rollActive === token) closeModal(); }, 6000);
 }
 
-document.querySelectorAll("#diceDd .menu button").forEach(b => b.onclick = () => { $("#diceDd").open = false; rollDice(b.dataset.kind); });
+document.querySelectorAll("#diceDd .menu button[data-kind]").forEach(b => b.onclick = () => { $("#diceDd").open = false; rollDice(b.dataset.kind); });
 const KINDS = ["coin", "d4", "d6", "d8", "d10", "d12", "d20"];
 function rollDice(kind){
   if (!KINDS.includes(kind)) return;
@@ -2321,6 +2395,7 @@ const aiKey = () => (AI.model || AI_MODELS[0]) + ":v3:";  // saved fingerprints;
 const AI = { ext:null, loading:null, failed:false, device:"", model:"", refs:[], learned:new Set(), camLoaded:new Set() };
 async function aiLoad(){
   if (AI.ext) return AI.ext;
+  if (AI.failed && Date.now() - AI.failedAt > 120000) AI.failed = false;  // a failed download is tried again after two minutes
   if (AI.failed) return null;
   if (!AI.loading) {
     AI.loading = (async () => {
@@ -2338,8 +2413,8 @@ async function aiLoad(){
           AI.device = device; AI.model = model; return AI.ext;
         } catch (e) { console.warn("AI matcher: couldn't load", model, "on", device, dtype, e); }
       }
-      throw new Error("model failed to load");
-    })().catch(e => { console.warn(e); AI.failed = true; return null; }).finally(() => { AI.loading = null; artStat(); });
+      throw new Error("model failed to load");  // after every model and device; clicks try again after two minutes
+    })().catch(e => { console.warn(e); AI.failed = true; AI.failedAt = Date.now(); return null; }).finally(() => { AI.loading = null; artStat(); });
     artStat();
   }
   return AI.loading || AI.ext;
@@ -2378,7 +2453,11 @@ function loadCardIndex(){
       const meta = await (await fetch("index/cards.json", { cache:"no-cache" })).json();
       if (!AI_MODELS.includes(meta?.model) || !Array.isArray(meta.cards) || !(meta.dims > 0)) throw new Error("index was built with a model this page doesn't use");
       artStat();
-      const buf = await (await fetch("index/cards.bin?v=" + encodeURIComponent(meta.built || ""))).arrayBuffer();
+      // The fingerprints (about 20 MB) are kept in this browser's own storage, which clearing the browser cache
+      // doesn't touch, and downloaded again only when a new build is published
+      const saved = await idb.get("card-index");
+      let buf = saved?.built && saved.built === meta.built && saved.buf instanceof ArrayBuffer ? saved.buf : null;
+      if (!buf) { buf = await (await fetch("index/cards.bin?v=" + encodeURIComponent(meta.built || ""))).arrayBuffer(); idb.set("card-index", { built:meta.built, buf }); }
       const n = meta.cards.length;
       if (buf.byteLength !== n * 4 + n * meta.dims) throw new Error("index file is incomplete");
       // Layout: n float32 scales, then n fingerprints of dims signed bytes (value = byte / scale)
@@ -2547,8 +2626,17 @@ function attachLookup(el, s){
     const r = (dx < 12 && dy < 12) ? null : { x1:start.x, y1:start.y, x2:e.clientX, y2:e.clientY };
     const clickPt = { x:start.x, y:start.y };
     start = null;
-    const b = box; setTimeout(() => b.remove(), 900);
-    identify(video, players[s]?.rot, clickPt, r, b, el, s);
+    const b = box;
+    if (!r) {  // a click: a pulsing ring at that spot until the card is found
+      const er = el.getBoundingClientRect();
+      b.classList.add("pulse");
+      Object.assign(b.style, { left:(clickPt.x - er.left - 22) + "px", top:(clickPt.y - er.top - 22) + "px", width:"44px", height:"44px" });
+    }
+    identify(video, players[s]?.rot, clickPt, r, b, el, s).then(found => {
+      b.classList.remove("pulse");
+      if (!found) { b.classList.add("miss"); setTimeout(() => b.remove(), 650); return; }
+      setTimeout(() => { b.classList.add("fade"); setTimeout(() => b.remove(), 450); }, 1400);
+    });
   });
   function drawBox(e){
     const er = el.getBoundingClientRect();
@@ -2556,6 +2644,8 @@ function attachLookup(el, s){
     Object.assign(box.style, { left:x + "px", top:y + "px", width:Math.abs(e.clientX - start.x) + "px", height:Math.abs(e.clientY - start.y) + "px" });
   }
 }
+// A click outline can't follow the card through a layout change, so a resize clears it
+addEventListener("resize", () => document.querySelectorAll(".tile .sel.card").forEach(b => b.remove()));
 function toVideo(video, cx, cy, rot){
   const r = video.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
   const scale = Math.min(r.width / vw, r.height / vh);
@@ -2626,6 +2716,9 @@ function partOf(fr, b, u0, v0, u1, v1){
 }
 // Where the art sits in a standard card frame, as fractions of the card
 const ART_IN_CARD = [0.085, 0.113, 0.915, 0.555];
+// And the other way round: the whole card as fractions of its art box
+const CARD_AROUND_ART = [-ART_IN_CARD[0] / (ART_IN_CARD[2] - ART_IN_CARD[0]), -ART_IN_CARD[1] / (ART_IN_CARD[3] - ART_IN_CARD[1]),
+  (1 - ART_IN_CARD[0]) / (ART_IN_CARD[2] - ART_IN_CARD[0]), (1 - ART_IN_CARD[1]) / (ART_IN_CARD[3] - ART_IN_CARD[1])];
 // A dragged box could hold the whole card (upright or tapped) or just its art: try every reading
 function boxesForRegion(fr, box){
   const out = [], land = box.w > box.h;
@@ -2633,14 +2726,67 @@ function boxesForRegion(fr, box){
   for (const r of land ? [1, 3] : [0, 2]) { const a = partOf(fr, { ...box, rot:r }, ...ART_IN_CARD); if (a) out.push(a); }  // the box is the whole card
   return out;
 }
+/* Snap an estimated card box to the card's real edges, so the click outline hugs the card. Looks near each side of the
+   estimate for lines that run unbroken along an edge, and takes the four that make a card's shape (63 x 88 mm).
+   Keeps the estimate when nothing card-shaped is there. */
+function snapCard(fr, b){
+  try {
+    const pad = 0.25, x0 = Math.max(0, b.x - b.w * pad), y0 = Math.max(0, b.y - b.h * pad);
+    const x1 = Math.min(fr.w, b.x + b.w * (1 + pad)), y1 = Math.min(fr.h, b.y + b.h * (1 + pad));
+    const ds = Math.min(1, 320 / Math.max(x1 - x0, y1 - y0)), W = Math.round((x1 - x0) * ds), H = Math.round((y1 - y0) * ds);
+    if (W < 40 || H < 40) return b;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d", { willReadFrequently:true }); if (!ctx) return b;
+    ctx.drawImage(fr.src, x0, y0, x1 - x0, y1 - y0, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H).data, g = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    const bx = (b.x - x0) * ds, by = (b.y - y0) * ds, bw = b.w * ds, bh = b.h * ds;
+    // Share of a line that sits on an edge: a step of 10+ gray levels, allowed to wander 2 pixels for a slightly turned card
+    const T = 10, S = 2;
+    const cover = (vertical, p, a0, a1) => {
+      let n = 0, t = 0;
+      for (let a = Math.max(1, Math.round(a0)); a < Math.min(vertical ? H : W, a1) - 1; a++, t++) {
+        let m = 0;
+        for (let k = -S; k <= S; k++) {
+          const q = p + k;
+          if (vertical) { if (q > 0 && q < W - 1) m = Math.max(m, Math.abs(g[a * W + q + 1] - g[a * W + q - 1])); }
+          else if (q > 0 && q < H - 1) m = Math.max(m, Math.abs(g[(q + 1) * W + a] - g[(q - 1) * W + a]));
+        }
+        if (m >= T) n++;
+      }
+      return t ? n / t : 0;
+    };
+    // The best few edge lines near one side of the estimate
+    const lines = (vertical, at, span, a0, a1) => {
+      const lo = Math.max(1, Math.round(at - span)), hi = Math.min((vertical ? W : H) - 2, Math.round(at + span)), c = [];
+      for (let p = lo; p <= hi; p++) c.push({ p, v:cover(vertical, p, a0, a1) });
+      const peaks = c.filter((x, i) => x.v >= 0.6 && (i === 0 || x.v >= c[i - 1].v) && (i === c.length - 1 || x.v >= c[i + 1].v)).sort((a, z) => z.v - a.v);
+      const out = []; for (const x of peaks) if (out.length < 3 && out.every(o => Math.abs(o.p - x.p) > 3)) out.push(x);
+      return out;
+    };
+    const L = lines(true, bx, bw * 0.2, by + bh * 0.2, by + bh * 0.8), R = lines(true, bx + bw, bw * 0.2, by + bh * 0.2, by + bh * 0.8);
+    const Tp = lines(false, by, bh * 0.2, bx + bw * 0.2, bx + bw * 0.8), B = lines(false, by + bh, bh * 0.2, bx + bw * 0.2, bx + bw * 0.8);
+    let best = null;
+    for (const l of L) for (const r of R) for (const t of Tp) for (const o of B) {
+      const w = r.p - l.p, h = o.p - t.p;
+      if (w < bw * 0.75 || w > bw * 1.35 || h < bh * 0.75 || h > bh * 1.35) continue;
+      const off = Math.abs((b.rot % 2 ? h / w : w / h) / (63 / 88) - 1);
+      if (off > 0.1) continue;
+      const score = l.v + r.v + t.v + o.v - 3 * off;
+      if (!best || score > best.score) best = { score, x:x0 + l.p / ds, y:y0 + t.p / ds, w:w / ds, h:h / ds, rot:b.rot };
+    }
+    return best ? { x:best.x, y:best.y, w:best.w, h:best.h, rot:b.rot } : b;
+  } catch { return b; }
+}
 async function fetchCard(id, name){ return (id && await scry(`/cards/${id}`)) || await scry("/cards/named?exact=" + encodeURIComponent(name)); }
+// Resolves true when a card was found and shown, so the click's outline can animate to match
 async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
-  if (!video.videoWidth) { setStatus("That camera has not started yet."); return; }
-  if (lookBusy) return;
+  if (!video.videoWidth) { setStatus("That camera has not started yet."); return false; }
+  if (lookBusy) return false;
   if (!AI.refs.length && !ART.entries.length && !IDX.n) {
     setStatus(ART.running || IDX.loading ? "Still getting picture matching ready. Try again in a moment."
       : "Picture matching doesn't know any cards yet. Paste your decklist in the lobby, or look a card up by name once.");
-    return;
+    return false;
   }
   lookBusy = true; showAlts(null);
   try {
@@ -2649,8 +2795,9 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
     const vid = (x, y) => { const c = toVideo(video, x, y, rot); return { x:c.x * fr.k, y:c.y * fr.k }; };
     const showBox = b => {
       const a = fromVideo(video, b.x / fr.k, b.y / fr.k, rot), z = fromVideo(video, (b.x + b.w) / fr.k, (b.y + b.h) / fr.k, rot);
-      const er = tileEl.getBoundingClientRect();
-      Object.assign(boxEl.style, { left:(Math.min(a.x, z.x) - er.left) + "px", top:(Math.min(a.y, z.y) - er.top) + "px", width:Math.abs(z.x - a.x) + "px", height:Math.abs(z.y - a.y) + "px" });
+      const er = tileEl.getBoundingClientRect(), pc = (v, of) => (v / of * 100) + "%";  // in % of the tile, so it stays put if the window resizes
+      Object.assign(boxEl.style, { left:pc(Math.min(a.x, z.x) - er.left, er.width), top:pc(Math.min(a.y, z.y) - er.top, er.height),
+                                   width:pc(Math.abs(z.x - a.x), er.width), height:pc(Math.abs(z.y - a.y), er.height) });
     };
     setStatus("Matching card art...");
     await sleep(16);  // let the status paint before the search runs
@@ -2671,15 +2818,19 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
     // The closest match, always: the AI's when it ran, otherwise the color matcher's
     const m = ai || (color?.name ? color : null);
     if (!m) { setStatus("Couldn't find a card there. Click right on the card's art."); return; }
-    showBox(m.vbox);
-    const card = await fetchCard(m.id, m.name);
-    if (!card) { setStatus(`Couldn't load ${m.name}. Check your connection.`); return; }
+    // Outline the whole card (worked out from where its art is), then sweep a scan line over it while the card loads
+    const around = partOf(fr, m.vbox, ...CARD_AROUND_ART);
+    showBox(around ? snapCard(fr, around) : m.vbox);
+    boxEl.classList.remove("pulse"); boxEl.classList.add("card"); boxEl.classList.toggle("unsure", !m.ok);
+    const [card] = await Promise.all([fetchCard(m.id, m.name), sleep(750)]);
+    if (!card) { setStatus(`Couldn't load ${m.name}. Check your connection.`); return false; }
     showCard(card, { share:true });
     const pct = Math.max(0, Math.min(99, Math.round(m.score * 100)));
     setStatus(m.ok ? `${ai ? "AI picture match" : "Picture match"} (${pct}% similar).` : `Closest match (${pct}% similar). Not it? Pick the right card below.`);
     const entry = logMatch({ how:m === ai ? "ai" : "color", drag:!!rect, ok:!!m.ok, name:m.name, score:m.score, margin:m.margin ?? null,
       second:(m.top || []).find(x => x.name !== m.name)?.score ?? null, seat, sharp:!!fr.sharp });
     showAlts({ list:(m.top || []).filter(x => x.name !== m.name).slice(0, 3), q:ai?.q || null, sure:m.ok, entry });
+    return true;
   } catch (e) {
     if (e?.name === "SecurityError") { ART.blocked = true; artStat(); setStatus("This browser blocked reading the camera picture."); }
     else { console.warn(e); setStatus("Something went wrong matching that card. Try again."); }
@@ -2792,7 +2943,7 @@ function showCard(card, { share = false, from = null, fromHistory = false } = {}
   const view = $("#cardView"); view.innerHTML = "";
   cardCache.set(card.id, card); remember(card, fromHistory); learnLater(card.name);
   if (!from) focusCardView();  // you asked for it, so bring the card into view; cards others show don't move your panel
-  if (from) { const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
+  if (from) { bumpTab("card"); const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
   const faces = card.card_faces && !card.image_uris ? card.card_faces : [card];
   faces.forEach(f => {
     const src = (f.image_uris || card.image_uris)?.normal;
@@ -2816,9 +2967,43 @@ function showCard(card, { share = false, from = null, fromHistory = false } = {}
   setStatus("");
   if (share) { broadcast({ type:"card", name:card.name }); log("You looked at ", card.name); }
 }
+/* Side panel tabs. A tab you're not looking at counts what arrived there since you last opened it. */
+var tabNow = "card";  // var: log() can run before this line
+function showTab(name){
+  tabNow = name;
+  document.querySelectorAll("#side .tabs button").forEach(b => {
+    const on = b.dataset.tab === name; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+    if (on) { const g = b.querySelector(".badge"); g.textContent = ""; g.classList.add("hidden"); }
+  });
+  document.querySelectorAll("#side .pane").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== name));
+  store.set("kt-tab", name);
+  if (name === "captions") { const ul = $("#captions"); ul.scrollTop = ul.scrollHeight; }
+}
+function bumpTab(name){
+  if (name === tabNow && !$("#table").classList.contains("nopanel")) return;
+  const g = $(`#tab-${name} .badge`); if (!g) return;
+  const n = (+g.textContent || 0) + 1; g.textContent = n > 99 ? "99+" : n; g.classList.remove("hidden");
+}
+document.querySelectorAll("#side .tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+$("#side .tabs").addEventListener("keydown", e => {  // arrow keys move between tabs
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const t = [...document.querySelectorAll("#side .tabs button")], i = t.findIndex(b => b.dataset.tab === tabNow);
+  const n = t[(i + (e.key === "ArrowRight" ? 1 : t.length - 1)) % t.length]; showTab(n.dataset.tab); n.focus();
+});
+// Hide the side panel to give the cameras the whole width. Looking a card up brings it back.
+function showPanel(on){
+  $("#table").classList.toggle("nopanel", !on);
+  const b = $("#panelBtn"); b.textContent = on ? "Hide panel" : "Show panel"; b.setAttribute("aria-expanded", on);
+  store.set("kt-panel", on ? "1" : "0");
+  if (on) { const g = $(`#tab-${tabNow} .badge`); if (g) { g.textContent = ""; g.classList.add("hidden"); } }
+}
+$("#panelBtn").onclick = () => showPanel($("#table").classList.contains("nopanel"));
+showTab(["card", "log", "captions", "table"].includes(store.get("kt-tab", "")) ? store.get("kt-tab", "") : "card");
+showPanel(store.get("kt-panel", "1") !== "0");
 // Scroll the side panel (or the page, on narrow screens) up to the Card section and flash it
 function focusCardView(){
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  showPanel(true); showTab("card");
   $("#cardSec").scrollIntoView({ behavior:reduce ? "auto" : "smooth", block:"start" });
   const v = $("#cardView"); v.classList.remove("flash"); void v.offsetWidth; v.classList.add("flash");
 }
@@ -3173,6 +3358,7 @@ async function addCaption(seat, text, heardHere){
     } else li.append(seg.t);
   });
   if (interimEl && interimEl.parentNode === ul) ul.insertBefore(li, interimEl); else ul.appendChild(li);
+  if (seat !== mySeat) bumpTab("captions");
   while (ul.children.length > 120) ul.firstChild.remove();
   if (nearBottom) ul.scrollTop = ul.scrollHeight;
 }
@@ -3201,12 +3387,15 @@ function startBrowserRec(){
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i], t = r[0].transcript.trim();
-      if (r.isFinal) { if (t) onFinalSpeech(t); }
+      if (r.isFinal) { if (t) { onFinalSpeech(t); setCapErr(""); } }
       else interim += t + " ";
     }
     showInterim(interim.trim());
   };
   rec.onerror = e => {
+    if (CAP_ERRORS[e.error]) setCapErr(e.error);
+    // Some browsers can't take the lobby's microphone directly; use the default microphone from then on
+    if (e.error === "audio-capture" && trackInput) { trackInput = false; return; }
     if (engine === "device" && (e.error === "language-not-supported" || e.error === "service-not-allowed")) {
       engine = "browser"; $("#engineSel").value = "browser";
       setCapHint("Chrome's on-device speech couldn't start, so captions switched to Chrome or Edge speech.");
@@ -3229,9 +3418,10 @@ function startBrowserRec(){
   };
   // Chrome can listen to the microphone track you already picked in the lobby (no extra permission prompt).
   // Browsers without that support ignore the argument and use the default microphone.
-  const track = localStream?.getAudioTracks()[0];
-  try { rec.start(track); } catch { try { rec.start(); } catch { rec = null; } }
+  const track = trackInput ? localStream?.getAudioTracks()[0] : null;
+  try { if (track) rec.start(track); else rec.start(); } catch { try { rec.start(); } catch { rec = null; } }
 }
+let trackInput = true;
 function stopBrowserRec(){ const r = rec; rec = null; if (r) { r.onend = null; try { r.stop(); } catch {} } showInterim(""); }
 
 /* Speech engine: Chrome and Edge have speech to text built in. "browser" uses their online service (most accurate).
@@ -3281,13 +3471,21 @@ function updateCapBtn(){
   if (me) { pushState(); syncRemoteCaps(); }  // the table sees whether your captions are running
 }
 // What the table sees about your captions: running, switched off, mic muted, or not possible in this browser
+// The last problem your own speech to text reported ("" once captions come through again), shared with the table
+let capErr = "";
+function setCapErr(code){ if (capErr === code) return; capErr = code; if (me) pushState(); }
+const CAP_ERRORS = {
+  network:"their browser can't reach its speech service (common in Brave, or behind a strict network)",
+  "not-allowed":"speech to text is blocked in their browser", "service-not-allowed":"speech to text is blocked in their browser",
+  "audio-capture":"their browser can't get audio from their microphone", "language-not-supported":"their browser doesn't support speech to text in their language"
+};
 function capState(){ return !SR ? "none" : !micLive() ? "muted" : capOn ? "on" : "off"; }
 /* Each player's own browser turns their speech into text and sends it to the table, so someone's words only
    show up here if captions are running on their computer. This shows who is and isn't sending. */
 const capAsked = {};
 function renderCapPeers(){
   const box = $("#capPeers"), seats = presentSeats().filter(s => s !== mySeat && players[s]?.name);
-  const sig = JSON.stringify([seats.map(s => [s, nm(s), players[s].cap, !!capAsked[s], lispFor(s), !!remoteCap[s], skipHere(s)]), !!ASR.loading, ASR.failed]);
+  const sig = JSON.stringify([seats.map(s => [s, nm(s), players[s].cap, players[s].capErr, !!capAsked[s], lispFor(s), !!remoteCap[s], skipHere(s)]), !!ASR.loading, ASR.failed]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig; box.innerHTML = "";
   seats.forEach(s => {
@@ -3298,7 +3496,8 @@ function renderCapPeers(){
       muted:`${nm(s)}: their microphone is muted.`,
       none:`${nm(s)}: their browser can't do captions. They need Chrome or Edge.`
     }[st] || `${nm(s)}: captions unknown (they may be on an older version of the page, ask them to reload).`;
-    if (st === "on") t.className = "ok";
+    if (players[s].capErr && CAP_ERRORS[players[s].capErr]) t.textContent += ` Their speech to text reports a problem: ${CAP_ERRORS[players[s].capErr]}.`;
+    if (st === "on" && !players[s].capErr) t.className = "ok";
     row.appendChild(t);
     const hl = document.createElement("label"); hl.className = "small";
     const hb = document.createElement("input"); hb.type = "checkbox"; hb.checked = !skipHere(s);
@@ -3307,6 +3506,7 @@ function renderCapPeers(){
       : " Caption them from here when their captions aren't coming through");
     hl.title = "Turns their voice into captions on this computer, from the audio you already hear";
     row.appendChild(hl);
+    if (remoteCap[s]) { const live = document.createElement("span"); live.className = "small caplive"; live.dataset.seat = s; row.appendChild(live); }
     const ll = document.createElement("label"); ll.className = "small";
     const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = lispFor(s); cb.disabled = !!players[s].lisp;
     cb.onchange = () => { const k = norm(nm(s)); lispLocal[k] = cb.checked; store.set("kt-lisp:" + k, cb.checked ? "1" : "0"); box.dataset.sig = ""; renderCapPeers(); };
@@ -3322,6 +3522,21 @@ function renderCapPeers(){
   });
 }
 function setCapHint(t){ $("#capHint").textContent = t; }
+// A text summary of how captions are doing on this screen, to paste to whoever is helping
+$("#capDiag").onclick = async () => {
+  const brand = navigator.userAgentData?.brands?.filter(b => !/not.?a.?brand/i.test(b.brand)).map(b => `${b.brand} ${b.version}`).join(", ") || navigator.userAgent;
+  const lines = [`Kitchen Table caption diagnostics, ${new Date().toISOString()}`,
+    `This browser: ${brand}. Page opened as ${LOCAL ? "a local file" : location.origin}. Speech to text available: ${!!SR}. Engine: ${engine}. Captions on: ${capOn}. Mic live: ${micLive()}. Mic hand-off: ${trackInput}. Last speech problem: ${capErr || "none"}.`,
+    `Speech model for captioning others: ${ASR.pipe ? "loaded" : ASR.loading ? "downloading" : ASR.failed ? "failed: " + (ASR.err || "unknown") : "not needed yet"}.`];
+  for (const s of presentSeats().filter(x => x !== mySeat)) {
+    const p = players[s], rc = remoteCap[s];
+    lines.push(`${nm(s)}: their captions ${p.cap || "unknown (old page?)"}, their problem ${p.capErr || "none"}, last caption from them ${lastCapFrom[s] ? Math.round((Date.now() - lastCapFrom[s]) / 1000) + "s ago" : "never"}, ` +
+      `their audio track ${p.stream?.getAudioTracks()[0]?.readyState || "missing"}, captioning here ${rc ? `on (audio ${rc.ctx.state}, level ${rc.level.toFixed(3)}, heard ${rc.heard}, captioned ${rc.captioned}, for ${Math.round((Date.now() - rc.since) / 1000)}s)` : skipHere(s) ? "turned off" : "off"}.`);
+  }
+  const text = lines.join("\n");
+  try { await navigator.clipboard.writeText(text); toast("Caption diagnostics copied. Paste them to whoever is helping you."); }
+  catch { prompt("Copy these caption diagnostics:", text); }
+};
 
 /* Captioning other players on this computer. Normally each player's own browser captions their speech and sends
    the text. When that isn't happening (captions off, a browser without speech to text, or a speech service that's
@@ -3336,20 +3551,29 @@ async function asrLoad(){
   if (!ASR.loading) ASR.loading = (async () => {
     const T = await import(TJS_URL);
     T.env.allowLocalModels = false;
-    for (const m of ASR_MODELS) {
-      try { return ASR.pipe = await T.pipeline("automatic-speech-recognition", m, { device:"wasm", dtype:"q8" }); }
-      catch (e) { console.warn("Speech model", m, "didn't load:", e); }
+    for (const m of ASR_MODELS) for (let attempt = 1; attempt <= 3; attempt++) {
+      try { ASR.pipe = await T.pipeline("automatic-speech-recognition", m, { device:"wasm", dtype:"q8" }); ASR.err = ""; return ASR.pipe; }
+      catch (e) { console.warn("Speech model", m, "didn't load:", e); ASR.err = String(e?.message || e).slice(0, 160); if (attempt < 3) await sleep(4000 * attempt); }
     }
     throw new Error("no speech model loaded");
-  })().catch(() => { ASR.failed = true; return null; }).finally(() => { ASR.loading = false; $("#capPeers").dataset.sig = ""; renderCapPeers(); });
+  })().catch(() => { ASR.failed = true; ASR.failedAt = Date.now(); return null; }).finally(() => { ASR.loading = false; $("#capPeers").dataset.sig = ""; renderCapPeers(); });
   return ASR.loading;
 }
 function wantHere(s){
   const p = players[s];
+  if (ASR.failed && Date.now() - ASR.failedAt > 120000) ASR.failed = false;  // try the download again after two minutes
   if (!capOn || !p?.name || !p.stream?.getAudioTracks().length || skipHere(s) || ASR.failed) return false;
   return !(p.cap === "on" && Date.now() - (lastCapFrom[s] || 0) < 60000);  // their own captions are arriving
 }
+// The live part of each "captioning here" line: is their audio arriving, and is it being turned into captions
+function capLive(s){
+  const rc = remoteCap[s]; if (!rc) return "";
+  const bars = "\u25AE".repeat(Math.min(5, Math.round(rc.level * 25))) || "silent";
+  const model = ASR.pipe ? "" : ASR.loading ? " Speech model downloading." : ASR.failed ? ` Speech model didn't load (${ASR.err || "unknown error"}); retrying soon.` : "";
+  return `Their audio: ${bars}. Phrases heard ${rc.heard}, captioned ${rc.captioned}.${rc.ctx.state !== "running" ? " Audio is paused: click anywhere on the page." : ""}${model}`;
+}
 function syncRemoteCaps(){
+  document.querySelectorAll("#capPeers .caplive").forEach(el => { el.textContent = capLive(+el.dataset.seat); });
   for (const s of Object.keys(players).map(Number)) {
     if (s === mySeat) continue;
     if (wantHere(s) && !remoteCap[s]) startRemoteCap(s);
@@ -3363,7 +3587,7 @@ function startRemoteCap(s){
     const ctx = new AudioContext({ sampleRate:16000 });
     const src = ctx.createMediaStreamSource(new MediaStream([track]));
     const node = ctx.createScriptProcessor(4096, 1, 1);
-    const rc = remoteCap[s] = { ctx, src, node, chunks:[], pre:null, speaking:false, silence:0, len:0, levels:[] };
+    const rc = remoteCap[s] = { ctx, src, node, chunks:[], pre:null, speaking:false, silence:0, len:0, levels:[], level:0, heard:0, captioned:0, since:Date.now() };
     node.onaudioprocess = e => hearChunk(s, rc, e.inputBuffer.getChannelData(0));
     src.connect(node); node.connect(ctx.destination);  // the processor only runs when connected; it outputs silence
     ctx.resume?.().catch(() => {});
@@ -3371,6 +3595,7 @@ function startRemoteCap(s){
     $("#capPeers").dataset.sig = ""; renderCapPeers();
   } catch (e) { console.warn("Couldn't listen to", nm(s), e); }
 }
+document.addEventListener("pointerdown", () => { for (const rc of Object.values(remoteCap)) if (rc.ctx.state === "suspended") rc.ctx.resume().catch(() => {}); });
 function stopRemoteCap(s){
   const rc = remoteCap[s]; delete remoteCap[s];
   try { rc.src.disconnect(); rc.node.disconnect(); rc.ctx.close(); } catch {}
@@ -3382,6 +3607,7 @@ function hearChunk(s, rc, data){
   const rms = Math.sqrt(e / data.length), dur = data.length / 16000;
   // Background level: the quiet end of the last ~10 seconds, so a lot of talking doesn't raise the bar
   rc.levels.push(rms); if (rc.levels.length > 40) rc.levels.shift();
+  rc.level = Math.max(rms, rc.level * 0.8);
   const noise = [...rc.levels].sort((a, b) => a - b)[Math.floor(rc.levels.length * 0.15)];
   const loud = rms > Math.max(0.01, noise * 3);
   if (loud && !rc.speaking) { rc.speaking = true; rc.chunks = rc.pre ? [rc.pre] : []; rc.len = rc.pre ? rc.pre.length / 16000 : 0; }
@@ -3393,6 +3619,7 @@ function hearChunk(s, rc, data){
         const audio = new Float32Array(rc.chunks.reduce((a, c) => a + c.length, 0));
         let o = 0; for (const c of rc.chunks) { audio.set(c, o); o += c.length; }
         ASR.queue.push({ s, audio }); if (ASR.queue.length > 6) ASR.queue.shift();
+        rc.heard++;
         runAsr();
       }
       rc.speaking = false; rc.chunks = []; rc.len = 0; rc.silence = 0;
@@ -3413,6 +3640,7 @@ async function runAsr(){
       const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
       if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
       addCaption(s, text, true);
+      if (remoteCap[s]) remoteCap[s].captioned++;
     }
   } catch (e) { console.warn("Speech model failed:", e); }
   finally { ASR.busy = false; }
@@ -3560,7 +3788,7 @@ function log(text, cardName){
     b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(cardName)) || await findCard(cardName); if (c) showCard(c); };
     li.appendChild(b); li.append(".");
   }
-  const ul = $("#log"); ul.prepend(li);
+  const ul = $("#log"); ul.prepend(li); bumpTab("log");
   while (ul.children.length > 80) ul.lastChild.remove();
 }
 })();

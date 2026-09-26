@@ -1,0 +1,13 @@
+{
+  "name": "kitchen-table-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests for Kitchen Table: two or three Chromium players on a local signaling server, with stand-ins for Scryfall, the AI models and speech recognition",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "peer": "1.0.2",
+    "peerjs": "1.5.4",
+    "qrcodejs": "1.0.0"
+  }
+}
