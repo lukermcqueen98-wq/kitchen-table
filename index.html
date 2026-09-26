@@ -2867,6 +2867,12 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
     const m = card ? await aiMatchBoxes(fr, await quadReadings(fr, [{ q:card }]), 0, null) : await aiMatch(fr, { x, y }, 0, null, { finder });
     return m && { name:m.name, id:m.id, score:m.score, margin:m.margin, ok:m.ok, quad:m.quad, top:m.top, ms:performance.now() - t0 };
   },
+  embed:canvases => aiEmbed(canvases),
+  // The art box of a card with known corners, straightened out, as the AI sees it
+  artFromCard(canvas, q){
+    const [u0, v0, u1, v1] = ART_IN_CARD;
+    return warpQuads({ src:canvas, w:canvas.width, h:canvas.height }, [[quadAt(q, u0, v0), quadAt(q, u1, v0), quadAt(q, u1, v1), quadAt(q, u0, v1)]])[0];
+  },
   // A clean picture of the art itself (like the ones the index was built from): what the AI ranks first
   async matchArt(canvas){
     const qs = await aiEmbed([canvas]); if (!qs) return null;

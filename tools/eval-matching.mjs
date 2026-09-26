@@ -10,7 +10,9 @@
    plus a clean check: Scryfall's own art crop, which should always find itself in the index.
 
    Usage (from the repo root, with the index in site/index):
-     node tools/eval-matching.mjs [cards=100] [dtype]     dtype: q8 (what browsers without WebGPU use) or fp32
+     node tools/eval-matching.mjs [cards=100] [dtype] [mode]     dtype: q8 (what browsers without WebGPU use) or fp32
+   mode "refs" instead tries ways of preparing pictures (for both the index and the click) on the perfectly found art,
+   against the test cards plus 900 others, to see which closes the gap between webcam and Scryfall pictures
    Needs the web (Scryfall, Hugging Face, jsDelivr). Writes eval-results/summary.md, results.json, and pictures of misses. */
 import http from "node:http";
 import fs from "node:fs";
@@ -19,7 +21,7 @@ import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("../tests/node_modules/@playwright/test");
 
 const ROOT = path.resolve(import.meta.dirname, ".."), OUT = path.join(ROOT, "eval-results");
-const N = +(process.argv[2] || 100), DTYPE = process.argv[3] || "q8", PORT = 8790;
+const N = +(process.argv[2] || 100), DTYPE = process.argv[3] || "q8", MODE = process.argv[4] || "match", PORT = 8790;
 const TYPES = { ".html":"text/html", ".js":"application/javascript", ".json":"application/json", ".bin":"application/octet-stream" };
 fs.mkdirSync(path.join(OUT, "misses"), { recursive:true });
 
@@ -37,7 +39,7 @@ await new Promise(r => server.listen(PORT, "127.0.0.1", r));
 const meta = JSON.parse(fs.readFileSync(path.join(ROOT, "site", "index", "cards.json"), "utf8"));
 let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 const pickCards = n => Array.from({ length:n }, () => meta.cards[Math.floor(rnd() * meta.cards.length)]);
-const tests = pickCards(N), mats = pickCards(12), others = pickCards(16);
+const tests = pickCards(N), mats = pickCards(12), others = pickCards(16), extra = MODE === "refs" ? pickCards(900) : [];
 console.log(`Index: ${meta.cards.length} artworks, model ${meta.model}. Testing ${N} cards with ${DTYPE}.`);
 
 const browser = await chromium.launch();
@@ -50,7 +52,7 @@ console.log("Ready:", JSON.stringify(ready));
 if (!ready.index || !ready.cv || !ready.model) throw new Error("the page isn't ready: " + JSON.stringify(ready));
 
 // Load card pictures in the page (Scryfall allows that): whole cards, and art crops for the clean check and playmats
-await page.evaluate(async ({ tests, mats, others }) => {
+await page.evaluate(async ({ tests, mats, others, extra }) => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const img = url => new Promise(res => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => res(null); i.src = url; });
   const get = async ([id, name, face]) => {
@@ -63,7 +65,63 @@ await page.evaluate(async ({ tests, mats, others }) => {
   };
   const all = async list => { const out = []; for (const x of list) out.push(await get(x)); return out; };
   window.bench = { tests:await all(tests), mats:(await all(mats)).filter(Boolean).map(x => x.art), others:(await all(others)).filter(Boolean).map(x => x.card) };
-}, { tests, mats, others });
+  // Distractors only need their art (and no whole card), and skipping the card picture halves the downloads
+  const arts = [];
+  for (const [id, name, face] of extra) {
+    await sleep(110);
+    const c = await (await fetch(`https://api.scryfall.com/cards/${id}`)).json().catch(() => null); if (!c) continue;
+    const f = c.card_faces?.[face || 0]?.image_uris ? c.card_faces[face || 0] : c, iu = f.image_uris || c.image_uris; if (!iu) continue;
+    const a = await img(iu.art_crop); if (a) arts.push({ name, art:a });
+  }
+  window.bench.extra = arts;
+}, { tests, mats, others, extra });
+
+if (MODE === "refs") {
+  const res = await page.evaluate(async () => {
+    const b = window.bench, E = window.ktEval;
+    // Ways to prepare a picture of art before the AI sees it (the same for the index and for the click)
+    const canvasOf = (src, w) => { const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height, c = document.createElement("canvas");
+      c.width = w; c.height = Math.max(1, Math.round(sh * w / sw)); const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(src, 0, 0, c.width, c.height); return c; };
+    const down = w => src => canvasOf(canvasOf(canvasOf(src, 240), w), 240);
+    // gray-world color balance and a 2%-98% contrast stretch per channel
+    const norm = src => { const c = canvasOf(src, 240), x = c.getContext("2d", { willReadFrequently:true }), im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+      for (let ch = 0; ch < 3; ch++) { const h = new Uint32Array(256); for (let i = ch; i < d.length; i += 4) h[d[i]]++;
+        const n = d.length / 4; let acc = 0, lo = 0, hi = 255; for (let v = 0; v < 256; v++) { acc += h[v]; if (acc < n * 0.02) lo = v; if (acc < n * 0.98) hi = v; }
+        const k = 255 / Math.max(8, hi - lo); for (let i = ch; i < d.length; i += 4) d[i] = (d[i] - lo) * k; }
+      x.putImageData(im, 0, 0); return c; };
+    const T = { clean:src => canvasOf(src, 240), down96:down(96), down64:down(64), norm, down96norm:src => norm(down(96)(src)), down64norm:src => norm(down(64)(src)) };
+    const refs = [...b.tests.filter(Boolean).map(t => ({ name:t.name, art:t.art })), ...b.extra];
+    // The test cards' art as found perfectly on the made-up webcam pictures
+    const shots = [];
+    for (let i = 0; i < b.tests.length; i++) {
+      const t = b.tests[i]; if (!t) continue;
+      const sc = window.ktScene.make(t.card, { seed:i + 1, mat:b.mats, others:b.others });
+      const pic = await window.ktScene.compress(sc.canvas, sc.quality);
+      shots.push({ name:t.name, art:E.artFromCard(pic, sc.quad), h:Math.hypot(sc.quad[0].x - sc.quad[3].x, sc.quad[0].y - sc.quad[3].y) });
+    }
+    const embedAll = async list => { const out = []; for (let i = 0; i < list.length; i += 16) out.push(...await E.embed(list.slice(i, i + 16))); return out; };
+    const out = {};
+    for (const [k, f] of Object.entries(T)) {
+      const rv = await embedAll(refs.map(r => f(r.art))), qv = await embedAll(shots.map(s => f(s.art)));
+      let top1 = 0, top5 = 0, sum = 0;
+      qv.forEach((q, i) => {
+        const sc = rv.map((r, j) => { let s = 0; for (let d = 0; d < q.length; d++) s += q[d] * r[d]; return { s, name:refs[j].name }; }).sort((a, z) => z.s - a.s);
+        const rank = sc.findIndex(x => x.name === shots[i].name);
+        if (rank === 0) top1++; if (rank >= 0 && rank < 5) top5++; sum += sc.find(x => x.name === shots[i].name)?.s || 0;
+      });
+      out[k] = { top1:top1 / shots.length, top5:top5 / shots.length, trueScore:sum / shots.length };
+      console.log("refs", k, JSON.stringify(out[k]));
+    }
+    return { n:shots.length, refs:refs.length, out };
+  });
+  const lines = [`## Picture preparation: ${res.n} webcam-like shots (art found perfectly) against ${res.refs} cards, ${DTYPE}`, "",
+    "| preparation | right card first | in top 5 | mean score of the right card |", "|---|---|---|---|",
+    ...Object.entries(res.out).map(([k, v]) => `| ${k} | ${Math.round(v.top1 * 100)}% | ${Math.round(v.top5 * 100)}% | ${v.trueScore.toFixed(3)} |`)].join("\n");
+  console.log("\n" + lines);
+  fs.writeFileSync(path.join(OUT, "summary.md"), lines + "\n");
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines + "\n");
+  await browser.close(); server.close(); process.exit(0);
+}
 
 const results = [];
 for (let i = 0; i < N; i++) {
