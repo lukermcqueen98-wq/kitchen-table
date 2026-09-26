@@ -16,6 +16,7 @@
    Flag:  --fake-model         a stand-in model, to test the pipeline without downloading the real one */
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { pipeline, RawImage } from "@huggingface/transformers";
 
 const OUT = path.resolve(process.argv.slice(2).find(a => !a.startsWith("--")) || "site/index");
@@ -45,16 +46,40 @@ async function getJSON(url){
 async function artworkListUrl(){
   const bulk = await getJSON("https://api.scryfall.com/bulk-data");
   const entry = (bulk?.data || []).find(b => b.type === "unique_artwork");
-  if (!entry?.download_uri) throw new Error(`Scryfall's bulk data list has no unique_artwork download (types: ${(bulk?.data || []).map(b => b.type).join(", ") || "none"})`);
-  console.log(`Downloading Scryfall's artwork list (${entry.size ? Math.round(entry.size / 1e6) + " MB, " : ""}updated ${entry.updated_at || "unknown"}).`);
-  return entry.download_uri;
+  if (!entry) throw new Error(`Scryfall's bulk data list has no unique_artwork entry (types: ${(bulk?.data || []).map(b => b.type).join(", ") || "none"})`);
+  // The link has been called download_uri; look for it under any name, preferring a .json file off the API host
+  const find = e => {
+    const urls = [];
+    const walk = v => { if (typeof v === "string" && /^https?:\/\//.test(v) && !/^https:\/\/api\.scryfall\.com\//.test(v)) urls.push(v); else if (v && typeof v === "object") Object.values(v).forEach(walk); };
+    if (e?.download_uri) urls.push(e.download_uri); else walk(e);
+    return urls.find(u => /\.json(\.gz)?(\?|$)/.test(u)) || urls[0];
+  };
+  let url = find(entry);
+  // No link in the catalog: the entry's own page (its uri) may have it
+  if (!url && /^https:\/\/api\.scryfall\.com\//.test(entry.uri || "")) url = find(await getJSON(entry.uri));
+  if (!url) throw new Error(`Scryfall's unique_artwork entry has no download link. Its fields: ${JSON.stringify(entry).slice(0, 800)}`);
+  console.log(`Downloading Scryfall's artwork list from ${url} (${entry.size ? Math.round(entry.size / 1e6) + " MB, " : ""}updated ${entry.updated_at || "unknown"}).`);
+  return url;
+}
+// The artwork list, which may come gzip-compressed
+async function getBigJSON(url){
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(url, { headers:{ "User-Agent":UA, Accept:"application/json" } });
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+      let buf = Buffer.from(await r.arrayBuffer());
+      if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);  // gzip file, not undone by the transfer
+      return JSON.parse(buf.toString("utf8"));
+    } catch (e) { if (i >= 3) throw e; await sleep(5000 * 2 ** i); }
+  }
 }
 
 // Every unique artwork printed on paper. Double-faced cards get one entry per face.
 async function artworks(){
   const list = process.env.SCRYFALL_BULK_FILE
     ? JSON.parse(fs.readFileSync(process.env.SCRYFALL_BULK_FILE, "utf8"))
-    : await getJSON(await artworkListUrl());
+    : await getBigJSON(await artworkListUrl());
+  if (!Array.isArray(list)) throw new Error(`Scryfall's artwork list isn't a list of cards (got ${typeof list}: ${JSON.stringify(list).slice(0, 300)})`);
   const out = new Map();
   for (const c of list) {
     if (c.digital || c.layout === "art_series" || !(c.games || []).includes("paper")) continue;
