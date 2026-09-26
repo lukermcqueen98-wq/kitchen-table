@@ -89,7 +89,9 @@ if (MODE === "refs") {
         const n = d.length / 4; let acc = 0, lo = 0, hi = 255; for (let v = 0; v < 256; v++) { acc += h[v]; if (acc < n * 0.02) lo = v; if (acc < n * 0.98) hi = v; }
         const k = 255 / Math.max(8, hi - lo); for (let i = ch; i < d.length; i += 4) d[i] = (d[i] - lo) * k; }
       x.putImageData(im, 0, 0); return c; };
-    const T = { clean:src => canvasOf(src, 240), down96:down(96), down64:down(64), norm, down96norm:src => norm(down(96)(src)), down64norm:src => norm(down(64)(src)) };
+    // shrink: the page's own block-averaging shrink, handed to the AI small (its preprocessor enlarges it)
+    const shrink = w => src => E.shrink(canvasOf(src, 240), w);
+    const T = { down64:down(64), shrink64:shrink(64), shrink48:shrink(48), shrink40:shrink(40), shrink32:shrink(32), shrink48norm:src => norm(shrink(48)(src)) };
     const refs = [...b.tests.filter(Boolean).map(t => ({ name:t.name, art:t.art })), ...b.extra];
     // The test cards' art as found perfectly on the made-up webcam pictures
     const shots = [];

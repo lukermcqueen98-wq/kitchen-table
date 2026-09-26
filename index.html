@@ -2531,6 +2531,35 @@ async function aiLearn(name, prints){
   const vecs = await aiEmbed(canvases); if (!vecs) return;
   vecs.forEach((v, i) => { AI.refs.push({ id:ids[i], name, v }); idb.set(aiKey() + ids[i], v); });
 }
+/* Shrink art to webcam detail before the AI sees it, by averaging blocks of pixels (the same arithmetic as
+   tools/build-index.mjs, so the index and a click see alike). A webcam shows a card's art only 60 to 170 pixels wide,
+   blurred and compressed, while the index is made from Scryfall's sharp art. Bringing both down to the same small
+   size makes them look alike to the AI, which roughly doubled right answers in the matching benchmark. */
+function shrinkPixels(src, sw, sh, w, h){  // src: RGBA bytes, sw x sh -> RGBA bytes, w x h
+  const out = new Uint8ClampedArray(w * h * 4), fx = sw / w, fy = sh / h;
+  for (let y = 0; y < h; y++) {
+    const y0 = y * fy, y1 = y0 + fy;
+    for (let x = 0; x < w; x++) {
+      const x0 = x * fx, x1 = x0 + fx; let r = 0, g = 0, b = 0, wt = 0;
+      for (let yy = Math.floor(y0); yy < Math.min(sh, Math.ceil(y1)); yy++) {
+        const wy = Math.min(y1, yy + 1) - Math.max(y0, yy);
+        for (let xx = Math.floor(x0); xx < Math.min(sw, Math.ceil(x1)); xx++) {
+          const k = wy * (Math.min(x1, xx + 1) - Math.max(x0, xx)), i = (yy * sw + xx) * 4;
+          r += src[i] * k; g += src[i + 1] * k; b += src[i + 2] * k; wt += k;
+        }
+      }
+      const o = (y * w + x) * 4; out[o] = r / wt; out[o + 1] = g / wt; out[o + 2] = b / wt; out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+function shrinkArt(canvas, w){
+  const sw = canvas.width, sh = canvas.height, h = Math.max(1, Math.round(sh * w / sw));
+  const px = canvas.getContext("2d", { willReadFrequently:true }).getImageData(0, 0, sw, sh).data;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").putImageData(new ImageData(shrinkPixels(px, sw, sh, w, h), w, h), 0, 0);
+  return c;
+}
 // Cut a box out of an image and turn it upright (rot = quarter turns clockwise, same as the color matcher)
 function cropArt(src, b, size = 240){
   const aw = b.rot % 2 ? b.h : b.w, ah = b.rot % 2 ? b.w : b.h, k = size / aw;
@@ -2876,6 +2905,7 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
     return m && { name:m.name, id:m.id, score:m.score, margin:m.margin, ok:m.ok, quad:m.quad, top:m.top, ms:performance.now() - t0 };
   },
   embed:canvases => aiEmbed(canvases),
+  shrink:(canvas, w) => shrinkArt(canvas, w),
   // The art box of a card with known corners, straightened out, as the AI sees it
   artFromCard(canvas, q){
     const [u0, v0, u1, v1] = ART_IN_CARD;
