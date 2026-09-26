@@ -72,7 +72,11 @@ header.bar .btn{padding:6px 11px;font-size:14px}
 #grid.n2{grid-template-columns:1fr 1fr}
 #grid.n3,#grid.n4{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
 #grid.n3 .tile,#grid.n4 .tile{grid-column:span 2}
-#grid.n3 .tile:nth-child(3){grid-column:2 / span 2}
+#grid.n3 .tile.third{grid-column:2 / span 2}
+.grip{pointer-events:auto;cursor:grab;touch-action:none;border:0;background:rgba(0,0,0,.65);border-radius:6px;padding:4px 8px;font-size:14px;line-height:1;color:var(--muted)}
+.grip:active{cursor:grabbing}
+.tile.dragging{opacity:.55}
+.tile.droptarget{border-color:var(--brass);border-style:dashed}
 
 .tile{position:relative;background:#000;border-radius:10px;overflow:hidden;min-height:200px;border:2px solid transparent}
 .tile.enter{animation:seatIn .35s ease-out}
@@ -220,8 +224,8 @@ button.mpip{cursor:pointer}
     <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" placeholder="Luke"></label>
     <label class="field"><span>Camera</span><select id="camSel"></select></label>
     <label class="field"><span>Microphone</span><select id="micSel"></select></label>
-    <label class="field"><span>Starting life</span>
-      <select id="lifeSel"><option value="40">40 (Commander)</option><option value="20">20 (60-card formats)</option><option value="30">30 (Brawl)</option></select></label>
+    <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
+      <select id="modeSel"></select></label>
     <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
       <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
     <p class="hint" id="deckCount"></p>
@@ -306,6 +310,8 @@ button.mpip{cursor:pointer}
     <section>
       <h2>Table</h2>
       <div class="tbl">
+        <label for="tblMode">Game mode</label><select id="tblMode"></select>
+        <span></span><span class="hint" id="modeHint"></span>
         <label for="monSel">Monarch</label><select id="monSel"></select>
         <label for="iniSel">Initiative</label><select id="iniSel"></select>
         <label for="dnSel">Day or night</label>
@@ -328,8 +334,8 @@ button.mpip{cursor:pointer}
       <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
       <label class="opts-line">Speech engine
         <select id="engineSel" style="padding:4px 6px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)">
-          <option value="local">On this computer (private, no popups)</option>
-          <option value="browser">Browser (Edge or Chrome, more accurate)</option>
+          <option value="browser">Chrome or Edge speech (most accurate)</option>
+          <option value="device">Chrome on-device (private, audio stays on this computer)</option>
         </select></label>
       <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn")</label>
     </section>
@@ -354,6 +360,14 @@ const MAX = 4;
 const SEAT_HEX = ["#e8dcb5", "#4a86c5", "#c65a3f", "#5a9a52"];
 const SEAT_INK = ["#1b1608", "#ffffff", "#ffffff", "#ffffff"];
 const CLOCKS = ["off", "up", "60", "120", "180", "300"];
+// Game modes: the host picks one and every player's starting life and seat limit follow it
+const MODES = {
+  cmdr:{ label:"Commander (up to 4 players, 40 life)", short:"Commander", life:40, max:4 },
+  duel:{ label:"1v1 Commander (2 players, 20 life)", short:"1v1 Commander", life:20, max:2 },
+  brawl:{ label:"Brawl (up to 4 players, 30 life)", short:"Brawl", life:30, max:4 },
+  sixty:{ label:"60-card formats (up to 4 players, 20 life)", short:"60-card", life:20, max:4 }
+};
+const modeOf = k => MODES[k] || MODES.cmdr;
 const $ = s => document.querySelector(s);
 const store = {
   get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
@@ -476,20 +490,24 @@ function runPhoneCam(){
    ===================================================================== */
 let localStream = null, peer = null, mySeat = 0, roomCode = "", me = null;
 const calls = {}, conns = {}, camCalls = {}, players = {};
-const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off" };
-let turnStartAt = null, gameStartAt = null, tableKnown = false;
+const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off", mode:"cmdr" };
+let turnStartAt = null, gameStartAt = null, tableKnown = false, joinedAt = 0;
 let damageLog = [], pending = null, camHidden = false;
 const shown = new Set();
 const nm = s => (s === mySeat ? me?.name : players[s]?.name) || `Seat ${s}`;
 
 /* ---------- Lobby ---------- */
 $("#nameIn").value = store.get("kt-name", "");
-$("#lifeSel").value = store.get("kt-life", "40");
+for (const sel of [$("#modeSel"), $("#tblMode")]) for (const [k, m] of Object.entries(MODES)) {
+  const o = document.createElement("option"); o.value = k; o.textContent = sel.id === "modeSel" ? m.label : `${m.short}, ${m.life} life`; sel.appendChild(o);
+}
+$("#modeSel").value = store.get("kt-mode", "") || ({ 20:"sixty", 30:"brawl" })[store.get("kt-life", "40")] || "cmdr";
 $("#deckIn").value = store.get("kt-deck", "");
 $("#turnUrl").value = store.get("kt-turn-url", "");
 $("#turnUser").value = store.get("kt-turn-user", "");
 $("#turnCred").value = store.get("kt-turn-cred", "");
 if (params.get("room")) $("#roomIn").value = params.get("room");
+if (params.get("full")) $("#lobbyErr").textContent = `That table is set to ${modeOf(params.get("full")).short} and already has ${modeOf(params.get("full")).max} players.`;
 
 // Finds commanders in a pasted list: a "Commander" section, or Archidekt-style [Commander] tags
 function deckCommanders(txt){
@@ -571,7 +589,7 @@ $("#joinBtn").onclick = async () => {
   const err = $("#lobbyErr"); err.textContent = "";
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
-  store.set("kt-name", name); store.set("kt-life", $("#lifeSel").value); store.set("kt-deck", $("#deckIn").value);
+  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-deck", $("#deckIn").value);
   store.set("kt-turn-url", $("#turnUrl").value.trim()); store.set("kt-turn-user", $("#turnUser").value.trim()); store.set("kt-turn-cred", $("#turnCred").value);
   roomCode = $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || randomCode();
   $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Finding a seat...";
@@ -587,11 +605,14 @@ $("#joinBtn").onclick = async () => {
     return;
   }
   if (!LOCAL) { try { history.replaceState(null, "", `?room=${roomCode}`); } catch {} }
-  const startLife = +$("#lifeSel").value;
-  me = { name, startLife, life:startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], cmd:{}, rot:$("#rotIn").checked,
+  // Your pick applies if you started the table; joiners switch to the host's mode when it arrives
+  table.mode = MODES[$("#modeSel").value] ? $("#modeSel").value : "cmdr";
+  const startLife = modeOf(table.mode).life;
+  joinedAt = Date.now();
+  me = { name, startLife, life:startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, rot:$("#rotIn").checked,
          manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 }, cmdrs:[], deckCmdrs:deckCommanders($("#deckIn").value), manaEmptyOnPass:store.get("kt-mana-empty", "0") === "1",
          stream:localStream, deck:parseDeck($("#deckIn").value), camKey:uid() };
-  players[mySeat] = me;
+  players[mySeat] = me; lastLife = me.life;
   enterTable();
 };
 
@@ -617,7 +638,15 @@ function wirePeer(){
     setupConn(s, conn, false);
   });
   peer.on("disconnected", () => { if (!peer.destroyed) peer.reconnect(); });
-  peer.on("error", e => { if (e.type !== "peer-unavailable") setStatus("Connection issue: " + e.type); });
+  peer.on("error", e => {
+    if (e.type !== "peer-unavailable") { setStatus("Connection issue: " + e.type); return; }
+    // Dialing an empty seat fails without closing the attempt. Forget it, or the tie-break above would
+    // turn away the real connection when someone sits in that seat later.
+    const id = /peer (\S+)$/.exec(e.message || "")?.[1], s = id && !id.endsWith("-cam") ? seatOf(id) : 0;
+    if (!s || players[s]?.name) return;
+    if (conns[s]?.outgoing && !conns[s].conn.open) { const c = conns[s].conn; delete conns[s]; try { c.close(); } catch {} }
+    if (calls[s]?.outgoing && !players[s]?.stream) { const c = calls[s].call; delete calls[s]; try { c.close(); } catch {} }
+  });
   for (let s = 1; s <= MAX; s++) {
     if (s === mySeat) continue;
     const id = `${PREFIX}-${roomCode}-${s}`;
@@ -688,7 +717,7 @@ function updateNetWarn(){
   box.classList.toggle("hidden", !show); box.classList.toggle("slow", cls === "slow");
   if (show) { $("#netText").textContent = msg; box.dataset.key = key; }
 }
-function blankPlayer(){ return { name:"", life:0, poison:0, exp:0, energy:0, blessing:false, emblems:[], cmd:{}, deck:[], manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } }; }
+function blankPlayer(){ return { name:"", life:0, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, deck:[], manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } }; }
 function removeIfGone(s){
   if (!calls[s] && !conns[s] && players[s]) {
     log(`${players[s].name || "A player"} left the table.`);
@@ -726,10 +755,36 @@ function applyWebcam(){ const t = localStream?.getVideoTracks()[0]; if (t) t.ena
 function send(conn, msg){ try { if (conn.open) conn.send(msg); } catch {} }
 function broadcast(msg){ Object.values(conns).forEach(c => send(c.conn, msg)); }
 function publicState(){
-  return { name:me.name, life:me.life, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
-           emblems:me.emblems, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
+  return { name:me.name, life:me.life, startLife:me.startLife, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
+           emblems:me.emblems, custom:me.custom, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
 }
-function pushState(){ broadcast({ type:"state", state:publicState() }); }
+let lastLife = null;
+function pushState(){
+  if (lastLife !== null && me.life !== lastLife) noteLife(mySeat, lastLife, me.life);
+  lastLife = me.life;
+  broadcast({ type:"state", state:publicState() });
+}
+/* Life changes go in the table log. Clicks are grouped: after 2 quiet seconds, one line with the net change. */
+const lifeTrack = {};  // seat -> { from, timer }
+let lifeQuietUntil = 0;
+function noteLife(s, before, after){
+  if (before === after || Date.now() < lifeQuietUntil) return;
+  const t = lifeTrack[s] || (lifeTrack[s] = { from:before, timer:null });
+  clearTimeout(t.timer);
+  t.timer = setTimeout(() => {
+    delete lifeTrack[s];
+    const now = s === mySeat ? me.life : players[s]?.life;
+    if (now == null || now === t.from) return;
+    const d = now - t.from;
+    log(`${s === mySeat ? "You" : nm(s)} ${d > 0 ? "gained" : "lost"} ${Math.abs(d)} life (${t.from} \u2192 ${now}).`);
+  }, 2000);
+}
+// Resets (new game, mode change) set everyone's life at once; those aren't gains or losses
+function quietLife(){
+  Object.keys(lifeTrack).forEach(k => { clearTimeout(lifeTrack[k].timer); delete lifeTrack[k]; });
+  lifeQuietUntil = Date.now() + 3000;
+  if (me) lastLife = me.life;
+}
 function tableSnap(){
   const now = Date.now();
   return { ...table, turnElapsed:turnStartAt ? now - turnStartAt : null, gameElapsed:gameStartAt ? now - gameStartAt : null };
@@ -751,6 +806,28 @@ function setTable(patch){
     table.dayNight = patch.dayNight; log(table.dayNight ? `It is now ${table.dayNight}.` : "Day and night cleared.");
   }
   if ("clockMode" in patch && CLOCKS.includes(String(patch.clockMode))) table.clockMode = String(patch.clockMode);
+  if ("mode" in patch && MODES[patch.mode] && patch.mode !== table.mode) { table.mode = patch.mode; applyMode(); }
+}
+/* Game mode: set by the host (the lowest occupied seat) and synced to everyone */
+function hostSeat(){ const seats = presentSeats(); return seats.length ? Math.min(...seats) : mySeat; }
+function applyMode(){
+  if (!me) return;
+  const m = modeOf(table.mode);
+  log(`Game mode: ${m.short}, ${m.life} starting life.`);
+  me.startLife = m.life;
+  // Before the game starts, everyone moves to the new starting life. Mid-game, the host's switch also starts a new game.
+  if (!gameStartAt && !damageLog.some(e => e.target === mySeat)) {
+    quietLife(); me.life = m.life; me.cmd = {}; pending = null; lastLife = me.life; pushState();
+  }
+  checkSeatLimit();
+}
+// A 1v1 table that already had two players when you sat down: the latest arrival steps back out
+function checkSeatLimit(){
+  const m = modeOf(table.mode), seats = presentSeats().filter(s => s === mySeat || players[s].name);
+  if (seats.length <= m.max || Date.now() - joinedAt > 20000 || mySeat !== Math.max(...seats)) return;
+  Object.values(calls).forEach(c => c.call.close()); Object.values(conns).forEach(c => c.conn.close());
+  peer?.destroy(); localStream?.getTracks().forEach(t => t.stop());
+  location.href = `${location.pathname}?full=${encodeURIComponent(table.mode)}`;
 }
 function applyTable(t){
   if (!t || typeof t !== "object") return;
@@ -777,11 +854,16 @@ function onMessage(s, msg){
     case "state": {
       const st = msg.state || {};
       const isNew = !p.name;
-      const oldKey = p.camKey;
+      const oldKey = p.camKey, oldLife = p.life;
       p.name = String(st.name || "Player").slice(0, 24);
       p.life = int(st.life, -999, 999); p.poison = int(st.poison, 0, 99); p.exp = int(st.exp, 0, 999); p.energy = int(st.energy, 0, 999);
       p.blessing = !!st.blessing;
       p.emblems = Array.isArray(st.emblems) ? st.emblems.slice(0, 10).map(x => String(x).slice(0, 140)) : [];
+      p.custom = Array.isArray(st.custom) ? st.custom.slice(0, MAX_CUSTOM).filter(c => c && typeof c === "object")
+        .map(c => ({ id:String(c.id || "").slice(0, 24), name:String(c.name || "").slice(0, 80), v:int(c.v, 0, 999) })).filter(c => c.name) : [];
+      // A changed starting life means their mode reset, not a gain or loss
+      const oldStart = p.startLife; p.startLife = int(st.startLife, 0, 999);
+      if (!isNew && msg.type === "state" && oldStart === p.startLife) noteLife(s, oldLife, p.life);
       p.cmd = {}; if (st.cmd && typeof st.cmd === "object") for (const [k, v] of Object.entries(st.cmd)) { const kk = int(k, 1, MAX); if (kk) p.cmd[kk] = int(v, 0, 999); }
       p.rot = !!st.rot;
       p.manaOn = !!st.manaOn;
@@ -797,6 +879,7 @@ function onMessage(s, msg){
         if (Array.isArray(msg.deck)) { p.deck = msg.deck.slice(0, 300).map(x => String(x).slice(0, 141)); if (p.deck.length) setTimeout(artSync, 500); }
         if (isNew) log(`${p.name} sat down.`);
         if (!tableKnown && msg.known && msg.table) applyTable(msg.table);
+        checkSeatLimit();
         if (Array.isArray(msg.dmg)) {
           let added = false;
           for (const raw of msg.dmg.slice(0, 2000)) { const e = cleanEntry(raw); if (e && !damageLog.some(x => x.id === e.id)) { damageLog.push(e); added = true; } }
@@ -844,6 +927,7 @@ function enterTable(){
   if (LOCAL) { $("#copyBtn").textContent = "Copy table code"; $("#waitNote").textContent = `Waiting for players. They open their copy of this file and enter code ${roomCode}.`; }
   $("#voiceIn").checked = store.get("kt-voice", "1") === "1";
   $("#oneWord").checked = store.get("kt-oneword", "1") === "1";
+  try { tileOrder = JSON.parse(store.get("kt-order:" + roomCode, "[]")).map(Number).filter(n => n >= 1 && n <= MAX); } catch { tileOrder = []; }
   wirePeer(); render(); renderDmg();
   setTimeout(() => askCommander(), 500);
   setTimeout(artSync, 1500);
@@ -852,12 +936,21 @@ function enterTable(){
   setInterval(updateClocks, 1000);
   loadIndex().catch(() => {});
   $("#engineSel").value = engine;
-  if (engine === "browser" && !SR) { engine = "local"; $("#engineSel").value = "local"; }
-  if (engine === "browser" && LOCAL) {
-    // Opened as a file: the browser won't remember mic permission, so every caption restart would ask again
+  if (!SR) { capOn = false; setCapHint("Captions and voice commands need Chrome or Edge."); }
+  else if (LOCAL) {
+    // Opened as a file: the browser won't remember mic permission, so every caption restart may ask again
     capOn = false;
-    setCapHint("The Browser speech engine asks for the microphone every time it restarts when this page is opened as a file. Switch the speech engine to On this computer, or click Captions to use it anyway.");
-  } else { capOn = true; startRec(); }
+    setCapHint("Captions may ask for the microphone every time they restart when this page is opened as a file. Use the hosted link instead, or click Captions to use them anyway.");
+  } else {
+    capOn = true;
+    (async () => {
+      if (engine === "device" && !(await prepareOnDevice(false))) {
+        engine = "browser"; $("#engineSel").value = "browser";
+        setCapHint("Chrome's on-device speech isn't ready on this computer, so captions are using Chrome or Edge speech. Pick On-device again to download it.");
+      }
+      startRec();
+    })();
+  }
   updateCapBtn();
 }
 $("#copyBtn").onclick = async () => {
@@ -902,8 +995,10 @@ $("#newBtn").onclick = () => {
   broadcast({ type:"newgame" }); applyNewGame("You");
 };
 function applyNewGame(by){
-  Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
-  pending = null; shown.clear();
+  quietLife();
+  me.startLife = modeOf(table.mode).life;
+  Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
+  lastLife = me.life; pending = null; shown.clear();
   Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"" });
   turnStartAt = null; gameStartAt = null; damageLog = [];
   pushState(); render(); renderDmg();
@@ -937,6 +1032,7 @@ function render(bumpMine){
   if (!me) return;
   const grid = $("#grid"), seats = presentSeats();
   grid.className = "n" + Math.max(1, Math.min(MAX, seats.length));
+  $("#roomLabel").textContent = `Table ${roomCode}, ${modeOf(table.mode).short}`;
   $("#waitNote").classList.toggle("hidden", seats.length > 1);
   [...grid.children].forEach(el => { if (!seats.includes(+el.dataset.seat)) el.remove(); });
   seats.forEach(s => {
@@ -957,6 +1053,8 @@ function render(bumpMine){
     el.querySelector(".nocam").classList.toggle("hidden", hasVideo);
     v.classList.toggle("rot", !!p.rot);
     el.classList.toggle("active", table.turnSeat === s);
+    const pos = tileSeats(seats).indexOf(s);
+    el.style.order = pos; el.classList.toggle("third", pos === 2);
     el.querySelector(".pname").textContent = p.name || "Connecting...";
     renderBadges(el, s);
     renderCmdrs(el, s);
@@ -984,12 +1082,52 @@ function buildTile(s){
     ${mine ? "" : "<audio autoplay></audio>"}
     <div class="nocam hidden">${mine ? "No camera. Use Phone camera in the top bar." : "No camera yet."}</div>
     <div class="hit" title="Click a card name to identify it"></div>
-    <div class="plate"><div class="prow"><span class="nm"><span class="pip" style="background:${SEAT_HEX[s - 1]}"></span><span class="pname"></span></span><span class="badges"></span><span class="turnflag"></span></div><div class="cmdrs"></div></div>
+    <div class="plate"><div class="prow"><button class="grip" title="Drag to move this camera. Arrow keys work too." aria-label="Move this camera">⠿</button><span class="nm"><span class="pip" style="background:${SEAT_HEX[s - 1]}"></span><span class="pname"></span></span><span class="badges"></span><span class="turnflag"></span></div><div class="cmdrs"></div></div>
     <div class="life">${mine ? '<button aria-label="Lose 1 life" data-d="-1">&minus;</button>' : ""}<output></output>${mine ? '<button aria-label="Gain 1 life" data-d="1">+</button>' : ""}</div>
     <div class="ctrs"></div>`;
   el.querySelectorAll(".life button").forEach(b => b.onclick = ev => { ev.stopPropagation(); changeLife(+b.dataset.d); });
   attachLookup(el, s);
+  attachDrag(el);
   return el;
+}
+/* Camera layout: drag a tile's handle onto another tile to swap them. Your layout is only on your screen.
+   Tiles are placed with CSS order instead of moving elements, because moving a playing video pauses it. */
+let tileOrder = [];
+function tileSeats(seats){
+  const known = tileOrder.filter(s => seats.includes(s));
+  return [...known, ...seats.filter(s => !known.includes(s))];
+}
+function swapTiles(a, b){
+  const order = tileSeats(presentSeats()), i = order.indexOf(a), j = order.indexOf(b);
+  if (i < 0 || j < 0 || i === j) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  tileOrder = order; store.set("kt-order:" + roomCode, JSON.stringify(order));
+  render();
+}
+function attachDrag(el){
+  const grip = el.querySelector(".grip");
+  grip.addEventListener("pointerdown", e => {
+    e.stopPropagation(); e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    el.classList.add("dragging");
+    let over = null;
+    const move = ev => {
+      const t = document.elementsFromPoint(ev.clientX, ev.clientY).map(n => n.closest?.(".tile")).find(x => x && x !== el) || null;
+      if (t !== over) { over?.classList.remove("droptarget"); over = t; over?.classList.add("droptarget"); }
+    };
+    const up = () => {
+      grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); grip.removeEventListener("pointercancel", up);
+      el.classList.remove("dragging"); over?.classList.remove("droptarget");
+      if (over) swapTiles(+el.dataset.seat, +over.dataset.seat);
+    };
+    grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up); grip.addEventListener("pointercancel", up);
+  });
+  grip.addEventListener("keydown", e => {
+    const d = { ArrowLeft:-1, ArrowUp:-1, ArrowRight:1, ArrowDown:1 }[e.key]; if (!d) return;
+    e.preventDefault();
+    const order = tileSeats(presentSeats()), other = order[order.indexOf(+el.dataset.seat) + d];
+    if (other) { swapTiles(+el.dataset.seat, other); grip.focus(); }
+  });
 }
 function renderBadges(el, s){
   const b = el.querySelector(".badges"), p = players[s], want = [];
@@ -1003,9 +1141,13 @@ function renderBadges(el, s){
 }
 
 const NUMERIC = [["poison", "Poison", 10], ["exp", "Experience", 0], ["energy", "Energy", 0]];
+// Any other counter: on you (rad, tickets) or on a permanent (+1/+1, loyalty, charge...). Shown to everyone.
+const MAX_CUSTOM = 16;
+const COUNTER_TYPES = ["+1/+1", "-1/-1", "Loyalty", "Defense", "Charge", "Time", "Lore", "Oil", "Shield", "Stun", "Finality",
+  "Level", "Quest", "Storage", "Age", "Fade", "Doom", "Rad", "Ticket"];
 function renderCounters(el, s){
   const p = players[s], box = el.querySelector(".ctrs"), mine = s === mySeat;
-  const sig = JSON.stringify([p.poison, p.exp, p.energy, p.cmd, p.emblems, p.blessing, p.manaOn, p.mana, mine ? [...shown] : 0, presentSeats().map(o => players[o]?.name)]);
+  const sig = JSON.stringify([p.poison, p.exp, p.energy, p.cmd, p.emblems, p.custom, p.blessing, p.manaOn, p.mana, mine ? [...shown] : 0, presentSeats().map(o => players[o]?.name)]);
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig; box.innerHTML = "";
   const chip = (label, val, o = {}) => {
@@ -1015,6 +1157,7 @@ function renderCounters(el, s){
     if (o.minus) { const b = document.createElement("button"); b.innerHTML = "&minus;"; b.setAttribute("aria-label", "Decrease " + label); b.onclick = e => { e.stopPropagation(); o.minus(); }; c.appendChild(b); }
     const v = document.createElement("b"); v.textContent = val; c.appendChild(v);
     if (o.plus) { const b = document.createElement("button"); b.textContent = "+"; b.setAttribute("aria-label", "Increase " + label); b.onclick = e => { e.stopPropagation(); o.plus(); }; c.appendChild(b); }
+    if (o.remove) { const b = document.createElement("button"); b.textContent = "\u00d7"; b.setAttribute("aria-label", "Remove " + label); b.onclick = e => { e.stopPropagation(); o.remove(); }; c.appendChild(b); }
     box.appendChild(c);
   };
   if (p.manaOn) box.appendChild(manaRow(p, mine));
@@ -1023,6 +1166,10 @@ function renderCounters(el, s){
     if (!(v > 0 || (mine && shown.has(k)))) return;
     chip(label, v, { lethal:lethal && v >= lethal, minus:mine ? () => bumpCounter(k, -1) : null, plus:mine ? () => bumpCounter(k, 1) : null });
   });
+  (p.custom || []).forEach(c => chip(c.name, c.v, mine ? {
+    minus:() => bumpCustom(c.id, -1), plus:() => bumpCustom(c.id, 1),
+    remove:() => { me.custom = me.custom.filter(x => x.id !== c.id); pushState(); render(); }
+  } : {}));
   Object.entries(p.cmd || {}).forEach(([src, v]) => { if (v > 0) chip(`Commander damage from ${nm(+src)}`, v, { sw:SEAT_HEX[src - 1], lethal:v >= 21 }); });
   (p.emblems || []).forEach((t, i) => {
     const c = document.createElement("div"); c.className = "ctr emblem"; c.title = t;
@@ -1066,6 +1213,55 @@ function manaRow(p, mine){
   return row;
 }
 function bumpCounter(k, d){ me[k] = Math.max(0, (me[k] || 0) + d); pushState(); render(); }
+function bumpCustom(id, d){
+  const c = me.custom.find(x => x.id === id); if (!c) return;
+  c.v = Math.max(0, Math.min(999, c.v + d)); pushState(); render();
+}
+function addCounterDialog(){
+  if (me.custom.length >= MAX_CUSTOM) { setStatus(`You can track up to ${MAX_CUSTOM} extra counters.`); return; }
+  const card = document.createElement("div"); card.className = "modal-card";
+  const h = document.createElement("h2"); h.textContent = "Add a counter"; card.appendChild(h);
+  const sub = document.createElement("p"); sub.className = "hint"; sub.textContent = "Pick a type, or type your own. Everyone at the table sees it next to your life total."; card.appendChild(sub);
+  const form = document.createElement("div"); form.className = "cmdrform"; card.appendChild(form);
+  const types = document.createElement("div"); types.className = "row"; types.style.justifyContent = "center"; form.appendChild(types);
+  const nameL = document.createElement("label"); nameL.className = "field";
+  const nameS = document.createElement("span"); nameS.textContent = "Counter type"; nameL.appendChild(nameS);
+  const nameIn = document.createElement("input"); nameIn.maxLength = 30; nameIn.placeholder = "For example: Charge"; nameL.appendChild(nameIn);
+  COUNTER_TYPES.forEach(t => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.style.padding = "5px 10px"; b.textContent = t;
+    b.onclick = () => { nameIn.value = t; types.querySelectorAll(".btn").forEach(x => x.classList.toggle("primary", x === b)); onIn.focus(); };
+    types.appendChild(b);
+  });
+  form.appendChild(nameL);
+  const onL = document.createElement("label"); onL.className = "field";
+  const onS = document.createElement("span"); onS.textContent = "On which card? (optional, leave blank for counters on you)"; onL.appendChild(onS);
+  const wrap = document.createElement("div"); wrap.className = "searchwrap";
+  const onIn = document.createElement("input"); onIn.autocomplete = "off"; onIn.placeholder = "Start typing a card name";
+  wrap.appendChild(onIn); onL.appendChild(wrap); form.appendChild(onL);
+  suggestInput(onIn, { commandersOnly:false });
+  const startL = document.createElement("label"); startL.className = "field";
+  const startS = document.createElement("span"); startS.textContent = "Starting amount"; startL.appendChild(startS);
+  const startIn = document.createElement("input"); startIn.type = "number"; startIn.min = "0"; startIn.max = "999"; startIn.value = "1"; startL.appendChild(startIn);
+  form.appendChild(startL);
+  const err = document.createElement("div"); err.id = "cmdrErr"; card.appendChild(err);
+  const row = document.createElement("div"); row.className = "row"; row.style.justifyContent = "center"; card.appendChild(row);
+  const save = document.createElement("button"); save.className = "btn primary"; save.textContent = "Add counter";
+  const cancel = document.createElement("button"); cancel.className = "btn"; cancel.textContent = "Cancel";
+  row.append(save, cancel);
+  save.onclick = () => {
+    const type = nameIn.value.trim().slice(0, 30);
+    if (!type) { err.textContent = "Pick a counter type or type one in."; return; }
+    const on = onIn.value.trim().slice(0, 45);
+    const name = on ? `${type} on ${on}` : type;
+    me.custom.push({ id:uid().slice(0, 12), name, v:int(startIn.value, 0, 999) });
+    pushState(); render(); closeModal();
+    log(`You added ${name} counters.`);
+  };
+  cancel.onclick = closeModal;
+  card.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT" && !e.defaultPrevented) { e.preventDefault(); save.click(); } });
+  openModal(card);
+  setTimeout(() => nameIn.focus(), 50);
+}
 function closeMenus(){ document.querySelectorAll(".tilemenu").forEach(m => m.remove()); }
 document.addEventListener("pointerdown", e => {
   if (!e.target.closest(".tilemenu") && !e.target.closest(".ctr.add")) closeMenus();
@@ -1076,6 +1272,7 @@ function openCounterMenu(el){
   const m = document.createElement("div"); m.className = "menu tilemenu";
   const item = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = e => { e.stopPropagation(); closeMenus(); fn(); }; m.appendChild(b); };
   NUMERIC.forEach(([k, label]) => { if (!shown.has(k) && !me[k]) item(`${label} counters`, () => { shown.add(k); render(); }); });
+  item("Other counters (+1/+1, loyalty, charge, rad...)", addCounterDialog);
   item(me.manaOn ? "Turn off mana pool" : "Turn on mana pool (shown to everyone)", () => {
     me.manaOn = !me.manaOn; pushState(); render();
     log(me.manaOn ? "You turned on your mana pool." : "You turned off your mana pool.");
@@ -1219,7 +1416,21 @@ function renderTablePanel(){
   fillSeatSelect($("#monSel"), table.monarch, seats);
   fillSeatSelect($("#iniSel"), table.initiative, seats);
   $("#dnSel").value = table.dayNight; $("#clockSel").value = table.clockMode;
+  const host = hostSeat(), ms = $("#tblMode");
+  ms.value = table.mode; ms.disabled = host !== mySeat;
+  $("#modeHint").textContent = host === mySeat ? "You're the host, so your pick applies to everyone." : `Set by the host, ${nm(host)}.`;
 }
+$("#tblMode").onchange = e => {
+  const v = e.target.value, m = modeOf(v);
+  if (hostSeat() !== mySeat || !MODES[v]) { e.target.value = table.mode; return; }
+  const seated = presentSeats().length;
+  if (seated > m.max) { e.target.value = table.mode; setStatus(`${m.short} is for ${m.max} players, and ${seated} are at the table.`); return; }
+  const inGame = !!gameStartAt || damageLog.length > 0;
+  if (inGame && !confirm(`Switch everyone to ${m.short}?\n\nThis starts a new game for everyone at ${m.life} life and erases the damage history.`)) { e.target.value = table.mode; return; }
+  changeTable({ mode:v });
+  store.set("kt-mode", v);
+  if (inGame) { broadcast({ type:"newgame" }); applyNewGame("You"); }
+};
 $("#monSel").onchange = e => changeTable({ monarch:+e.target.value });
 $("#iniSel").onchange = e => changeTable({ initiative:+e.target.value });
 $("#dnSel").onchange = e => changeTable({ dayNight:e.target.value });
@@ -1628,7 +1839,7 @@ function artSearch(G, cx, cy, cards, seatBias){
         const co = artNorm(artCoarse(raw));
         let best = -2;
         for (const e of cards) { const sc = dotv(co, e.coarse) + (seatBias(e) || 0); if (sc > best) best = sc; }
-        patches.push({ raw, best, bx, by, bw, bh });
+        patches.push({ raw, best, bx, by, bw, bh, rot });
       }
     }
   }
@@ -1644,7 +1855,7 @@ function artSearch(G, cx, cy, cards, seatBias){
     }
   }
   const ranked = [...byName.values()].sort((a, b) => b.score - a.score);
-  return { best:ranked[0] || null, second:ranked[1] || null, patches:patches.length };
+  return { best:ranked[0] || null, second:ranked[1] || null, patches:patches.length, top };
 }
 
 const BASICS = new Set(["plains", "island", "swamp", "mountain", "forest", "wastes", "snow covered plains", "snow covered island", "snow covered swamp", "snow covered mountain", "snow covered forest"]);
@@ -1655,7 +1866,14 @@ function artStat(){
   if (ART.blocked) el.textContent = "Picture matching isn't available in this browser (card images couldn't be read). Name reading still works.";
   else if (!all.length) el.textContent = "Tip: paste decklists in the lobby to turn on picture matching.";
   else if (done < all.length) el.textContent = `Learning card art: ${done} of ${all.length} cards...`;
-  else el.textContent = `Picture matching ready for ${all.length} cards.`;
+  else if (AI.loading) el.textContent = "Loading the AI card matcher (one-time download, about 25 to 45 MB)...";
+  else if (AI.failed) el.textContent = `Basic picture matching ready for ${all.length} cards. The AI matcher couldn't load in this browser.`;
+  else {
+    const aiDone = all.filter(x => x.ai).length;
+    el.textContent = aiDone < all.filter(x => x.prints?.length).length
+      ? `Picture matching ready. AI matcher learning: ${aiDone} of ${all.length} cards...`
+      : `AI picture matching ready for ${all.length} cards${AI.device === "webgpu" ? " (using your graphics card)" : ""}.`;
+  }
 }
 function artSync(){
   if (ART.running) { ART.rerun = true; return; }
@@ -1674,19 +1892,27 @@ function artSync(){
           info.state = info.count ? "done" : "none";
           artStat();
         }
+        // Second pass: teach the AI matcher the same cards (downloads the model the first time)
+        for (const [name, info] of ART.names) {
+          if (ART.blocked || AI.failed) break;
+          if (!info.prints?.length || info.ai) continue;
+          info.ai = true;
+          try { await aiLearn(name, info.prints); } catch (e) { console.warn(e); }
+          artStat();
+        }
       } while (ART.rerun && !ART.blocked);
     } finally { ART.running = false; artStat(); }
   })();
 }
 async function artPrintings(name){
-  const key = "kt-pr:" + name;
+  const key = "kt-pr2:" + name;
   try { const c = JSON.parse(store.get(key, "null")); if (c && Date.now() - c.t < 14 * 864e5) return c.l; } catch {}
   await sleep(110);  // stay well under Scryfall's rate limit
   const r = await scry(`/cards/search?unique=art&order=released&dir=desc&q=${encodeURIComponent('!"' + name.replace(/"/g, "") + '"')}`);
   let list = r?.data || [];
   if (!list.length) { await sleep(110); const one = await scry("/cards/named?fuzzy=" + encodeURIComponent(name)); if (one) list = [one]; }
   const l = list.slice(0, 5)
-    .map(c => ({ id:c.id, url:(c.image_uris || c.card_faces?.[0]?.image_uris)?.small }))
+    .map(c => { const iu = c.image_uris || c.card_faces?.[0]?.image_uris; return { id:c.id, url:iu?.small, art:iu?.art_crop }; })
     .filter(x => x.url && /^https:\/\/cards\.scryfall\.io\//.test(x.url));
   if (l.length) store.set(key, JSON.stringify({ t:Date.now(), l }));
   return l;
@@ -1708,6 +1934,7 @@ async function artDescriptor(p){
 }
 async function learnCard(name, info){
   const prints = await artPrintings(name);
+  info.prints = prints;
   await Promise.all(prints.map(async p => {
     const raw = await artDescriptor(p);
     if (raw) { ART.entries.push(artEntry(raw, { id:p.id, name })); info.count++; }
@@ -1729,10 +1956,144 @@ function artMatch(video, pt, rot, seat){
   const G = integral(ctx.getImageData(0, 0, cw, ch).data, cw, ch);
   const seatsOf = new Map(); for (const v of deckPool().values()) seatsOf.set(v.name, v.seats);
   const res = artSearch(G, (c.x - rx0) * ds, (c.y - ry0) * ds, ART.entries, e => seatsOf.get(e.name)?.has(seat) ? 0.02 : 0);
-  if (!res.best) return null;
-  const margin = res.best.score - (res.second ? res.second.score : -1), b = res.best.box;
+  const toVid = b => ({ x:rx0 + b.bx / ds, y:ry0 + b.by / ds, w:b.bw / ds, h:b.bh / ds, rot:b.rot });
+  // The best-looking spots by color, for the AI matcher to take a closer look at
+  const cands = [];
+  for (const p of res.top) {
+    if (cands.length >= 8) break;
+    if (cands.every(q => boxIoU(p, q) < 0.4)) cands.push(p);
+  }
+  if (!res.best) return { ok:false, cands:cands.map(toVid) };
+  const margin = res.best.score - (res.second ? res.second.score : -1);
   return { ok:res.best.score >= 0.75 && margin >= 0.05, name:res.best.name, id:res.best.id, score:res.best.score,
-           vbox:{ x:rx0 + b.bx / ds, y:ry0 + b.by / ds, w:b.bw / ds, h:b.bh / ds } };
+           vbox:toVid(res.best.box), cands:cands.map(toVid) };
+}
+function boxIoU(a, b){
+  const ix = Math.max(0, Math.min(a.bx + a.bw, b.bx + b.bw) - Math.max(a.bx, b.bx));
+  const iy = Math.max(0, Math.min(a.by + a.bh, b.by + b.bh) - Math.max(a.by, b.by));
+  const i = ix * iy; return i / (a.bw * a.bh + b.bw * b.bh - i);
+}
+
+/* =====================================================================
+   AI picture matching: a small vision model (DINOv2) runs in the browser,
+   on the graphics card (WebGPU) in Chrome and Edge when available. It turns
+   card art into a fingerprint that holds up to glare, angles, sleeves, and
+   webcam blur much better than comparing colors. The basic color matcher
+   and name reading stay as fallbacks.
+   ===================================================================== */
+const TJS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js";
+const AI_MODEL = "Xenova/dinov2-small";
+const AI = { ext:null, loading:null, failed:false, device:"", refs:[], learned:new Set() };
+async function aiLoad(){
+  if (AI.ext) return AI.ext;
+  if (AI.failed) return null;
+  if (!AI.loading) {
+    AI.loading = (async () => {
+      const T = await import(TJS_URL);
+      T.env.allowLocalModels = false;
+      let adapter = null;
+      try { adapter = await navigator.gpu?.requestAdapter(); } catch {}
+      const tries = adapter ? [["webgpu", adapter.features?.has("shader-f16") ? "fp16" : "fp32"], ["webgpu", "fp32"], ["wasm", "q8"]] : [["wasm", "q8"]];
+      for (const [device, dtype] of tries) {
+        try {
+          AI.ext = await T.pipeline("image-feature-extraction", AI_MODEL, { device, dtype });
+          AI.device = device; return AI.ext;
+        } catch (e) { console.warn("AI matcher: couldn't load on", device, dtype, e); }
+      }
+      throw new Error("model failed to load");
+    })().catch(e => { console.warn(e); AI.failed = true; return null; }).finally(() => { AI.loading = null; artStat(); });
+    artStat();
+  }
+  return AI.loading || AI.ext;
+}
+// One normalized fingerprint per image (the model's summary token)
+async function aiEmbed(canvases){
+  const ext = await aiLoad(); if (!ext || !canvases.length) return null;
+  const out = await ext(canvases);
+  const d = out.data, dims = out.dims, n = dims[0], D = dims[dims.length - 1], stride = dims.length === 3 ? dims[1] * D : D;
+  const res = [];
+  for (let i = 0; i < n; i++) {
+    const v = new Float32Array(D); let ss = 0;
+    for (let j = 0; j < D; j++) { v[j] = d[i * stride + j]; ss += v[j] * v[j]; }
+    const k = 1 / Math.sqrt(ss || 1); for (let j = 0; j < D; j++) v[j] *= k;
+    res.push(v);
+  }
+  return res;
+}
+// Fingerprints are saved in this browser, so each card is only learned once
+const idb = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open("kt-ai", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("emb");
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  return {
+    async get(k){ try { const db = await open(); return await new Promise(res => { const q = db.transaction("emb").objectStore("emb").get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch { return null; } },
+    async set(k, v){ try { const db = await open(); db.transaction("emb", "readwrite").objectStore("emb").put(v, k); } catch {} }
+  };
+})();
+async function aiLearn(name, prints){
+  const todo = [];
+  for (const p of prints.slice(0, 4)) {
+    if (!p.art || AI.learned.has(p.id)) continue;
+    AI.learned.add(p.id);
+    const cached = await idb.get(AI_MODEL + ":" + p.id);
+    if (cached instanceof Float32Array) AI.refs.push({ id:p.id, name, v:cached }); else todo.push(p);
+  }
+  if (!todo.length) return;
+  const canvases = [], ids = [];
+  for (const p of todo) {
+    const im = await loadImg(p.art); if (!im) continue;
+    const cv = document.createElement("canvas"), k = 240 / im.naturalWidth;
+    cv.width = 240; cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+    const ctx = cv.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    try { ctx.getImageData(0, 0, 1, 1); } catch { ART.blocked = true; return; }
+    canvases.push(cv); ids.push(p.id);
+  }
+  const vecs = await aiEmbed(canvases); if (!vecs) return;
+  vecs.forEach((v, i) => { AI.refs.push({ id:ids[i], name, v }); idb.set(AI_MODEL + ":" + ids[i], v); });
+}
+// Cut a box out of the video and turn it upright (rot = quarter turns clockwise, same as the color matcher)
+function cropArt(video, b, size = 240){
+  const aw = b.rot % 2 ? b.h : b.w, ah = b.rot % 2 ? b.w : b.h, k = size / aw;
+  const cv = document.createElement("canvas"); cv.width = size; cv.height = Math.max(1, Math.round(ah * k));
+  const ctx = cv.getContext("2d"); ctx.imageSmoothingQuality = "high";
+  const W = cv.width, H = cv.height;
+  if (b.rot === 1) { ctx.translate(0, H); ctx.rotate(-Math.PI / 2); }
+  else if (b.rot === 2) { ctx.translate(W, H); ctx.rotate(Math.PI); }
+  else if (b.rot === 3) { ctx.translate(W, 0); ctx.rotate(Math.PI / 2); }
+  ctx.drawImage(video, b.x, b.y, b.w, b.h, 0, 0, b.w * k, b.h * k);
+  return cv;
+}
+async function aiMatch(video, pt, rot, seat, color){
+  if (!AI.refs.length || AI.failed) return null;
+  const vw = video.videoWidth, vh = video.videoHeight, c = toVideo(video, pt.x, pt.y, rot);
+  if (c.x < 0 || c.y < 0 || c.x > vw || c.y > vh) return null;
+  const boxes = [...(color?.cands || [])];
+  // Plus a few card sizes centered on the click, in every orientation (tapped cards are sideways)
+  for (const f of [0.1, 0.16, 0.24]) for (let r = 0; r < 4; r++) {
+    const aw = vw * f, ah = aw / ART_ASPECT, bw = r % 2 ? ah : aw, bh = r % 2 ? aw : ah;
+    const x = Math.max(0, Math.min(vw - bw, c.x - bw / 2)), y = Math.max(0, Math.min(vh - bh, c.y - bh / 2));
+    if (bw <= vw && bh <= vh) boxes.push({ x, y, w:bw, h:bh, rot:r });
+  }
+  const qs = await aiEmbed(boxes.map(b => cropArt(video, b)));
+  if (!qs) return null;
+  const seatsOf = new Map(); for (const v of deckPool().values()) seatsOf.set(v.name, v.seats);
+  const byName = new Map();
+  qs.forEach((q, qi) => {
+    for (const r of AI.refs) {
+      const sc = dotv(q, r.v) + (seatsOf.get(r.name)?.has(seat) ? 0.01 : 0);
+      const cur = byName.get(r.name);
+      if (!cur || sc > cur.score) byName.set(r.name, { name:r.name, id:r.id, score:sc, box:boxes[qi] });
+    }
+  });
+  const ranked = [...byName.values()].sort((a, b) => b.score - a.score);
+  const best = ranked[0]; if (!best) return null;
+  const margin = best.score - (ranked[1]?.score ?? 0);
+  // Confident on its own, or a closer call that the color matcher agrees with
+  const ok = (best.score >= 0.55 && margin >= 0.06) || (best.score >= 0.45 && margin >= 0.02 && color?.name === best.name);
+  return { ok, name:best.name, id:best.id, score:best.score, vbox:best.box };
 }
 function fromVideo(video, x, y, rot){
   const r = video.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
@@ -1788,18 +2149,22 @@ function toVideo(video, cx, cy, rot){
 async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
   if (!video.videoWidth) { setStatus("That camera has not started yet."); return; }
   if (ocrBusy) return;
-  if (!rect && ART.entries.length) {
+  if (!rect && (ART.entries.length || AI.refs.length)) {
     ocrBusy = true;
     try {
       setStatus("Matching card art...");
       await sleep(16);  // let the status paint before the search runs
-      const m = artMatch(video, pt, rot, seat);
+      const color = artMatch(video, pt, rot, seat);
+      let m = null;
+      try { m = await aiMatch(video, pt, rot, seat, color); } catch (e) { console.warn("AI matcher:", e); }
+      const how = m?.ok ? "AI picture match" : "Matched by picture";
+      if (!m?.ok) m = color;
       if (m?.ok) {
         const a = fromVideo(video, m.vbox.x, m.vbox.y, rot), b = fromVideo(video, m.vbox.x + m.vbox.w, m.vbox.y + m.vbox.h, rot);
         const er = tileEl.getBoundingClientRect();
         Object.assign(boxEl.style, { left:(Math.min(a.x, b.x) - er.left) + "px", top:(Math.min(a.y, b.y) - er.top) + "px", width:Math.abs(b.x - a.x) + "px", height:Math.abs(b.y - a.y) + "px" });
         const card = await scry(`/cards/${m.id}`) || await scry("/cards/named?exact=" + encodeURIComponent(m.name));
-        if (card) { showCard(card, { share:true }); setStatus(`Matched by picture (${Math.min(99, Math.round(m.score * 100))}% similar).`); return; }
+        if (card) { showCard(card, { share:true }); setStatus(`${how} (${Math.min(99, Math.round(m.score * 100))}% similar).`); return; }
       }
       setStatus("No confident picture match. Reading the name instead...");
     } catch (e) {
@@ -1850,9 +2215,15 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
     const card = fromDeck ? (await scry("/cards/named?exact=" + encodeURIComponent(fromDeck)) || await findCard(fromDeck)) : await findCard(guess);
     if (!card) { setStatus(`No card matched "${guess}". Drag a tighter box, or type the name above.`); return; }
     showCard(card, { share:true });
+    learnLater(card.name);
   } catch {
     setStatus("The text reader failed to load. Check your connection and try again.");
   } finally { ocrBusy = false; }
+}
+// Cards identified by name get learned by picture too, so the next click on them is instant
+function learnLater(name){
+  if (!name || ART.names.has(name) || BASICS.has(norm(name))) return;
+  ART.names.set(name, { state:"todo", count:0 }); artSync();
 }
 function cleanName(text){
   const lines = text.split("\n")
@@ -2237,12 +2608,14 @@ function micLive(){ return !!localStream?.getAudioTracks()[0]?.enabled; }
 function startBrowserRec(){
   if (!SR || rec || !micLive()) return;
   rec = new SR();
-  rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || "en-US";
-  // Newer browsers can be told which phrases to expect. Feed them the table's card names when supported.
+  rec.continuous = true; rec.interimResults = true; rec.lang = speechLang();
+  if (engine === "device") { if ("processLocally" in rec) rec.processLocally = true; else if ("mode" in rec) rec.mode = "ondevice-only"; }
+  // Newer Chrome can be told which phrases to expect: the table's card names, commanders, and player names
   if (window.SpeechRecognitionPhrase && "phrases" in rec && !noPhrases) {
     try {
-      const names = [...new Set([...deckPool().values()].map(v => v.name))].slice(0, 200);
-      rec.phrases = names.map(n => new SpeechRecognitionPhrase(n, 5));
+      const names = [...new Set([...deckPool().values()].map(v => v.name))].slice(0, 400);
+      const people = presentSeats().filter(s => s !== mySeat).map(nm).filter(Boolean);
+      rec.phrases = [...names.map(n => new SpeechRecognitionPhrase(n, 5)), ...people.map(n => new SpeechRecognitionPhrase(n, 3))];
     } catch { noPhrases = true; }
   }
   rec.onresult = e => {
@@ -2255,7 +2628,10 @@ function startBrowserRec(){
     showInterim(interim.trim());
   };
   rec.onerror = e => {
-    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+    if (engine === "device" && (e.error === "language-not-supported" || e.error === "service-not-allowed")) {
+      engine = "browser"; $("#engineSel").value = "browser";
+      setCapHint("Chrome's on-device speech couldn't start, so captions switched to Chrome or Edge speech.");
+    } else if (e.error === "not-allowed" || e.error === "service-not-allowed") {
       capOn = false; updateCapBtn();
       setCapHint("Speech to text was blocked. Allow the microphone for this site (Brave also needs Google services enabled), then turn captions on.");
     } else if (e.error === "phrases-not-supported") { noPhrases = true; }
@@ -2270,98 +2646,62 @@ function startBrowserRec(){
       setCapHint("Captions stopped because the microphone kept getting blocked. Click Captions to try again.");
       return;
     }
-    if (capOn && micLive() && engine === "browser") setTimeout(startBrowserRec, LOCAL ? 1500 : 300);
+    if (capOn && micLive()) setTimeout(startBrowserRec, LOCAL ? 1500 : 300);
   };
-  try { rec.start(); setCapHint(""); } catch { rec = null; }
+  // Chrome can listen to the microphone track you already picked in the lobby (no extra permission prompt).
+  // Browsers without that support ignore the argument and use the default microphone.
+  const track = localStream?.getAudioTracks()[0];
+  try { rec.start(track); } catch { try { rec.start(); } catch { rec = null; } }
 }
 function stopBrowserRec(){ const r = rec; rec = null; if (r) { r.onend = null; try { r.stop(); } catch {} } showInterim(""); }
 
-/* On-device speech engine (Vosk, open source). Runs in a background worker on the microphone you already
-   allowed in the lobby, so it never asks for permission again and never restarts. Audio stays on this computer. */
-let engine = store.get("kt-engine", "") || (LOCAL ? "local" : "browser");
-const VOSK_JS = "https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js";
-const VOSK_MODEL = "https://raw.githubusercontent.com/ccoreilly/vosk-browser/gh-pages/models/vosk-model-small-en-us-0.15.tar.gz";
-const vosk = { model:null, loading:null, rec:null, ctx:null, node:null, src:null, starting:false };
-function loadScript(src){
-  return new Promise((res, rej) => {
-    if (window.Vosk) return res();
-    const s = document.createElement("script"); s.src = src; s.onload = () => res(); s.onerror = () => rej(new Error("couldn't download the speech library"));
-    document.head.appendChild(s);
-  });
-}
-function voskLoad(){
-  if (vosk.model) return Promise.resolve(vosk.model);
-  if (vosk.loading) return vosk.loading;
-  vosk.loading = (async () => {
-    setCapHint("Loading the on-device speech engine. The first time downloads about 45 MB, then it's saved on this computer.");
-    await loadScript(VOSK_JS);
-    if (!window.Vosk?.Model) throw new Error("the speech library didn't load");
-    // Make saving the model to browser storage optional: if a browser blocks storage for local files,
-    // speech still works and just downloads the model again next session instead of failing.
-    const RealWorker = window.Worker;
-    window.Worker = function(url, opts){
-      try {
-        const x = new XMLHttpRequest(); x.open("GET", url, false); x.send();
-        const code = x.responseText
-          .replace("return this.Vosk.syncFilesystem(true);", "return this.Vosk.syncFilesystem(true).catch(e => this.logger.warn(e));")
-          .replace("return this.Vosk.syncFilesystem(false);", "return this.Vosk.syncFilesystem(false).catch(e => this.logger.warn(e));");
-        return new RealWorker(URL.createObjectURL(new Blob([code], { type:"application/javascript" })), opts);
-      } catch { return new RealWorker(url, opts); }
-    };
-    const model = await new Promise((res, rej) => {
-      let m; try { m = new window.Vosk.Model(VOSK_MODEL); } finally { window.Worker = RealWorker; }
-      m.on("load", msg => msg.result ? res(m) : rej(new Error("the speech model failed to load")));
-      m.on("error", msg => rej(new Error(msg.error || "the speech model failed to load")));
-    });
-    vosk.model = model; return model;
-  })();
-  vosk.loading.catch(() => { vosk.loading = null; });
-  return vosk.loading;
-}
-async function startVosk(){
-  if (vosk.rec || vosk.starting || !micLive()) return;
-  vosk.starting = true;
+/* Speech engine: Chrome and Edge have speech to text built in. "browser" uses their online service (most accurate).
+   "device" asks Chrome to run its speech model on this computer (newer Chrome only), so audio never leaves it. */
+let engine = store.get("kt-engine", "");
+if (engine !== "browser" && engine !== "device") engine = "browser";
+const speechLang = () => navigator.language || "en-US";
+async function onDeviceState(){
+  if (!SR) return "unavailable";
   try {
-    const model = await voskLoad();
-    if (!capOn || engine !== "local" || !micLive()) return;
-    const track = localStream.getAudioTracks()[0];
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const recog = new model.KaldiRecognizer(ctx.sampleRate);
-    recog.on("result", m => { const t = (m.result?.text || "").trim(); showInterim(""); if (t) onFinalSpeech(t); });
-    recog.on("partialresult", m => showInterim((m.result?.partial || "").trim()));
-    const src = ctx.createMediaStreamSource(new MediaStream([track]));
-    const node = ctx.createScriptProcessor(4096, 1, 1);
-    node.onaudioprocess = e => { if (capOn && micLive()) { try { recog.acceptWaveform(e.inputBuffer); } catch {} } };
-    src.connect(node); node.connect(ctx.destination);  // the processor only runs when connected; it outputs silence
-    if (ctx.state === "suspended") { try { await ctx.resume(); } catch {} }
-    Object.assign(vosk, { rec:recog, ctx, node, src });
-    setCapHint("Captions are running on this computer. Nothing you say is sent anywhere except the caption text to your table.");
-  } catch (e) {
-    capOn = false; updateCapBtn();
-    setCapHint(`The on-device speech engine couldn't start (${e.message}). Check your internet connection for the first download, or switch the speech engine to Browser.`);
-  } finally { vosk.starting = false; }
+    if (SR.available) return await SR.available({ langs:[speechLang()], processLocally:true });
+    if (SR.availableOnDevice) return await SR.availableOnDevice(speechLang());
+  } catch {}
+  return "unavailable";
 }
-function stopVosk(){
-  try { vosk.src?.disconnect(); vosk.node?.disconnect(); } catch {}
-  try { vosk.rec?.remove(); } catch {}
-  try { vosk.ctx?.close(); } catch {}
-  Object.assign(vosk, { rec:null, ctx:null, node:null, src:null });
-  showInterim("");
+async function installOnDevice(){
+  try {
+    if (SR.install) return await SR.install({ langs:[speechLang()], processLocally:true });
+    if (SR.installOnDevice) return await SR.installOnDevice(speechLang());
+  } catch {}
+  return false;
 }
-function startRec(){ if (engine === "local") startVosk(); else startBrowserRec(); }
-function stopRec(){ stopVosk(); stopBrowserRec(); }
+// Returns true when the on-device model is ready. Downloading it needs a click, so pass fromClick when the user just picked it.
+async function prepareOnDevice(fromClick){
+  let st = await onDeviceState();
+  if (st === "available") return true;
+  if ((st === "downloadable" || st === "downloading") && fromClick) {
+    setCapHint("Downloading Chrome's on-device speech model. Captions start when it's ready.");
+    if (await installOnDevice()) st = await onDeviceState();
+  }
+  return st === "available";
+}
+function startRec(){ startBrowserRec(); }
+function stopRec(){ stopBrowserRec(); }
 function onFinalSpeech(t){ addCaption(mySeat, t); broadcast({ type:"caption", text:t }); runVoice(t); }
-$("#engineSel").onchange = e => {
+$("#engineSel").onchange = async e => {
   stopRec(); engine = e.target.value; store.set("kt-engine", engine);
-  if (engine === "browser" && !SR) { setCapHint("This browser doesn't have built-in speech to text. Use On this computer instead."); capOn = false; }
-  else { capOn = true; setCapHint(""); startRec(); if (engine === "browser" && LOCAL) toast("Heads up: the Browser engine may ask for the microphone repeatedly while this page is opened as a file."); }
-  updateCapBtn();
+  if (!SR) { setCapHint("Captions need Chrome or Edge."); capOn = false; updateCapBtn(); return; }
+  if (engine === "device" && !(await prepareOnDevice(true))) {
+    engine = "browser"; e.target.value = "browser"; store.set("kt-engine", engine);
+    setCapHint("This browser can't run speech on-device yet (it needs a recent desktop Chrome). Using Chrome or Edge speech instead.");
+  } else setCapHint(engine === "device" ? "Captions are running on this computer. Only the caption text goes to your table." : "");
+  capOn = true; startRec(); updateCapBtn();
 };
-function updateCapBtn(){ const b = $("#capBtn"); b.textContent = capOn ? "Captions on" : "Captions off"; b.classList.toggle("off", !capOn); b.disabled = engine === "browser" && !SR; }
+function updateCapBtn(){ const b = $("#capBtn"); b.textContent = capOn ? "Captions on" : "Captions off"; b.classList.toggle("off", !capOn); b.disabled = !SR; }
 function setCapHint(t){ $("#capHint").textContent = t; }
 $("#capBtn").onclick = () => {
   capOn = !capOn; quickEnds = 0;
-  if (capOn) { startRec(); if (LOCAL && engine === "browser") toast("Captions on. Because this page is a local file, the Browser engine may ask for the microphone each time it restarts."); }
+  if (capOn) { startRec(); if (LOCAL) toast("Captions on. Because this page is a local file, Chrome may ask for the microphone each time captions restart."); }
   else stopRec();
   updateCapBtn();
 };
