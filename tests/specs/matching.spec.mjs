@@ -6,9 +6,9 @@ test("picture matching finds a card on another player's camera from the all-card
   const a = await newPlayer(b1), b = await newPlayer(b2);
   a.on("download", d => (a.downloads ||= []).push(d.suggestedFilename()));
   await a.addInitScript(() => { const f = window.createImageBitmap; window.__stills = 0; window.createImageBitmap = (...x) => { window.__stills++; return f(...x); }; });
+  let binDownloads = 0; a.on("request", r => { if (r.url().includes("cards.bin")) binDownloads++; });
   const room = await sitDown(a, "Luke", { deck:"" }); await settle(a);
   await sitDown(b, "Rick", { room, deck:"" });
-  let binDownloads = 0; a.on("request", r => { if (r.url().includes("cards.bin")) binDownloads++; });
   await expect(a.locator("#artStat")).toHaveText(/ready for all 5/, { timeout:30000 });
   // The matcher downloads right after sitting down, before any click
   expect(await a.evaluate(() => window.__tjs?.task)).toBe("image-feature-extraction");
@@ -18,6 +18,17 @@ test("picture matching finds a card on another player's camera from the all-card
   expect(r.shown).toBe("Gamma Card");
   expect(r.status).toMatch(/AI picture match/);
   expect(await a.evaluate(() => window.__stills)).toBeGreaterThan(0);
+  // The click's ring became an outline around the whole card (drawn at 490,150, 300x419 on Rick's 1280x720 camera), then goes away
+  const outline = await a.evaluate(() => {
+    const t = [...document.querySelectorAll(".tile")].find(t => t.querySelector(".sel.card"));
+    const s = t.querySelector(".sel.card").getBoundingClientRect(), v = t.querySelector("video"), r = v.getBoundingClientRect();
+    const k = Math.min(r.width / v.videoWidth, r.height / v.videoHeight) * v.videoWidth / 1280;
+    const ox = r.x + (r.width - v.videoWidth * k * 1280 / v.videoWidth) / 2, oy = r.y + (r.height - v.videoHeight * k * 1280 / v.videoWidth) / 2;
+    return { x:(s.x - ox) / k, y:(s.y - oy) / k, w:s.width / k, h:s.height / k, unsure:t.querySelector(".sel").classList.contains("unsure") };
+  });
+  for (const [got, want] of [[outline.x, 490], [outline.y, 150], [outline.w, 300], [outline.h, 419]]) expect(Math.abs(got - want)).toBeLessThan(8);
+  expect(outline.unsure).toBe(false);
+  await expect(a.locator(".tile .sel")).toHaveCount(0, { timeout:4000 });
   // A box around the whole card works too
   r = await clickCamera(a, 2, 488, 148, [792, 571]);
   expect(r.shown).toBe("Gamma Card");

@@ -89,6 +89,17 @@ header.bar .btn{padding:6px 11px;font-size:14px}
 .tile video.rot{transform:rotate(180deg)}
 .tile .hit{position:absolute;inset:0;cursor:crosshair;touch-action:none}
 .tile .sel{position:absolute;border:2px solid var(--brass);background:rgba(201,164,76,.12);pointer-events:none}
+/* Card click, SpellTable style: a pulsing ring where you clicked, which snaps to an outline of the card it found, then a scan sweep */
+.tile .sel.pulse{border-radius:50%;animation:selPulse 1s ease-in-out infinite}
+@keyframes selPulse{0%,100%{box-shadow:0 0 0 0 rgba(201,164,76,.7)}50%{box-shadow:0 0 0 12px rgba(201,164,76,0)}}
+.tile .sel.card{border-radius:4.8%/3.4%;background:rgba(201,164,76,.06);box-shadow:0 0 16px 2px rgba(201,164,76,.6);overflow:hidden;animation:none;
+  transition:left .25s ease-out,top .25s ease-out,width .25s ease-out,height .25s ease-out,border-radius .25s ease-out}
+.tile .sel.card::after{content:"";position:absolute;left:0;right:0;height:20%;top:-20%;background:linear-gradient(to bottom,transparent,rgba(255,232,160,.55),transparent);animation:selScan .5s .25s ease-in-out forwards}
+@keyframes selScan{to{top:100%}}
+.tile .sel.unsure{border-style:dashed;border-color:#e8a33c;box-shadow:0 0 14px 1px rgba(232,163,60,.5)}
+.tile .sel.miss{border-color:var(--danger);background:rgba(224,118,92,.18);animation:selMiss .6s ease-out forwards}
+@keyframes selMiss{to{opacity:0;transform:scale(1.3)}}
+.tile .sel.fade{opacity:0;transition:opacity .4s}
 .nocam{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;pointer-events:none;text-align:center;padding:20px}
 .plate{position:absolute;left:10px;top:10px;right:130px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:none}
 .prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -236,7 +247,7 @@ button.mpip{cursor:pointer}
   aside{border-left:0;border-top:1px solid var(--felt-edge)}
 }
 @media (prefers-reduced-motion:reduce){
-  .life output{transition:none}.tile.enter{animation:none}.die.rolling svg{animation:none}
+  .life output{transition:none}.tile.enter{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
 }
 </style>
 </head>
@@ -818,11 +829,14 @@ function setupCall(s, call, outgoing){
   const drop = () => { if (calls[s]?.call === call) { delete calls[s]; removeIfGone(s); } };
   call.on("close", drop); call.on("error", drop);
 }
+function sendHello(conn){
+  send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog,
+               fresh:!restored && Date.now() - joinedAt < 30000, sid:SID });
+}
 function setupConn(s, conn, outgoing){
   conns[s] = { conn, outgoing };
   watchLink(s, () => conn.peerConnection);
-  conn.on("open", () => send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog,
-                                     fresh:!restored && Date.now() - joinedAt < 30000, sid:SID }));
+  conn.on("open", () => sendHello(conn));
   conn.on("data", msg => { try { onMessage(s, msg); } catch (e) { console.warn(e); } });
   const drop = () => { if (conns[s]?.conn === conn) { delete conns[s]; removeIfGone(s); } };
   conn.on("close", drop); conn.on("error", drop);
@@ -1074,7 +1088,7 @@ function onMessage(s, msg){
       const st = msg.state || {};
       const isNew = !p.name;
       // Same player reconnecting before we noticed they dropped: what we last saw of them, to hand back
-      const before = msg.type === "hello" && msg.fresh && p.name && norm(p.name) === norm(String(st.name || ""))
+      const before = msg.type === "hello" && msg.fresh && p.greeted && norm(p.name) === norm(String(st.name || ""))
         ? { life:p.life, startLife:p.startLife, poison:p.poison, exp:p.exp, energy:p.energy, blessing:p.blessing, emblems:p.emblems,
             custom:p.custom, cmd:p.cmd, cmdrs:p.cmdrs, manaOn:p.manaOn, mana:p.mana } : null;
       const oldKey = p.camKey, oldLife = p.life;
@@ -1104,7 +1118,7 @@ function onMessage(s, msg){
       if (msg.type === "hello") {
         if (typeof msg.sid === "string") p.sid = msg.sid.slice(0, 40);
         if (Array.isArray(msg.deck)) { p.deck = msg.deck.slice(0, 300).map(x => String(x).slice(0, 141)); if (p.deck.length) setTimeout(artSync, 500); }
-        if (isNew) log(`${p.name} sat down.`);
+        if (!p.greeted) { p.greeted = true; log(`${p.name} sat down.`); }
         if (!tableKnown && msg.known && msg.table) {
           applyTable(msg.table); tableFromPeer = true; tryRestoreLocal(false);
           if (heldState?.gameId === table.gameId) restoreMe(heldState.state, "the table");
@@ -1122,9 +1136,12 @@ function onMessage(s, msg){
           if (added) renderDmg();
         }
       }
+      // Their updates are arriving but their hello never did (it can get lost as a connection opens): ask again
+      else if (!p.greeted && !p.askedHello) { p.askedHello = true; send(conns[s]?.conn || {}, { type:"hellopls" }); }
       render();
       break;
     }
+    case "hellopls": if (conns[s]) sendHello(conns[s].conn); break;
     case "table": applyTable(msg.table); break;
     case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500)); break;
     case "card": if (typeof msg.name === "string") log(`${p.name || "Someone"} looked at `, msg.name.slice(0, 141)); break;
@@ -1590,7 +1607,7 @@ function addCounterDialog(){
   cancel.onclick = closeModal;
   card.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT" && !e.defaultPrevented) { e.preventDefault(); save.click(); } });
   openModal(card);
-  setTimeout(() => nameIn.focus(), 50);
+  setTimeout(() => { if (!card.contains(document.activeElement)) nameIn.focus(); }, 50);  // not if you already picked a type and moved on
 }
 function closeMenus(){ document.querySelectorAll(".tilemenu").forEach(m => m.remove()); }
 document.addEventListener("pointerdown", e => {
@@ -2558,8 +2575,17 @@ function attachLookup(el, s){
     const r = (dx < 12 && dy < 12) ? null : { x1:start.x, y1:start.y, x2:e.clientX, y2:e.clientY };
     const clickPt = { x:start.x, y:start.y };
     start = null;
-    const b = box; setTimeout(() => b.remove(), 900);
-    identify(video, players[s]?.rot, clickPt, r, b, el, s);
+    const b = box;
+    if (!r) {  // a click: a pulsing ring at that spot until the card is found
+      const er = el.getBoundingClientRect();
+      b.classList.add("pulse");
+      Object.assign(b.style, { left:(clickPt.x - er.left - 22) + "px", top:(clickPt.y - er.top - 22) + "px", width:"44px", height:"44px" });
+    }
+    identify(video, players[s]?.rot, clickPt, r, b, el, s).then(found => {
+      b.classList.remove("pulse");
+      if (!found) { b.classList.add("miss"); setTimeout(() => b.remove(), 650); return; }
+      setTimeout(() => { b.classList.add("fade"); setTimeout(() => b.remove(), 450); }, 1400);
+    });
   });
   function drawBox(e){
     const er = el.getBoundingClientRect();
@@ -2637,6 +2663,9 @@ function partOf(fr, b, u0, v0, u1, v1){
 }
 // Where the art sits in a standard card frame, as fractions of the card
 const ART_IN_CARD = [0.085, 0.113, 0.915, 0.555];
+// And the other way round: the whole card as fractions of its art box
+const CARD_AROUND_ART = [-ART_IN_CARD[0] / (ART_IN_CARD[2] - ART_IN_CARD[0]), -ART_IN_CARD[1] / (ART_IN_CARD[3] - ART_IN_CARD[1]),
+  (1 - ART_IN_CARD[0]) / (ART_IN_CARD[2] - ART_IN_CARD[0]), (1 - ART_IN_CARD[1]) / (ART_IN_CARD[3] - ART_IN_CARD[1])];
 // A dragged box could hold the whole card (upright or tapped) or just its art: try every reading
 function boxesForRegion(fr, box){
   const out = [], land = box.w > box.h;
@@ -2644,14 +2673,67 @@ function boxesForRegion(fr, box){
   for (const r of land ? [1, 3] : [0, 2]) { const a = partOf(fr, { ...box, rot:r }, ...ART_IN_CARD); if (a) out.push(a); }  // the box is the whole card
   return out;
 }
+/* Snap an estimated card box to the card's real edges, so the click outline hugs the card. Looks near each side of the
+   estimate for lines that run unbroken along an edge, and takes the four that make a card's shape (63 x 88 mm).
+   Keeps the estimate when nothing card-shaped is there. */
+function snapCard(fr, b){
+  try {
+    const pad = 0.25, x0 = Math.max(0, b.x - b.w * pad), y0 = Math.max(0, b.y - b.h * pad);
+    const x1 = Math.min(fr.w, b.x + b.w * (1 + pad)), y1 = Math.min(fr.h, b.y + b.h * (1 + pad));
+    const ds = Math.min(1, 320 / Math.max(x1 - x0, y1 - y0)), W = Math.round((x1 - x0) * ds), H = Math.round((y1 - y0) * ds);
+    if (W < 40 || H < 40) return b;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d", { willReadFrequently:true }); if (!ctx) return b;
+    ctx.drawImage(fr.src, x0, y0, x1 - x0, y1 - y0, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H).data, g = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    const bx = (b.x - x0) * ds, by = (b.y - y0) * ds, bw = b.w * ds, bh = b.h * ds;
+    // Share of a line that sits on an edge: a step of 10+ gray levels, allowed to wander 2 pixels for a slightly turned card
+    const T = 10, S = 2;
+    const cover = (vertical, p, a0, a1) => {
+      let n = 0, t = 0;
+      for (let a = Math.max(1, Math.round(a0)); a < Math.min(vertical ? H : W, a1) - 1; a++, t++) {
+        let m = 0;
+        for (let k = -S; k <= S; k++) {
+          const q = p + k;
+          if (vertical) { if (q > 0 && q < W - 1) m = Math.max(m, Math.abs(g[a * W + q + 1] - g[a * W + q - 1])); }
+          else if (q > 0 && q < H - 1) m = Math.max(m, Math.abs(g[(q + 1) * W + a] - g[(q - 1) * W + a]));
+        }
+        if (m >= T) n++;
+      }
+      return t ? n / t : 0;
+    };
+    // The best few edge lines near one side of the estimate
+    const lines = (vertical, at, span, a0, a1) => {
+      const lo = Math.max(1, Math.round(at - span)), hi = Math.min((vertical ? W : H) - 2, Math.round(at + span)), c = [];
+      for (let p = lo; p <= hi; p++) c.push({ p, v:cover(vertical, p, a0, a1) });
+      const peaks = c.filter((x, i) => x.v >= 0.6 && (i === 0 || x.v >= c[i - 1].v) && (i === c.length - 1 || x.v >= c[i + 1].v)).sort((a, z) => z.v - a.v);
+      const out = []; for (const x of peaks) if (out.length < 3 && out.every(o => Math.abs(o.p - x.p) > 3)) out.push(x);
+      return out;
+    };
+    const L = lines(true, bx, bw * 0.2, by + bh * 0.2, by + bh * 0.8), R = lines(true, bx + bw, bw * 0.2, by + bh * 0.2, by + bh * 0.8);
+    const Tp = lines(false, by, bh * 0.2, bx + bw * 0.2, bx + bw * 0.8), B = lines(false, by + bh, bh * 0.2, bx + bw * 0.2, bx + bw * 0.8);
+    let best = null;
+    for (const l of L) for (const r of R) for (const t of Tp) for (const o of B) {
+      const w = r.p - l.p, h = o.p - t.p;
+      if (w < bw * 0.75 || w > bw * 1.35 || h < bh * 0.75 || h > bh * 1.35) continue;
+      const off = Math.abs((b.rot % 2 ? h / w : w / h) / (63 / 88) - 1);
+      if (off > 0.1) continue;
+      const score = l.v + r.v + t.v + o.v - 3 * off;
+      if (!best || score > best.score) best = { score, x:x0 + l.p / ds, y:y0 + t.p / ds, w:w / ds, h:h / ds, rot:b.rot };
+    }
+    return best ? { x:best.x, y:best.y, w:best.w, h:best.h, rot:b.rot } : b;
+  } catch { return b; }
+}
 async function fetchCard(id, name){ return (id && await scry(`/cards/${id}`)) || await scry("/cards/named?exact=" + encodeURIComponent(name)); }
+// Resolves true when a card was found and shown, so the click's outline can animate to match
 async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
-  if (!video.videoWidth) { setStatus("That camera has not started yet."); return; }
-  if (lookBusy) return;
+  if (!video.videoWidth) { setStatus("That camera has not started yet."); return false; }
+  if (lookBusy) return false;
   if (!AI.refs.length && !ART.entries.length && !IDX.n) {
     setStatus(ART.running || IDX.loading ? "Still getting picture matching ready. Try again in a moment."
       : "Picture matching doesn't know any cards yet. Paste your decklist in the lobby, or look a card up by name once.");
-    return;
+    return false;
   }
   lookBusy = true; showAlts(null);
   try {
@@ -2682,15 +2764,19 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
     // The closest match, always: the AI's when it ran, otherwise the color matcher's
     const m = ai || (color?.name ? color : null);
     if (!m) { setStatus("Couldn't find a card there. Click right on the card's art."); return; }
-    showBox(m.vbox);
-    const card = await fetchCard(m.id, m.name);
-    if (!card) { setStatus(`Couldn't load ${m.name}. Check your connection.`); return; }
+    // Outline the whole card (worked out from where its art is), then sweep a scan line over it while the card loads
+    const around = partOf(fr, m.vbox, ...CARD_AROUND_ART);
+    showBox(around ? snapCard(fr, around) : m.vbox);
+    boxEl.classList.remove("pulse"); boxEl.classList.add("card"); boxEl.classList.toggle("unsure", !m.ok);
+    const [card] = await Promise.all([fetchCard(m.id, m.name), sleep(750)]);
+    if (!card) { setStatus(`Couldn't load ${m.name}. Check your connection.`); return false; }
     showCard(card, { share:true });
     const pct = Math.max(0, Math.min(99, Math.round(m.score * 100)));
     setStatus(m.ok ? `${ai ? "AI picture match" : "Picture match"} (${pct}% similar).` : `Closest match (${pct}% similar). Not it? Pick the right card below.`);
     const entry = logMatch({ how:m === ai ? "ai" : "color", drag:!!rect, ok:!!m.ok, name:m.name, score:m.score, margin:m.margin ?? null,
       second:(m.top || []).find(x => x.name !== m.name)?.score ?? null, seat, sharp:!!fr.sharp });
     showAlts({ list:(m.top || []).filter(x => x.name !== m.name).slice(0, 3), q:ai?.q || null, sure:m.ok, entry });
+    return true;
   } catch (e) {
     if (e?.name === "SecurityError") { ART.blocked = true; artStat(); setStatus("This browser blocked reading the camera picture."); }
     else { console.warn(e); setStatus("Something went wrong matching that card. Try again."); }

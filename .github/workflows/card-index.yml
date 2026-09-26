@@ -21,16 +21,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 340
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: tools/package-lock.json
 
       - name: Restore the card index from the last run
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: site/index
           key: card-index-${{ github.run_id }}
@@ -60,7 +60,7 @@ jobs:
 
       - name: Save the card index for the next run
         if: always() && hashFiles('site/index/cards.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: site/index
           key: card-index-${{ github.run_id }}
@@ -72,11 +72,18 @@ jobs:
           git checkout FETCH_HEAD -- index.html README.md
           cp index.html README.md site/
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      # What actions/upload-pages-artifact does, with the Node 24 version of upload-artifact
+      - name: Pack the site for GitHub Pages
+        run: tar --dereference --hard-dereference --directory site -cvf "$RUNNER_TEMP/artifact.tar" --exclude=.git --exclude=.github .
+
+      - uses: actions/upload-artifact@v6
         with:
-          path: site
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
 
   deploy:
     needs: build
@@ -86,4 +93,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

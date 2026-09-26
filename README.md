@@ -45,6 +45,10 @@ Double-click `index.html`. Players each open their own copy and type the same ta
   - Each player's own browser normally captions their own speech. When a friend's captions aren't coming through (turned off, a browser without speech to text, or a blocked speech service), your computer captions them from the audio you already hear, using Whisper (an open speech model, about 80 MB, downloaded once). It steps aside as soon as their own captions arrive. The Captions panel shows each player's status, with a checkbox to turn this off and a button to ask them to turn their captions on.
   - **Lisp-friendly matching**: tick **I have a lisp** on your own screen (this also helps your voice commands), or **Has a lisp** next to a player. "Th", "sh" and "z" then count as "s" when matching card names, so "Thol Ring" still links Sol Ring.
 
+## Tests
+
+`tests/` holds browser tests that play the game with two or three Chromium players (joining, rejoining, life and turns, card matching, captions, decks, and the index builder). GitHub runs them on every pull request and every change to `main`. See `tests/README.md` to run them yourself.
+
 ## Troubleshooting
 
 - **A friend sees the table but never gets video**: one of you is behind a strict network. Add a TURN relay (Metered, Twilio) under **Connection settings** in the lobby. Both players do this, then rejoin.
