@@ -1,0 +1,2486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitchen Table: webcam Magic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#15302b; --felt-deep:#0d201d; --felt-edge:#244a42;
+  --parchment:#efe6cf; --muted:#a9b8ae; --brass:#c9a44c; --danger:#e0765c;
+  --serif:"Spectral", Georgia, "Times New Roman", serif;
+  --sans:"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 50% 30%, var(--felt) 0%, var(--felt-deep) 80%);color:var(--parchment);font:15px/1.5 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.hidden{display:none !important}
+.hint{font-size:13px;color:var(--muted)}
+
+/* Lobby and phone camera */
+.screen{min-height:100%;display:grid;place-items:center;padding:24px}
+.lobby-card{width:min(100%,480px)}
+.lobby-card h1{font:700 clamp(40px,8vw,64px)/1 var(--serif);margin:0 0 8px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 24px;max-width:42ch}
+.preview{width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;margin:8px 0 14px;object-fit:contain}
+.field{display:block;margin-bottom:14px}
+.field span{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+.field textarea{min-height:110px;resize:vertical;font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{padding:10px 16px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.2)}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:#1b1608;font-weight:600}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.off{border-color:var(--danger);color:var(--danger)}
+details.adv{margin-top:18px;color:var(--muted);font-size:14px}
+details.adv summary{cursor:pointer}
+#lobbyErr,#phStatus{min-height:1.5em;margin-top:10px}
+#lobbyErr{color:var(--danger)}
+
+/* Table layout */
+#table{height:100%;display:grid;grid-template-columns:1fr 350px;grid-template-rows:auto 1fr}
+header.bar{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap;position:relative;z-index:20}
+header.bar .room{font:700 20px var(--serif);margin-right:4px}
+header.bar .spacer{flex:1}
+header.bar .btn{padding:6px 11px;font-size:14px}
+#waitNote{color:var(--muted);font-size:14px}
+#netWarn{flex-basis:100%;display:flex;gap:12px;align-items:flex-start;background:rgba(224,118,92,.14);border:1px solid var(--danger);border-radius:8px;padding:8px 12px;font-size:14px}
+#netWarn.slow{background:rgba(201,164,76,.12);border-color:var(--brass)}
+#netWarn span{flex:1}
+#netWarn button{background:none;border:0;color:var(--muted);text-decoration:underline}
+.clock{font:700 18px var(--serif);font-variant-numeric:tabular-nums;margin-left:6px}
+.daychip{font-size:13px;font-weight:600;padding:2px 9px;border-radius:999px;background:#f1d98a;color:#2a2106}
+.daychip.night{background:#2f3d6b;color:#e4e8ff}
+
+.dd{position:relative}
+.dd summary{list-style:none}
+.dd summary::-webkit-details-marker{display:none}
+.menu{position:absolute;right:0;top:calc(100% + 6px);background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:10px;padding:6px;display:flex;flex-direction:column;min-width:200px;z-index:40}
+.menu button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:6px}
+.menu button:hover{background:rgba(255,255,255,.07)}
+
+#grid{display:grid;gap:10px;padding:10px;min-height:0;grid-auto-rows:minmax(0,1fr)}
+#grid.n1{grid-template-columns:1fr}
+#grid.n2{grid-template-columns:1fr 1fr}
+#grid.n3,#grid.n4{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
+#grid.n3 .tile,#grid.n4 .tile{grid-column:span 2}
+#grid.n3 .tile:nth-child(3){grid-column:2 / span 2}
+
+.tile{position:relative;background:#000;border-radius:10px;overflow:hidden;min-height:200px;border:2px solid transparent}
+.tile.enter{animation:seatIn .35s ease-out}
+@keyframes seatIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+.tile.active{border-color:var(--brass);box-shadow:0 0 0 4px rgba(201,164,76,.25)}
+.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.tile video.rot{transform:rotate(180deg)}
+.tile .hit{position:absolute;inset:0;cursor:crosshair;touch-action:none}
+.tile .sel{position:absolute;border:2px solid var(--brass);background:rgba(201,164,76,.12);pointer-events:none}
+.nocam{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;pointer-events:none;text-align:center;padding:20px}
+.plate{position:absolute;left:10px;top:10px;right:130px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:none}
+.prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cmdrs{display:flex;gap:6px;flex-wrap:wrap}
+.cmdrs:empty{display:none}
+.cmdr{pointer-events:auto;background:rgba(0,0,0,.65);border:0;border-radius:6px;padding:3px 9px;font-size:13px;color:var(--parchment);font-style:italic;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdr.ask{font-style:normal;color:var(--brass);border:1px dashed var(--brass)}
+#cmdrPop{position:fixed;width:240px;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.6);z-index:70;pointer-events:none}
+.cmdrform{text-align:left;margin-top:14px}
+.cmdrform .searchwrap{margin-bottom:4px}
+.cmdrform input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+.sugbox{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:8px;z-index:60;max-height:240px;overflow:auto;padding:4px}
+.sugbox button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:6px 8px;border-radius:6px}
+.sugbox button:hover,.sugbox button.on{background:rgba(255,255,255,.08)}
+.sugbox img{width:34px;border-radius:3px}
+.cmdrpreview{display:flex;gap:12px;justify-content:center;margin:12px 0 4px;min-height:0}
+.cmdrpreview img{width:150px;border-radius:8px}
+#cmdrErr{color:var(--danger);min-height:1.4em;font-size:14px}
+.plate .nm{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.65);padding:5px 10px;border-radius:6px;font-weight:600}
+.pip{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.badge{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--brass);color:#1b1608}
+.badge.ini{background:#8f6fc9;color:#fff}
+.badge.bless{background:#e8dcb5;color:#1b1608}
+.turnflag{color:var(--brass);font-weight:600;font-size:13px;background:rgba(0,0,0,.65);padding:3px 8px;border-radius:6px;font-variant-numeric:tabular-nums}
+.turnflag:empty{display:none}
+.turnflag.over{color:var(--danger)}
+.life{position:absolute;right:10px;top:8px;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,.65);border-radius:10px;padding:2px 6px;z-index:2}
+.life output{font:700 44px/1 var(--serif);min-width:2ch;text-align:center;font-variant-numeric:tabular-nums;transition:transform .15s}
+.life output.bump{transform:scale(1.15)}
+.life button,.ctr button{border:0;background:rgba(255,255,255,.1);border-radius:6px;width:30px;height:30px;font-size:18px;line-height:1}
+.life.low output{color:var(--danger)}
+.ctrs{position:absolute;right:10px;bottom:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;pointer-events:none;z-index:2}
+.ctr{pointer-events:auto;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.7);border-radius:8px;padding:3px 7px;font-size:13px;max-width:100%}
+.ctr b{font:700 18px var(--serif);min-width:1.5ch;text-align:center}
+.ctr.lethal b{color:var(--danger)}
+.ctr .sw{width:8px;height:8px;border-radius:50%;flex:none}
+.ctr.emblem span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.ctr.add{border:1px dashed var(--muted);background:rgba(0,0,0,.5);cursor:pointer;padding:5px 10px}
+.tilemenu{top:auto;bottom:48px;right:10px}
+
+.dmgask{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(13,32,29,.97);border:1px solid var(--brass);border-radius:12px;padding:12px 14px;width:min(92%,380px);z-index:5;text-align:center}
+.dmgask p{margin:0 0 10px;font-weight:600}
+.dmgask .opts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.dmgask .btn{padding:6px 10px;font-size:14px;display:flex;align-items:center;gap:6px}
+.dmgask label{display:flex;gap:6px;justify-content:center;align-items:center;font-size:13px;margin-top:10px;color:var(--muted)}
+.dmgask .skip{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px}
+
+/* Side panel */
+aside{border-left:1px solid var(--felt-edge);min-height:0;overflow:auto;padding:14px}
+aside h2{font:700 18px var(--serif);margin:0 0 8px}
+aside section+section{margin-top:22px}
+.search{display:flex;gap:6px;margin-bottom:10px}
+.search input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);min-width:0}
+#cardView img{width:100%;border-radius:4.75% / 3.5%;display:block;margin-bottom:10px}
+#cardView .type{color:var(--muted);font-size:14px;margin:0 0 6px}
+#cardView .oracle{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
+#cardView a{color:var(--brass)}
+#cardView .from{background:rgba(201,164,76,.15);border:1px solid var(--brass);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:14px}
+#status{font-size:13px;color:var(--muted);min-height:1.4em;margin-bottom:6px}
+.tbl{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;font-size:14px}
+.tbl select{padding:6px 8px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);width:100%}
+.list{list-style:none;padding:0;margin:6px 0 0;font-size:14px}
+.list li{padding:6px 0;border-top:1px solid var(--felt-edge)}
+.list .t{font-variant-numeric:tabular-nums;color:var(--muted);margin-right:8px}
+.list li.undone .txt{text-decoration:line-through;color:var(--muted)}
+.linkbtn{background:none;border:0;padding:0;color:var(--parchment);text-decoration:underline;text-underline-offset:3px}
+.small{font-size:13px}
+.dmghead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dmghead select{padding:5px 8px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+#dmgTotals{font-size:13px;color:var(--muted);margin-top:6px}
+#captions{list-style:none;padding:0;margin:6px 0 0;font-size:14px;max-height:240px;overflow:auto;border:1px solid var(--felt-edge);border-radius:8px}
+#captions li{padding:6px 10px;border-top:1px solid rgba(255,255,255,.05)}
+#captions li:first-child{border-top:0}
+#captions .who{font-weight:600;margin-right:6px}
+#captions .interim{color:var(--muted);font-style:italic}
+#captions:empty::before{content:"Spoken card names show up here as links.";display:block;padding:10px;color:var(--muted)}
+.cardlink{background:none;border:0;padding:0;color:var(--brass);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.opts-line{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-top:6px}
+
+/* Modals, dice, toast */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:50;padding:16px}
+.modal-card{background:var(--felt);border:1px solid var(--felt-edge);border-radius:14px;padding:22px;width:min(100%,640px);text-align:center;max-height:100%;overflow:auto}
+.modal-card h2{font:700 24px var(--serif);margin:0}
+.dice-row{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:20px 0}
+.die{display:flex;flex-direction:column;align-items:center;gap:8px;width:120px;transition:opacity .3s}
+.die svg{width:100px;height:100px}
+.die.rolling svg{animation:tumble .45s linear infinite}
+.die.win .face{stroke:var(--brass);stroke-width:6}
+.die.out{opacity:.35}
+.die .who{font-weight:600;display:flex;align-items:center;gap:6px;max-width:120px}
+.die .who span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes tumble{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(.88)}100%{transform:rotate(360deg) scale(1)}}
+.rollstatus{font-size:17px;min-height:1.6em;margin:0 0 14px}
+#qr{display:inline-block;background:#fff;padding:12px;border-radius:10px;margin:14px 0}
+#qr img,#qr canvas{display:block}
+.camurl{word-break:break-all;font-size:13px;color:var(--muted)}
+/* mana pool */
+.manarow{pointer-events:auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:rgba(0,0,0,.7);border-radius:8px;padding:4px 7px;font-size:13px}
+.msym{display:inline-flex;align-items:center;gap:3px}
+.mpip{width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font:700 12px var(--sans);border:1px solid rgba(0,0,0,.5);padding:0}
+button.mpip{cursor:pointer}
+.msym b{font:700 16px var(--serif);min-width:1.4ch;text-align:center}
+.msym .mminus{border:0;background:rgba(255,255,255,.1);border-radius:5px;width:20px;height:20px;line-height:1;padding:0;font-size:14px}
+.manarow .mt{color:var(--muted);margin-left:4px}
+.manarow .mempty{border:0;background:rgba(255,255,255,.1);border-radius:6px;padding:3px 8px;font-size:12px}
+/* search suggestions */
+.searchwrap{position:relative;flex:1;min-width:0;display:flex}
+.searchwrap input{flex:1}
+#acBox{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:8px;z-index:30;max-height:280px;overflow:auto;padding:4px}
+#acBox button{display:block;width:100%;text-align:left;background:none;border:0;padding:7px 9px;border-radius:6px}
+#acBox button:hover,#acBox button.on{background:rgba(255,255,255,.08)}
+/* keyword highlights in captions */
+.kwlink{background:rgba(143,111,201,.22);border:0;border-bottom:1px dotted #b9a2e6;padding:0 3px;border-radius:3px;color:#d9ccf5;font:inherit}
+.fuzzy{font-style:italic}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--felt-deep);border:1px solid var(--brass);border-radius:10px;padding:10px 14px;z-index:60;display:flex;gap:12px;align-items:center;max-width:92vw}
+
+@media (max-width:900px){
+  #table{grid-template-columns:1fr;grid-template-rows:auto auto auto;height:auto;min-height:100%}
+  #grid.n2,#grid.n3,#grid.n4{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto}
+  #grid .tile{grid-column:auto !important;aspect-ratio:16/9}
+  aside{border-left:0;border-top:1px solid var(--felt-edge)}
+}
+@media (prefers-reduced-motion:reduce){
+  .life output{transition:none}.tile.enter{animation:none}.die.rolling svg{animation:none}
+}
+</style>
+</head>
+<body>
+
+<section id="lobby" class="screen hidden">
+  <div class="lobby-card">
+    <h1>Kitchen Table</h1>
+    <p class="lede">Play paper Magic over webcam. Point a camera at your playmat, share the table, and click any card on screen to read it.</p>
+    <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
+    <p class="hint hidden" id="noCam">No webcam found. You can still sit down and use your phone as the camera from the table.</p>
+    <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" placeholder="Luke"></label>
+    <label class="field"><span>Camera</span><select id="camSel"></select></label>
+    <label class="field"><span>Microphone</span><select id="micSel"></select></label>
+    <label class="field"><span>Starting life</span>
+      <select id="lifeSel"><option value="40">40 (Commander)</option><option value="20">20 (60-card formats)</option><option value="30">30 (Brawl)</option></select></label>
+    <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
+      <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
+    <p class="hint" id="deckCount"></p>
+    <label class="field"><span>Table code (leave blank to start a new table)</span><input id="roomIn" maxlength="16" autocomplete="off"></label>
+    <div class="row">
+      <button class="btn primary" id="joinBtn">Sit down</button>
+      <label class="btn"><input type="checkbox" id="rotIn"> Camera is upside down</label>
+    </div>
+    <div id="lobbyErr" role="alert"></div>
+    <details class="adv">
+      <summary>Connection settings (TURN relay)</summary>
+      <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
+      <label class="field"><span>TURN URL</span><input id="turnUrl" placeholder="turn:example.com:3478"></label>
+      <label class="field"><span>Username</span><input id="turnUser"></label>
+      <label class="field"><span>Credential</span><input id="turnCred" type="password"></label>
+    </details>
+  </div>
+</section>
+
+<section id="phone" class="screen hidden">
+  <div class="lobby-card">
+    <h1>Phone camera</h1>
+    <p class="lede" id="phLabel"></p>
+    <video id="phPreview" class="preview" autoplay playsinline muted></video>
+    <div class="row">
+      <button class="btn primary" id="phStart">Start camera</button>
+      <button class="btn hidden" id="phFlip">Switch camera</button>
+      <button class="btn hidden" id="phStop">Stop</button>
+    </div>
+    <p id="phStatus" aria-live="polite"></p>
+    <p class="hint">Point the phone straight down at your playmat and keep this screen open while you play. Your computer still handles your microphone, life total, and controls.</p>
+  </div>
+</section>
+
+<section id="table" class="hidden">
+  <header class="bar">
+    <span class="room" id="roomLabel"></span>
+    <button class="btn" id="copyBtn">Copy invite link</button>
+    <button class="btn" id="phoneBtn">Phone camera</button>
+    <span id="waitNote">Waiting for players to join</span>
+    <span class="clock" id="gameClock">Game not started</span>
+    <span class="daychip hidden" id="dayChip"></span>
+    <button class="btn" id="startBtn">Start game</button>
+    <button class="btn" id="newBtn">New game</button>
+    <span class="spacer"></span>
+    <button class="btn" id="rollBtn">Roll for first</button>
+    <details class="dd" id="diceDd">
+      <summary class="btn">Dice</summary>
+      <div class="menu">
+        <button data-kind="coin">Flip a coin</button>
+        <button data-kind="d4">Roll a d4</button>
+        <button data-kind="d6">Roll a d6</button>
+        <button data-kind="d8">Roll a d8</button>
+        <button data-kind="d10">Roll a d10</button>
+        <button data-kind="d12">Roll a d12</button>
+        <button data-kind="d20">Roll a d20</button>
+      </div>
+    </details>
+    <button class="btn" id="passBtn">Pass turn</button>
+    <button class="btn" id="capBtn">Captions on</button>
+    <button class="btn" id="micBtn">Mute mic</button>
+    <button class="btn" id="camBtn">Hide camera</button>
+    <button class="btn" id="rotBtn">Flip my camera</button>
+    <button class="btn" id="leaveBtn">Leave</button>
+    <div id="netWarn" class="hidden" role="alert"><span id="netText"></span><button id="netDismiss">Dismiss</button></div>
+  </header>
+  <div id="grid"></div>
+  <aside>
+    <section>
+      <h2>Card</h2>
+      <div class="search">
+        <div class="searchwrap">
+          <input id="searchIn" placeholder="Type a card name" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="acBox">
+          <div id="acBox" class="hidden" role="listbox"></div>
+        </div>
+        <button class="btn" id="searchBtn">Find</button>
+      </div>
+      <div id="status" aria-live="polite"></div>
+      <p class="hint" id="artStat"></p>
+      <div id="cardView"><p class="hint">Click a card's art on any camera to identify it. If that misses, click the card's name bar, or drag a box around just the name.</p></div>
+    </section>
+    <section>
+      <h2>Table</h2>
+      <div class="tbl">
+        <label for="monSel">Monarch</label><select id="monSel"></select>
+        <label for="iniSel">Initiative</label><select id="iniSel"></select>
+        <label for="dnSel">Day or night</label>
+        <select id="dnSel"><option value="">Neither yet</option><option value="day">Day</option><option value="night">Night</option></select>
+        <label for="clockSel">Turn clock</label>
+        <select id="clockSel"><option value="off">Off</option><option value="up">Count up</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option></select>
+      </div>
+    </section>
+    <section>
+      <div class="dmghead"><h2 style="margin:0">Damage history</h2><span class="spacer" style="flex:1"></span>
+        <select id="dmgFilter" aria-label="Filter damage history"></select>
+        <button class="btn small" id="csvBtn" style="padding:5px 10px">Export CSV</button></div>
+      <div id="dmgTotals"></div>
+      <ul class="list" id="dmgList"></ul>
+    </section>
+    <section>
+      <h2>Captions</h2>
+      <p class="hint" id="capHint"></p>
+      <ul id="captions"></ul>
+      <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
+      <label class="opts-line">Speech engine
+        <select id="engineSel" style="padding:4px 6px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)">
+          <option value="local">On this computer (private, no popups)</option>
+          <option value="browser">Browser (Edge or Chrome, more accurate)</option>
+        </select></label>
+      <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn")</label>
+    </section>
+    <section>
+      <h2>Table log</h2>
+      <ul class="list" id="log"></ul>
+    </section>
+  </aside>
+</section>
+
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
+<div id="toast" class="hidden" role="status"></div>
+<img id="cmdrPop" class="hidden" alt="">
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(() => {
+const PREFIX = "kt-mtg-v1";
+const MAX = 4;
+const SEAT_HEX = ["#e8dcb5", "#4a86c5", "#c65a3f", "#5a9a52"];
+const SEAT_INK = ["#1b1608", "#ffffff", "#ffffff", "#ffffff"];
+const CLOCKS = ["off", "up", "60", "120", "180", "300"];
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, v); } catch {} }
+};
+const params = new URLSearchParams(location.search);
+const LOCAL = location.protocol === "file:";
+const PHONE = params.get("cam");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function rnd(n){ const a = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n; do crypto.getRandomValues(a); while (a[0] >= lim); return (a[0] % n) + 1; }
+function uid(){ return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+function fmt(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+}
+function norm(t){ return String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
+function iceServers(){
+  const list = [{ urls:"stun:stun.l.google.com:19302" }, { urls:"stun:stun1.l.google.com:19302" }];
+  const u = store.get("kt-turn-url", "");
+  if (u) list.push({ urls:u, username:store.get("kt-turn-user", ""), credential:store.get("kt-turn-cred", "") });
+  return list;
+}
+function openPeer(id){
+  return new Promise((resolve, reject) => {
+    const p = new Peer(id, { config:{ iceServers:iceServers() }, debug:1 });
+    const onErr = e => { p.off("open", onOpen); p.destroy(); reject(e); };
+    const onOpen = () => { p.off("error", onErr); resolve(p); };
+    p.once("open", onOpen); p.once("error", onErr);
+  });
+}
+async function boostBitrate(call){
+  try {
+    for (const sender of call.peerConnection.getSenders()) {
+      if (sender.track?.kind !== "video") continue;
+      const p = sender.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      p.encodings[0].maxBitrate = 3_000_000;
+      await sender.setParameters(p);
+    }
+  } catch {}
+}
+
+if (PHONE) { runPhoneCam(); return; }
+$("#lobby").classList.remove("hidden");
+
+/* =====================================================================
+   Phone camera mode: this page was opened from the QR code on a phone
+   ===================================================================== */
+function runPhoneCam(){
+  $("#phone").classList.remove("hidden");
+  const [room, seatStr, key] = String(PHONE).split(".");
+  const seat = +seatStr;
+  if (!room || !(seat >= 1 && seat <= MAX) || !key) { $("#phLabel").textContent = "This camera link is incomplete. Scan the code on your computer again."; $("#phStart").disabled = true; return; }
+  $("#phLabel").textContent = `Camera for seat ${seat} at table ${room}.`;
+  let facing = "environment", stream = null, cpeer = null, timer = null, wake = null;
+  const out = {};
+  const status = t => { $("#phStatus").textContent = t; };
+
+  async function getCam(){
+    const next = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:facing }, width:{ ideal:1920 }, height:{ ideal:1080 } }, audio:false });
+    const old = stream; stream = next;
+    $("#phPreview").srcObject = stream;
+    const track = stream.getVideoTracks()[0];
+    for (const o of Object.values(out)) {
+      const sender = o.call.peerConnection?.getSenders().find(x => x.track && x.track.kind === "video");
+      if (sender) try { await sender.replaceTrack(track); } catch {}
+    }
+    old?.getTracks().forEach(t => t.stop());
+  }
+  async function keepAwake(){ try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && cpeer) keepAwake(); });
+
+  function dial(){
+    let live = 0, mine = false;
+    for (let s = 1; s <= MAX; s++) {
+      const o = out[s], st = o?.call.peerConnection?.connectionState;
+      if (o && st === "connected") { live++; if (s === seat) mine = true; continue; }
+      if (o && (!st || st === "new" || st === "connecting") && Date.now() - o.at < 12000) continue;
+      if (o) { try { o.call.close(); } catch {} delete out[s]; }
+      const call = cpeer.call(`${PREFIX}-${room}-${s}`, stream, { metadata:{ cam:true, key } });
+      if (!call) continue;
+      out[s] = { call, at:Date.now() };
+      call.on("close", () => { if (out[s]?.call === call) delete out[s]; });
+      call.on("error", () => {});
+      setTimeout(() => boostBitrate(call), 3000);
+    }
+    status(!mine ? "Connecting to your seat... Make sure you're sitting at the table on your computer."
+      : `Live. Sending video to ${live} ${live === 1 ? "screen" : "screens"} at the table.`);
+  }
+
+  $("#phStart").onclick = async () => {
+    $("#phStart").disabled = true;
+    try { await getCam(); }
+    catch { status("Camera blocked. Allow camera access for this site in your browser settings, then reload."); $("#phStart").disabled = false; return; }
+    status("Connecting...");
+    try { cpeer = await openPeer(`${PREFIX}-${room}-${seat}-cam`); }
+    catch (e) {
+      status(e.type === "unavailable-id" ? "Another phone is already the camera for this seat. Stop that one first." : "Could not reach the connection server. Check your internet and try again.");
+      $("#phStart").disabled = false; return;
+    }
+    cpeer.on("error", () => {});
+    cpeer.on("disconnected", () => { if (!cpeer.destroyed) cpeer.reconnect(); });
+    keepAwake();
+    $("#phStart").classList.add("hidden"); $("#phFlip").classList.remove("hidden"); $("#phStop").classList.remove("hidden");
+    dial(); timer = setInterval(dial, 4000);
+  };
+  $("#phFlip").onclick = async () => { facing = facing === "environment" ? "user" : "environment"; try { await getCam(); } catch { status("Could not switch cameras."); } };
+  $("#phStop").onclick = () => {
+    clearInterval(timer); Object.values(out).forEach(o => { try { o.call.close(); } catch {} });
+    cpeer?.destroy(); stream?.getTracks().forEach(t => t.stop()); wake?.release?.();
+    status("Stopped. Your computer's webcam (if you have one) takes over again.");
+    $("#phFlip").classList.add("hidden"); $("#phStop").classList.add("hidden");
+  };
+  window.addEventListener("beforeunload", () => cpeer?.destroy());
+}
+
+/* =====================================================================
+   Table state
+   ===================================================================== */
+let localStream = null, peer = null, mySeat = 0, roomCode = "", me = null;
+const calls = {}, conns = {}, camCalls = {}, players = {};
+const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off" };
+let turnStartAt = null, gameStartAt = null, tableKnown = false;
+let damageLog = [], pending = null, camHidden = false;
+const shown = new Set();
+const nm = s => (s === mySeat ? me?.name : players[s]?.name) || `Seat ${s}`;
+
+/* ---------- Lobby ---------- */
+$("#nameIn").value = store.get("kt-name", "");
+$("#lifeSel").value = store.get("kt-life", "40");
+$("#deckIn").value = store.get("kt-deck", "");
+$("#turnUrl").value = store.get("kt-turn-url", "");
+$("#turnUser").value = store.get("kt-turn-user", "");
+$("#turnCred").value = store.get("kt-turn-cred", "");
+if (params.get("room")) $("#roomIn").value = params.get("room");
+
+// Finds commanders in a pasted list: a "Commander" section, or Archidekt-style [Commander] tags
+function deckCommanders(txt){
+  const out = []; let inCmdr = false;
+  for (let line of String(txt).split(/\r?\n/)) {
+    line = line.trim();
+    if (!line) { inCmdr = false; continue; }
+    const header = line.replace(/\s*\(\d+\)\s*$/, "").replace(/:$/, "").trim();
+    if (!/^\d/.test(line) && /^[a-z ]+$/i.test(header)) { inCmdr = /^commanders?$/i.test(header); continue; }
+    if (inCmdr || /\[commander/i.test(line)) {
+      const n = line.replace(/^\d+\s*x?\s+/i, "").replace(/\s*[\(\[].*$/, "").replace(/\s+\*[A-Za-z]+\*.*$/, "").trim();
+      if (n && !out.includes(n)) out.push(n);
+    }
+  }
+  return out.slice(0, 2);
+}
+function parseDeck(txt){
+  const out = new Set();
+  for (let line of String(txt).split(/\r?\n/)) {
+    line = line.trim();
+    if (!line || /^(\/\/|#)/.test(line) || /:$/.test(line)) continue;
+    if (/^(commander|companion|deck|main|mainboard|sideboard|maybeboard|creatures?|lands?|instants?|sorcery|sorceries|artifacts?|enchantments?|planeswalkers?|battles?|other)(\s*\(\d+\))?$/i.test(line)) continue;
+    line = line.replace(/^\d+\s*x?\s+/i, "").replace(/\s*[\(\[].*$/, "").replace(/\s+\*[A-Za-z]+\*.*$/, "").replace(/\s+#.*$/, "").trim();
+    if (line.length >= 2 && line.length <= 141) out.add(line);
+  }
+  return [...out].slice(0, 300);
+}
+function showDeckCount(){ const n = parseDeck($("#deckIn").value).length; $("#deckCount").textContent = n ? `${n} unique cards recognized from your list.` : ""; }
+$("#deckIn").addEventListener("input", showDeckCount); showDeckCount();
+
+async function startCamera(deviceId, micId){
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  const video = { width:{ ideal:1920 }, height:{ ideal:1080 }, ...(deviceId ? { deviceId:{ exact:deviceId } } : {}) };
+  const audio = { echoCancellation:true, noiseSuppression:true, ...(micId ? { deviceId:{ exact:micId } } : {}) };
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
+    $("#noCam").classList.add("hidden");
+  } catch (e) {
+    if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCamera();
+    if (e.name === "NotAllowedError") throw e;
+    localStream = await navigator.mediaDevices.getUserMedia({ audio });
+    $("#noCam").classList.remove("hidden");
+  }
+  $("#lobbyPreview").srcObject = localStream;
+}
+async function listDevices(){
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const fill = (sel, kind, current, empty, label) => {
+    const list = devs.filter(d => d.kind === kind);
+    sel.innerHTML = ""; sel.disabled = !list.length;
+    if (!list.length) { const o = document.createElement("option"); o.textContent = empty; sel.appendChild(o); return; }
+    list.forEach((d, i) => {
+      const o = document.createElement("option");
+      o.value = d.deviceId; o.textContent = d.label || `${label} ${i + 1}`;
+      if (d.deviceId === current) o.selected = true;
+      sel.appendChild(o);
+    });
+  };
+  fill($("#camSel"), "videoinput", localStream?.getVideoTracks()[0]?.getSettings().deviceId, "No webcam found", "Camera");
+  fill($("#micSel"), "audioinput", localStream?.getAudioTracks()[0]?.getSettings().deviceId, "No microphone found", "Microphone");
+}
+(async () => {
+  try { await startCamera(store.get("kt-cam", "") || undefined, store.get("kt-mic", "") || undefined); }
+  catch { $("#lobbyErr").textContent = "Camera and microphone are blocked. Allow them in the address bar, then reload."; return; }
+  listDevices();
+})();
+async function switchDevices(){
+  store.set("kt-cam", $("#camSel").disabled ? "" : $("#camSel").value);
+  store.set("kt-mic", $("#micSel").disabled ? "" : $("#micSel").value);
+  try { await startCamera(store.get("kt-cam", "") || undefined, store.get("kt-mic", "") || undefined); listDevices(); }
+  catch { $("#lobbyErr").textContent = "That device is blocked or in use by another app."; }
+}
+$("#camSel").onchange = switchDevices;
+$("#micSel").onchange = switchDevices;
+
+function randomCode(){ const a = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; for (let i = 0; i < 6; i++) s += a[rnd(a.length) - 1]; return s; }
+
+$("#joinBtn").onclick = async () => {
+  const err = $("#lobbyErr"); err.textContent = "";
+  if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
+  const name = $("#nameIn").value.trim() || "Player";
+  store.set("kt-name", name); store.set("kt-life", $("#lifeSel").value); store.set("kt-deck", $("#deckIn").value);
+  store.set("kt-turn-url", $("#turnUrl").value.trim()); store.set("kt-turn-user", $("#turnUser").value.trim()); store.set("kt-turn-cred", $("#turnCred").value);
+  roomCode = $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || randomCode();
+  $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Finding a seat...";
+  try {
+    for (let s = 1; s <= MAX && !peer; s++) {
+      try { peer = await openPeer(`${PREFIX}-${roomCode}-${s}`); mySeat = s; }
+      catch (e) { if (e.type !== "unavailable-id") throw e; }
+    }
+    if (!peer) throw new Error("This table already has 4 players.");
+  } catch (e) {
+    err.textContent = e.message || "Could not reach the connection server. Check your internet and try again.";
+    $("#joinBtn").disabled = false; $("#joinBtn").textContent = "Sit down";
+    return;
+  }
+  if (!LOCAL) { try { history.replaceState(null, "", `?room=${roomCode}`); } catch {} }
+  const startLife = +$("#lifeSel").value;
+  me = { name, startLife, life:startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], cmd:{}, rot:$("#rotIn").checked,
+         manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 }, cmdrs:[], deckCmdrs:deckCommanders($("#deckIn").value), manaEmptyOnPass:store.get("kt-mana-empty", "0") === "1",
+         stream:localStream, deck:parseDeck($("#deckIn").value), camKey:uid() };
+  players[mySeat] = me;
+  enterTable();
+};
+
+/* =====================================================================
+   Networking
+   ===================================================================== */
+function seatOf(id){ const m = /-(\d)(-cam)?$/.exec(id); return m ? +m[1] : 0; }
+function wirePeer(){
+  peer.on("call", call => {
+    if (call.peer.endsWith("-cam")) { handleCamCall(call); return; }
+    const s = seatOf(call.peer); if (!s) { call.close(); return; }
+    const ex = calls[s];
+    if (ex && ex.outgoing && mySeat < s) { call.close(); return; }
+    if (ex) ex.call.close();
+    call.answer(localStream);
+    setupCall(s, call, false);
+  });
+  peer.on("connection", conn => {
+    const s = seatOf(conn.peer); if (!s || conn.peer.endsWith("-cam")) { conn.close(); return; }
+    const ex = conns[s];
+    if (ex && ex.outgoing && mySeat < s) { conn.close(); return; }
+    if (ex) ex.conn.close();
+    setupConn(s, conn, false);
+  });
+  peer.on("disconnected", () => { if (!peer.destroyed) peer.reconnect(); });
+  peer.on("error", e => { if (e.type !== "peer-unavailable") setStatus("Connection issue: " + e.type); });
+  for (let s = 1; s <= MAX; s++) {
+    if (s === mySeat) continue;
+    const id = `${PREFIX}-${roomCode}-${s}`;
+    setupConn(s, peer.connect(id, { reliable:true }), true);
+    setupCall(s, peer.call(id, localStream), true);
+  }
+}
+function setupCall(s, call, outgoing){
+  calls[s] = { call, outgoing };
+  watchLink(s, () => call.peerConnection);
+  call.on("stream", stream => {
+    players[s] = players[s] || blankPlayer();
+    players[s].stream = stream;
+    boostBitrate(call);
+    render();
+  });
+  const drop = () => { if (calls[s]?.call === call) { delete calls[s]; removeIfGone(s); } };
+  call.on("close", drop); call.on("error", drop);
+}
+function setupConn(s, conn, outgoing){
+  conns[s] = { conn, outgoing };
+  watchLink(s, () => conn.peerConnection);
+  conn.on("open", () => send(conn, { type:"hello", state:publicState(), deck:me.deck, known:tableKnown, table:tableKnown ? tableSnap() : null, dmg:damageLog }));
+  conn.on("data", msg => { try { onMessage(s, msg); } catch (e) { console.warn(e); } });
+  const drop = () => { if (conns[s]?.conn === conn) { delete conns[s]; removeIfGone(s); } };
+  conn.on("close", drop); conn.on("error", drop);
+}
+/* Connection health: tells you when a player found the table but the connection can't get through */
+const link = {};  // seat -> { state, since }
+let netDismissed = "";
+function watchLink(s, getPc){
+  let tries = 0;
+  const attach = () => {
+    const pc = getPc();
+    if (!pc || typeof pc.addEventListener !== "function") { if (++tries < 40) setTimeout(attach, 250); return; }
+    if (pc.__ktWatched) return; pc.__ktWatched = true;
+    const check = () => {
+      const st = pc.iceConnectionState;
+      if (st === "connected" || st === "completed") setLink(s, "ok");
+      else if (st === "failed") setLink(s, "failed");
+      else if (st === "checking" && link[s]?.state !== "ok") setLink(s, "connecting");
+    };
+    pc.addEventListener("iceconnectionstatechange", check); check();
+  };
+  attach();
+}
+function setLink(s, state){
+  if (link[s]?.state === state) return;
+  link[s] = { state, since:Date.now() };
+  if (state === "failed") log(`Couldn't connect to the player in seat ${s}.`);
+  if (state === "ok" && players[s]?.name) netDismissed = "";
+  updateNetWarn();
+}
+function updateNetWarn(){
+  const box = $("#netWarn"); if (!box) return;
+  const failed = Object.keys(link).filter(s => link[s].state === "failed").map(Number);
+  const slow = Object.keys(link).filter(s => link[s].state === "connecting" && Date.now() - link[s].since > 12000).map(Number);
+  let msg = "", cls = "";
+  if (failed.length) {
+    msg = `The player in seat ${failed.join(" and ")} found your table, but the video connection failed. One of your networks is blocking direct connections. `
+        + "Fix: turn off any VPN, then both players add a TURN relay under Connection settings in the lobby and rejoin (you first, then your friend).";
+  } else if (slow.length) {
+    msg = `Still connecting to seat ${slow.join(" and ")}. If this doesn't finish in a few seconds, your networks are probably blocking direct connections and a TURN relay is needed.`;
+    cls = "slow";
+  }
+  const key = msg ? (cls + failed.join() + slow.join()) : "";
+  const show = !!msg && key !== netDismissed;
+  box.classList.toggle("hidden", !show); box.classList.toggle("slow", cls === "slow");
+  if (show) { $("#netText").textContent = msg; box.dataset.key = key; }
+}
+function blankPlayer(){ return { name:"", life:0, poison:0, exp:0, energy:0, blessing:false, emblems:[], cmd:{}, deck:[], manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } }; }
+function removeIfGone(s){
+  if (!calls[s] && !conns[s] && players[s]) {
+    log(`${players[s].name || "A player"} left the table.`);
+    try { camCalls[s]?.close(); } catch {}
+    delete players[s];
+    if (table.turnSeat === s) table.turnSeat = nextSeat(s);
+    if (table.monarch === s) table.monarch = 0;
+    if (table.initiative === s) table.initiative = 0;
+    render();
+  }
+}
+function handleCamCall(call){
+  const s = seatOf(call.peer);
+  const expected = s === mySeat ? me.camKey : players[s]?.camKey;
+  if (!s || !expected || call.metadata?.key !== expected) { call.close(); return; }
+  if (camCalls[s] && camCalls[s] !== call) { try { camCalls[s].close(); } catch {} }
+  camCalls[s] = call;
+  call.answer();
+  call.on("stream", st => {
+    const p = players[s]; if (!p) return;
+    p.camStream = st;
+    if (s === mySeat) { applyWebcam(); log("Your phone camera is connected."); updatePhoneUi(); }
+    render();
+  });
+  const drop = () => {
+    if (camCalls[s] !== call) return;
+    delete camCalls[s];
+    if (players[s]) { players[s].camStream = null; if (s === mySeat) { applyWebcam(); updatePhoneUi(); } render(); }
+  };
+  call.on("close", drop); call.on("error", drop);
+}
+// Webcam video is paused while a phone camera is feeding your seat, to save bandwidth
+function applyWebcam(){ const t = localStream?.getVideoTracks()[0]; if (t) t.enabled = !camHidden && !me.camStream; }
+
+function send(conn, msg){ try { if (conn.open) conn.send(msg); } catch {} }
+function broadcast(msg){ Object.values(conns).forEach(c => send(c.conn, msg)); }
+function publicState(){
+  return { name:me.name, life:me.life, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
+           emblems:me.emblems, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
+}
+function pushState(){ broadcast({ type:"state", state:publicState() }); }
+function tableSnap(){
+  const now = Date.now();
+  return { ...table, turnElapsed:turnStartAt ? now - turnStartAt : null, gameElapsed:gameStartAt ? now - gameStartAt : null };
+}
+function pushTable(){ broadcast({ type:"table", table:tableSnap() }); render(); }
+const int = (v, lo, hi) => { v = Math.round(Number(v)); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : 0; };
+
+function setTable(patch){
+  for (const k of ["turnSeat", "monarch", "initiative"]) {
+    if (!(k in patch)) continue;
+    const v = int(patch[k], 0, MAX);
+    if (v === table[k]) continue;
+    table[k] = v;
+    if (k === "monarch") log(v ? `${nm(v)} is the monarch.` : "No one is the monarch.");
+    if (k === "initiative") log(v ? `${nm(v)} has the initiative.` : "No one has the initiative.");
+    if (k === "turnSeat" && v) log(`${nm(v)}'s turn.`);
+  }
+  if ("dayNight" in patch && ["", "day", "night"].includes(patch.dayNight) && patch.dayNight !== table.dayNight) {
+    table.dayNight = patch.dayNight; log(table.dayNight ? `It is now ${table.dayNight}.` : "Day and night cleared.");
+  }
+  if ("clockMode" in patch && CLOCKS.includes(String(patch.clockMode))) table.clockMode = String(patch.clockMode);
+}
+function applyTable(t){
+  if (!t || typeof t !== "object") return;
+  setTable(t);
+  const now = Date.now();
+  if ("turnElapsed" in t) turnStartAt = t.turnElapsed == null ? null : now - Math.max(0, Number(t.turnElapsed) || 0);
+  if ("gameElapsed" in t) gameStartAt = t.gameElapsed == null ? null : now - Math.max(0, Number(t.gameElapsed) || 0);
+  tableKnown = true;
+  render();
+}
+function changeTable(patch){ setTable(patch); tableKnown = true; pushTable(); }
+
+function cleanEntry(e, s){
+  if (!e || typeof e !== "object" || typeof e.id !== "string") return null;
+  return { id:e.id.slice(0, 40), t:int(e.t, 0, 1e6), target:int(e.target, 1, MAX), targetName:String(e.targetName || "").slice(0, 24),
+           source:int(e.source, -1, MAX), sourceName:String(e.sourceName || "").slice(0, 24), amount:int(e.amount, 0, 999),
+           cmd:!!e.cmd, undone:!!e.undone, at:int(e.at, 0, 1e14) };
+}
+function onMessage(s, msg){
+  if (!msg || typeof msg !== "object") return;
+  const p = players[s] = players[s] || blankPlayer();
+  switch (msg.type) {
+    case "hello":
+    case "state": {
+      const st = msg.state || {};
+      const isNew = !p.name;
+      const oldKey = p.camKey;
+      p.name = String(st.name || "Player").slice(0, 24);
+      p.life = int(st.life, -999, 999); p.poison = int(st.poison, 0, 99); p.exp = int(st.exp, 0, 999); p.energy = int(st.energy, 0, 999);
+      p.blessing = !!st.blessing;
+      p.emblems = Array.isArray(st.emblems) ? st.emblems.slice(0, 10).map(x => String(x).slice(0, 140)) : [];
+      p.cmd = {}; if (st.cmd && typeof st.cmd === "object") for (const [k, v] of Object.entries(st.cmd)) { const kk = int(k, 1, MAX); if (kk) p.cmd[kk] = int(v, 0, 999); }
+      p.rot = !!st.rot;
+      p.manaOn = !!st.manaOn;
+      const oldCmdr = (p.cmdrs || []).map(c => c.name).join(" and ");
+      p.cmdrs = cleanCmdrs(st.cmdrs);
+      const newCmdr = p.cmdrs.map(c => c.name).join(" and ");
+      if (newCmdr && newCmdr !== oldCmdr) { setTimeout(artSync, 500); if (p.cmdrs.length === 1) log(`${p.name || "A player"} is playing `, newCmdr); else log(`${p.name || "A player"} is playing ${newCmdr}.`); }
+      p.mana = { W:0, U:0, B:0, R:0, G:0, C:0 };
+      if (st.mana && typeof st.mana === "object") for (const c of MANA) p.mana[c] = int(st.mana[c], 0, 999);
+      p.camKey = typeof st.camKey === "string" ? st.camKey.slice(0, 40) : "";
+      if (oldKey && oldKey !== p.camKey && camCalls[s]) { try { camCalls[s].close(); } catch {} }
+      if (msg.type === "hello") {
+        if (Array.isArray(msg.deck)) { p.deck = msg.deck.slice(0, 300).map(x => String(x).slice(0, 141)); if (p.deck.length) setTimeout(artSync, 500); }
+        if (isNew) log(`${p.name} sat down.`);
+        if (!tableKnown && msg.known && msg.table) applyTable(msg.table);
+        if (Array.isArray(msg.dmg)) {
+          let added = false;
+          for (const raw of msg.dmg.slice(0, 2000)) { const e = cleanEntry(raw); if (e && !damageLog.some(x => x.id === e.id)) { damageLog.push(e); added = true; } }
+          if (added) renderDmg();
+        }
+      }
+      render();
+      break;
+    }
+    case "table": applyTable(msg.table); break;
+    case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500)); break;
+    case "card": if (typeof msg.name === "string") log(`${p.name || "Someone"} looked at `, msg.name.slice(0, 141)); break;
+    case "show":
+      if (typeof msg.id === "string" && /^[0-9a-f-]{36}$/.test(msg.id)) {
+        log(`${p.name || "Someone"} showed everyone `, String(msg.name || "a card").slice(0, 141));
+        scry(`/cards/${msg.id}`).then(c => { if (c) showCard(c, { from:p.name || "Another player" }); });
+      }
+      break;
+    case "dmg": {
+      const e = cleanEntry(msg.entry);
+      if (e && e.target === s && !damageLog.some(x => x.id === e.id)) { damageLog.push(e); renderDmg(); }
+      break;
+    }
+    case "dmgundo": {
+      const e = damageLog.find(x => x.id === msg.id);
+      if (e && e.target === s) { e.undone = true; renderDmg(); }
+      break;
+    }
+    case "dice": playDice(msg, s); break;
+    case "rolloff": playRollOff(msg); break;
+    case "newgame": applyNewGame(p.name); break;
+  }
+}
+function nextSeat(from){
+  for (let i = 1; i <= MAX; i++) { const s = ((from - 1 + i) % MAX) + 1; if (players[s] && s !== from) return s; }
+  return players[from] ? from : 0;
+}
+
+/* =====================================================================
+   Table UI
+   ===================================================================== */
+function enterTable(){
+  $("#lobby").classList.add("hidden"); $("#table").classList.remove("hidden");
+  $("#roomLabel").textContent = `Table ${roomCode}`;
+  if (LOCAL) { $("#copyBtn").textContent = "Copy table code"; $("#waitNote").textContent = `Waiting for players. They open their copy of this file and enter code ${roomCode}.`; }
+  $("#voiceIn").checked = store.get("kt-voice", "1") === "1";
+  $("#oneWord").checked = store.get("kt-oneword", "1") === "1";
+  wirePeer(); render(); renderDmg();
+  setTimeout(() => askCommander(), 500);
+  setTimeout(artSync, 1500);
+  log(`You took seat ${mySeat}.`);
+  setTimeout(() => { tableKnown = true; }, 3500);
+  setInterval(updateClocks, 1000);
+  loadIndex().catch(() => {});
+  $("#engineSel").value = engine;
+  if (engine === "browser" && !SR) { engine = "local"; $("#engineSel").value = "local"; }
+  if (engine === "browser" && LOCAL) {
+    // Opened as a file: the browser won't remember mic permission, so every caption restart would ask again
+    capOn = false;
+    setCapHint("The Browser speech engine asks for the microphone every time it restarts when this page is opened as a file. Switch the speech engine to On this computer, or click Captions to use it anyway.");
+  } else { capOn = true; startRec(); }
+  updateCapBtn();
+}
+$("#copyBtn").onclick = async () => {
+  const text = LOCAL ? roomCode : `${location.origin}${location.pathname}?room=${roomCode}`;
+  const label = LOCAL ? "Copy table code" : "Copy invite link";
+  try { await navigator.clipboard.writeText(text); $("#copyBtn").textContent = LOCAL ? "Code copied" : "Link copied"; }
+  catch { prompt(LOCAL ? "Send this table code to your friends:" : "Copy this invite link:", text); }
+  setTimeout(() => $("#copyBtn").textContent = label, 2000);
+};
+$("#passBtn").onclick = () => passTurn();
+$("#netDismiss").onclick = () => { netDismissed = $("#netWarn").dataset.key || ""; updateNetWarn(); };
+function passTurn(){
+  const next = nextSeat(table.turnSeat || mySeat);
+  if (me.manaOn && me.manaEmptyOnPass && table.turnSeat === mySeat && manaTotal(me.mana)) { emptyMana(); log("Your mana pool emptied at the end of your turn."); }
+  turnStartAt = Date.now(); if (!gameStartAt) gameStartAt = Date.now();
+  changeTable({ turnSeat:next });
+}
+$("#micBtn").onclick = e => {
+  const t = localStream.getAudioTracks()[0]; if (!t) return;
+  t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mute mic" : "Unmute mic"; e.target.classList.toggle("off", !t.enabled);
+  if (!t.enabled) stopRec(); else if (capOn) startRec();
+};
+$("#camBtn").onclick = e => {
+  camHidden = !camHidden; applyWebcam();
+  e.target.textContent = camHidden ? "Show camera" : "Hide camera"; e.target.classList.toggle("off", camHidden);
+};
+$("#rotBtn").onclick = () => { me.rot = !me.rot; pushState(); render(); };
+$("#leaveBtn").onclick = () => {
+  if (!confirm("Leave the table? You can rejoin with the same code, but your life total and counters reset.")) return;
+  Object.values(calls).forEach(c => c.call.close()); Object.values(conns).forEach(c => c.conn.close());
+  peer?.destroy(); localStream?.getTracks().forEach(t => t.stop());
+  location.href = location.pathname;
+};
+window.addEventListener("beforeunload", () => peer?.destroy());
+
+/* ---------- Game clock, turn clock, new game ---------- */
+function gameSeconds(){ return gameStartAt ? (Date.now() - gameStartAt) / 1000 : 0; }
+function ensureGameStarted(){ if (!gameStartAt) { gameStartAt = Date.now(); tableKnown = true; pushTable(); log("Game clock started."); } }
+$("#startBtn").onclick = () => { if (!gameStartAt) { gameStartAt = Date.now(); if (table.turnSeat) turnStartAt = Date.now(); tableKnown = true; pushTable(); log("Game clock started."); } };
+$("#newBtn").onclick = () => {
+  if (!confirm("Start a new game for everyone?\n\nThis resets every player's life, counters, and commander damage, clears the board state, stops the game clock, and erases the damage history. Click Export CSV first if you want to keep the history.")) return;
+  broadcast({ type:"newgame" }); applyNewGame("You");
+};
+function applyNewGame(by){
+  Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
+  pending = null; shown.clear();
+  Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"" });
+  turnStartAt = null; gameStartAt = null; damageLog = [];
+  pushState(); render(); renderDmg();
+  log(`${by} started a new game.`);
+  askCommander({ again:true });
+}
+function turnText(s){
+  if (table.turnSeat !== s) return ["", false];
+  const base = s === mySeat ? "Your turn" : "Their turn";
+  if (table.clockMode === "off" || !turnStartAt) return [base, false];
+  const el = (Date.now() - turnStartAt) / 1000;
+  if (table.clockMode === "up") return [`${base} ${fmt(el)}`, false];
+  const left = +table.clockMode - el;
+  return left >= 0 ? [`${base}, ${fmt(left)} left`, false] : [`${base}, ${fmt(-left)} over`, true];
+}
+function updateClocks(){
+  updateNetWarn();
+  $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "Game not started";
+  $("#startBtn").classList.toggle("hidden", !!gameStartAt);
+  document.querySelectorAll("#grid .tile").forEach(el => {
+    const [txt, over] = turnText(+el.dataset.seat);
+    const f = el.querySelector(".turnflag");
+    if (f.textContent !== txt) f.textContent = txt;
+    f.classList.toggle("over", over);
+  });
+}
+
+/* ---------- Tiles ---------- */
+function presentSeats(){ return Object.keys(players).map(Number).filter(s => s === mySeat || players[s].stream || players[s].name).sort((a, b) => a - b); }
+function render(bumpMine){
+  if (!me) return;
+  const grid = $("#grid"), seats = presentSeats();
+  grid.className = "n" + Math.max(1, Math.min(MAX, seats.length));
+  $("#waitNote").classList.toggle("hidden", seats.length > 1);
+  [...grid.children].forEach(el => { if (!seats.includes(+el.dataset.seat)) el.remove(); });
+  seats.forEach(s => {
+    const p = players[s];
+    let el = grid.querySelector(`.tile[data-seat="${s}"]`);
+    if (!el) {
+      // insert in seat order without moving existing tiles (moving a playing video pauses it)
+      el = buildTile(s);
+      const after = [...grid.children].find(c => +c.dataset.seat > s);
+      grid.insertBefore(el, after || null);
+    }
+    const v = el.querySelector("video");
+    const vs = p.camStream || (s === mySeat ? localStream : p.stream);
+    if (vs && v.srcObject !== vs) { v.srcObject = vs; v.play?.().catch(() => {}); }
+    const au = el.querySelector("audio");
+    if (au && p.stream && au.srcObject !== p.stream) { au.srcObject = p.stream; au.play?.().catch(() => {}); }
+    const hasVideo = !!(p.camStream || (vs && vs.getVideoTracks().length));
+    el.querySelector(".nocam").classList.toggle("hidden", hasVideo);
+    v.classList.toggle("rot", !!p.rot);
+    el.classList.toggle("active", table.turnSeat === s);
+    el.querySelector(".pname").textContent = p.name || "Connecting...";
+    renderBadges(el, s);
+    renderCmdrs(el, s);
+    const out = el.querySelector(".life output");
+    if (out.textContent !== String(p.life)) {
+      out.textContent = p.life;
+      if (s !== mySeat || bumpMine) { out.classList.add("bump"); setTimeout(() => out.classList.remove("bump"), 160); }
+    }
+    el.querySelector(".life").classList.toggle("low", p.life <= 5);
+    renderCounters(el, s);
+  });
+  renderAsk(); renderTablePanel(); updateClocks();
+  const dc = $("#dayChip");
+  dc.classList.toggle("hidden", !table.dayNight); dc.classList.toggle("night", table.dayNight === "night");
+  dc.textContent = table.dayNight === "night" ? "Night" : "Day";
+}
+
+function buildTile(s){
+  const el = document.createElement("div");
+  el.className = "tile enter"; el.dataset.seat = s;
+  el.addEventListener("animationend", () => el.classList.remove("enter"), { once:true });
+  const mine = s === mySeat;
+  el.innerHTML = `
+    <video autoplay playsinline muted></video>
+    ${mine ? "" : "<audio autoplay></audio>"}
+    <div class="nocam hidden">${mine ? "No camera. Use Phone camera in the top bar." : "No camera yet."}</div>
+    <div class="hit" title="Click a card name to identify it"></div>
+    <div class="plate"><div class="prow"><span class="nm"><span class="pip" style="background:${SEAT_HEX[s - 1]}"></span><span class="pname"></span></span><span class="badges"></span><span class="turnflag"></span></div><div class="cmdrs"></div></div>
+    <div class="life">${mine ? '<button aria-label="Lose 1 life" data-d="-1">&minus;</button>' : ""}<output></output>${mine ? '<button aria-label="Gain 1 life" data-d="1">+</button>' : ""}</div>
+    <div class="ctrs"></div>`;
+  el.querySelectorAll(".life button").forEach(b => b.onclick = ev => { ev.stopPropagation(); changeLife(+b.dataset.d); });
+  attachLookup(el, s);
+  return el;
+}
+function renderBadges(el, s){
+  const b = el.querySelector(".badges"), p = players[s], want = [];
+  if (table.monarch === s) want.push(["Monarch", ""]);
+  if (table.initiative === s) want.push(["Initiative", "ini"]);
+  if (p.blessing) want.push(["City's blessing", "bless"]);
+  const sig = want.map(x => x[0]).join("|");
+  if (b.dataset.sig === sig) return;
+  b.dataset.sig = sig; b.innerHTML = "";
+  want.forEach(([t, c]) => { const x = document.createElement("span"); x.className = "badge " + c; x.textContent = t; b.appendChild(x); });
+}
+
+const NUMERIC = [["poison", "Poison", 10], ["exp", "Experience", 0], ["energy", "Energy", 0]];
+function renderCounters(el, s){
+  const p = players[s], box = el.querySelector(".ctrs"), mine = s === mySeat;
+  const sig = JSON.stringify([p.poison, p.exp, p.energy, p.cmd, p.emblems, p.blessing, p.manaOn, p.mana, mine ? [...shown] : 0, presentSeats().map(o => players[o]?.name)]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig; box.innerHTML = "";
+  const chip = (label, val, o = {}) => {
+    const c = document.createElement("div"); c.className = "ctr" + (o.lethal ? " lethal" : "");
+    if (o.sw) { const d = document.createElement("span"); d.className = "sw"; d.style.background = o.sw; c.appendChild(d); }
+    const l = document.createElement("span"); l.textContent = label; c.appendChild(l);
+    if (o.minus) { const b = document.createElement("button"); b.innerHTML = "&minus;"; b.setAttribute("aria-label", "Decrease " + label); b.onclick = e => { e.stopPropagation(); o.minus(); }; c.appendChild(b); }
+    const v = document.createElement("b"); v.textContent = val; c.appendChild(v);
+    if (o.plus) { const b = document.createElement("button"); b.textContent = "+"; b.setAttribute("aria-label", "Increase " + label); b.onclick = e => { e.stopPropagation(); o.plus(); }; c.appendChild(b); }
+    box.appendChild(c);
+  };
+  if (p.manaOn) box.appendChild(manaRow(p, mine));
+  NUMERIC.forEach(([k, label, lethal]) => {
+    const v = p[k] || 0;
+    if (!(v > 0 || (mine && shown.has(k)))) return;
+    chip(label, v, { lethal:lethal && v >= lethal, minus:mine ? () => bumpCounter(k, -1) : null, plus:mine ? () => bumpCounter(k, 1) : null });
+  });
+  Object.entries(p.cmd || {}).forEach(([src, v]) => { if (v > 0) chip(`Commander damage from ${nm(+src)}`, v, { sw:SEAT_HEX[src - 1], lethal:v >= 21 }); });
+  (p.emblems || []).forEach((t, i) => {
+    const c = document.createElement("div"); c.className = "ctr emblem"; c.title = t;
+    const l = document.createElement("span"); l.textContent = "Emblem: " + t; c.appendChild(l);
+    c.onclick = e => { e.stopPropagation(); setStatus(`${nm(s)}'s emblem: ${t}`); };
+    if (mine) { const b = document.createElement("button"); b.textContent = "\u00d7"; b.setAttribute("aria-label", "Remove emblem"); b.onclick = e => { e.stopPropagation(); me.emblems.splice(i, 1); pushState(); render(); }; c.appendChild(b); }
+    box.appendChild(c);
+  });
+  if (mine) {
+    const add = document.createElement("button"); add.className = "ctr add"; add.textContent = "+ Counter";
+    add.onclick = e => { e.stopPropagation(); openCounterMenu(el); };
+    box.appendChild(add);
+  }
+}
+const MANA = ["W", "U", "B", "R", "G", "C"];
+const MANA_STYLE = { W:["#f8f3d6", "#1b1608", "White"], U:["#1f6fb5", "#ffffff", "Blue"], B:["#2b2622", "#e9e2d6", "Black"],
+                     R:["#d0402f", "#ffffff", "Red"], G:["#1f7a45", "#ffffff", "Green"], C:["#c9c2bd", "#1b1608", "Colorless"] };
+const manaTotal = m => MANA.reduce((a, c) => a + (m?.[c] || 0), 0);
+function bumpMana(c, d){ me.mana[c] = Math.max(0, (me.mana[c] || 0) + d); pushState(); render(); }
+function emptyMana(){ MANA.forEach(c => { me.mana[c] = 0; }); pushState(); render(); }
+function manaRow(p, mine){
+  const row = document.createElement("div"); row.className = "manarow";
+  const lab = document.createElement("span"); lab.textContent = "Mana"; row.appendChild(lab);
+  MANA.forEach(c => {
+    const v = p.mana?.[c] || 0;
+    if (!mine && !v) return;
+    const [bg, ink, name] = MANA_STYLE[c];
+    const g = document.createElement("span"); g.className = "msym";
+    const pip = document.createElement(mine ? "button" : "span"); pip.className = "mpip";
+    pip.style.background = bg; pip.style.color = ink; pip.textContent = c;
+    pip.setAttribute("aria-label", mine ? `Add 1 ${name} mana` : `${name} mana`); pip.title = mine ? `Add 1 ${name}` : name;
+    if (mine) pip.onclick = e => { e.stopPropagation(); bumpMana(c, 1); };
+    g.appendChild(pip);
+    const b = document.createElement("b"); b.textContent = v; g.appendChild(b);
+    if (mine) { const m = document.createElement("button"); m.className = "mminus"; m.innerHTML = "&minus;"; m.setAttribute("aria-label", `Remove 1 ${name} mana`); m.onclick = e => { e.stopPropagation(); bumpMana(c, -1); }; g.appendChild(m); }
+    row.appendChild(g);
+  });
+  const tot = manaTotal(p.mana);
+  const t = document.createElement("span"); t.className = "mt"; t.textContent = tot ? `Total ${tot}` : "Empty"; row.appendChild(t);
+  if (mine && tot) { const e = document.createElement("button"); e.className = "mempty"; e.textContent = "Empty pool"; e.onclick = ev => { ev.stopPropagation(); emptyMana(); }; row.appendChild(e); }
+  return row;
+}
+function bumpCounter(k, d){ me[k] = Math.max(0, (me[k] || 0) + d); pushState(); render(); }
+function closeMenus(){ document.querySelectorAll(".tilemenu").forEach(m => m.remove()); }
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".tilemenu") && !e.target.closest(".ctr.add")) closeMenus();
+  const dd = $("#diceDd"); if (dd?.open && !e.target.closest("#diceDd")) dd.open = false;
+});
+function openCounterMenu(el){
+  closeMenus();
+  const m = document.createElement("div"); m.className = "menu tilemenu";
+  const item = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = e => { e.stopPropagation(); closeMenus(); fn(); }; m.appendChild(b); };
+  NUMERIC.forEach(([k, label]) => { if (!shown.has(k) && !me[k]) item(`${label} counters`, () => { shown.add(k); render(); }); });
+  item(me.manaOn ? "Turn off mana pool" : "Turn on mana pool (shown to everyone)", () => {
+    me.manaOn = !me.manaOn; pushState(); render();
+    log(me.manaOn ? "You turned on your mana pool." : "You turned off your mana pool.");
+  });
+  if (me.manaOn) item(me.manaEmptyOnPass ? "Keep mana when I pass the turn" : "Empty mana when I pass the turn", () => {
+    me.manaEmptyOnPass = !me.manaEmptyOnPass; store.set("kt-mana-empty", me.manaEmptyOnPass ? "1" : "0");
+    setStatus(me.manaEmptyOnPass ? "Your mana pool will empty when you pass the turn." : "Your mana pool now carries over between turns.");
+  });
+  item(me.blessing ? "Remove the city's blessing" : "Get the city's blessing", () => { me.blessing = !me.blessing; pushState(); render(); log(me.blessing ? "You got the city's blessing." : "You removed the city's blessing."); });
+  item("Add an emblem", () => {
+    if (me.emblems.length >= 10) { setStatus("You can track up to 10 emblems."); return; }
+    const t = prompt("Emblem text (for example: Creatures you control get +1/+1)");
+    if (t && t.trim()) { me.emblems.push(t.trim().slice(0, 140)); pushState(); render(); }
+  });
+  m.addEventListener("pointerdown", e => e.stopPropagation());
+  el.appendChild(m);
+}
+
+/* ---------- Life changes and "who was that from?" ---------- */
+function changeLife(delta, opts = {}){
+  me.life += delta;
+  if (!opts.noAsk) {
+    if (delta < 0) { if (!pending) pending = { amount:0, t:gameSeconds(), cmd:false }; pending.amount += -delta; }
+    else if (delta > 0 && pending) { pending.amount -= delta; if (pending.amount <= 0) pending = null; }
+  }
+  pushState(); render(true);
+}
+function renderAsk(){
+  const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
+  let box = el.querySelector(".dmgask");
+  if (!pending) { box?.remove(); return; }
+  const others = presentSeats().filter(s => s !== mySeat);
+  const sig = JSON.stringify([pending.amount, others.map(s => players[s].name)]);
+  if (box && box.dataset.sig === sig) return;
+  if (!box) { box = document.createElement("div"); box.className = "dmgask"; box.addEventListener("pointerdown", e => e.stopPropagation()); el.appendChild(box); }
+  box.dataset.sig = sig; box.innerHTML = "";
+  const q = document.createElement("p"); q.textContent = `You lost ${pending.amount} life. Who was it from?`; box.appendChild(q);
+  const opts = document.createElement("div"); opts.className = "opts"; box.appendChild(opts);
+  const opt = (label, src, color) => {
+    const b = document.createElement("button"); b.className = "btn";
+    if (color) { const d = document.createElement("span"); d.className = "pip"; d.style.background = color; b.appendChild(d); }
+    b.append(label); b.onclick = () => resolvePending(src); opts.appendChild(b);
+  };
+  others.forEach(s => opt(nm(s), s, SEAT_HEX[s - 1]));
+  opt("Myself", mySeat, SEAT_HEX[mySeat - 1]);
+  opt("Not a player", 0);
+  if (others.length) {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = pending.cmd; cb.onchange = () => { pending.cmd = cb.checked; };
+    lab.append(cb, "Commander damage"); box.appendChild(lab);
+  }
+  const skip = document.createElement("button"); skip.className = "skip"; skip.textContent = "Skip (log as unknown)"; skip.onclick = () => resolvePending(-1);
+  box.appendChild(skip);
+}
+function resolvePending(src){
+  if (!pending) return;
+  const p = pending; pending = null;
+  recordDamage({ source:src, amount:p.amount, cmd:p.cmd && src > 0 && src !== mySeat, t:p.t });
+  pushState(); render();
+}
+function sourceLabel(src, target){ return src === target ? "self" : src > 0 ? nm(src) : src === 0 ? "not a player" : "unknown"; }
+function recordDamage({ source, amount, cmd, t }){
+  const hadClock = !!gameStartAt;
+  ensureGameStarted();
+  const e = { id:uid(), t:Math.floor(hadClock ? (t ?? gameSeconds()) : 0), target:mySeat, targetName:me.name, source,
+              sourceName:sourceLabel(source, mySeat), amount, cmd:!!cmd, undone:false, at:Date.now() };
+  if (e.cmd) me.cmd[source] = (me.cmd[source] || 0) + amount;
+  damageLog.push(e);
+  broadcast({ type:"dmg", entry:e });
+  renderDmg();
+  return e;
+}
+function undoDamage(id){
+  const e = damageLog.find(x => x.id === id);
+  if (!e || e.undone || e.target !== mySeat) return;
+  e.undone = true; me.life += e.amount;
+  if (e.cmd && e.source > 0) me.cmd[e.source] = Math.max(0, (me.cmd[e.source] || 0) - e.amount);
+  broadcast({ type:"dmgundo", id }); pushState(); render(true); renderDmg();
+}
+
+/* ---------- Damage history ---------- */
+function renderDmg(){
+  const sel = $("#dmgFilter");
+  const seen = new Map();
+  presentSeats().forEach(s => seen.set(s, nm(s)));
+  damageLog.forEach(e => { if (!seen.has(e.target)) seen.set(e.target, e.targetName); });
+  const sig = [...seen].join("|");
+  if (sel.dataset.sig !== sig) {
+    const cur = sel.value || "all";
+    sel.dataset.sig = sig; sel.innerHTML = "";
+    const o = document.createElement("option"); o.value = "all"; o.textContent = "All players"; sel.appendChild(o);
+    [...seen].sort((a, b) => a[0] - b[0]).forEach(([s, n]) => { const x = document.createElement("option"); x.value = s; x.textContent = n; sel.appendChild(x); });
+    sel.value = [...sel.options].some(x => x.value === cur) ? cur : "all";
+  }
+  const f = sel.value;
+  const list = damageLog.filter(e => f === "all" || e.target === +f || e.source === +f).sort((a, b) => b.t - a.t || b.at - a.at);
+  const ul = $("#dmgList"); ul.innerHTML = "";
+  if (!list.length) { const li = document.createElement("li"); li.className = "hint"; li.textContent = "No damage yet. When anyone loses life, it's logged here with the game clock time."; ul.appendChild(li); }
+  list.slice(0, 300).forEach(e => {
+    const li = document.createElement("li"); if (e.undone) li.classList.add("undone");
+    const t = document.createElement("span"); t.className = "t"; t.textContent = fmt(e.t); li.appendChild(t);
+    const txt = document.createElement("span"); txt.className = "txt";
+    const src = e.source === e.target ? "themselves" : e.sourceName;
+    txt.textContent = `${e.targetName} took ${e.amount} from ${src}${e.cmd ? " (commander)" : ""}`;
+    li.appendChild(txt);
+    if (e.target === mySeat && !e.undone) {
+      const b = document.createElement("button"); b.className = "linkbtn small"; b.style.marginLeft = "8px"; b.textContent = "Undo";
+      b.onclick = () => undoDamage(e.id); li.appendChild(b);
+    }
+    ul.appendChild(li);
+  });
+  const dealt = new Map();
+  damageLog.forEach(e => { if (!e.undone && e.source > 0 && e.source !== e.target) dealt.set(e.sourceName, (dealt.get(e.sourceName) || 0) + e.amount); });
+  $("#dmgTotals").textContent = dealt.size ? "Total dealt: " + [...dealt].sort((a, b) => b[1] - a[1]).map(([n, v]) => `${n} ${v}`).join(", ") : "";
+}
+$("#dmgFilter").onchange = renderDmg;
+$("#csvBtn").onclick = () => {
+  const safe = v => { v = String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return `"${v.replace(/"/g, '""')}"`; };
+  const rows = [["Game time", "Player", "Damage", "From", "Commander damage", "Undone", "Clock time"]];
+  [...damageLog].sort((a, b) => a.t - b.t || a.at - b.at).forEach(e => rows.push([fmt(e.t), e.targetName, e.amount, e.source === e.target ? "Self" : e.sourceName, e.cmd ? "Yes" : "No", e.undone ? "Yes" : "No", new Date(e.at).toLocaleTimeString()]));
+  const csv = rows.map(r => r.map(safe).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv" }));
+  a.download = `damage-history-${roomCode}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
+/* ---------- Table panel: monarch, initiative, day/night, turn clock ---------- */
+function fillSeatSelect(sel, val, seats){
+  const sig = seats.map(s => s + ":" + nm(s)).join("|");
+  if (sel.dataset.sig !== sig) {
+    sel.dataset.sig = sig; sel.innerHTML = "";
+    const o = document.createElement("option"); o.value = "0"; o.textContent = "No one"; sel.appendChild(o);
+    seats.forEach(s => { const x = document.createElement("option"); x.value = s; x.textContent = nm(s); sel.appendChild(x); });
+  }
+  sel.value = String(val);
+}
+function renderTablePanel(){
+  const seats = presentSeats();
+  fillSeatSelect($("#monSel"), table.monarch, seats);
+  fillSeatSelect($("#iniSel"), table.initiative, seats);
+  $("#dnSel").value = table.dayNight; $("#clockSel").value = table.clockMode;
+}
+$("#monSel").onchange = e => changeTable({ monarch:+e.target.value });
+$("#iniSel").onchange = e => changeTable({ initiative:+e.target.value });
+$("#dnSel").onchange = e => changeTable({ dayNight:e.target.value });
+$("#clockSel").onchange = e => { if (!turnStartAt && table.turnSeat) turnStartAt = Date.now(); changeTable({ clockMode:e.target.value }); };
+
+/* ---------- Phone camera setup from the table ---------- */
+$("#phoneBtn").onclick = () => {
+  const card = document.createElement("div"); card.className = "modal-card";
+  const h = document.createElement("h2"); h.textContent = "Use your phone as your camera"; card.appendChild(h);
+  const p = document.createElement("p");
+  if (LOCAL) {
+    p.textContent = "Phone camera needs the hosted version of this page (for example on GitHub Pages), because your phone can't open a file stored on your computer. Everything else works from the file.";
+    card.appendChild(p);
+  } else {
+    p.textContent = "Scan this code with your phone's camera app, then tap Start camera on your phone. Its video replaces your webcam on your seat. Your computer keeps handling your mic and controls.";
+    card.appendChild(p);
+    const url = `${location.origin}${location.pathname}?cam=${roomCode}.${mySeat}.${me.camKey}`;
+    const qr = document.createElement("div"); qr.id = "qr"; card.appendChild(qr);
+    if (window.QRCode) new QRCode(qr, { text:url, width:220, height:220, colorDark:"#000000", colorLight:"#ffffff", correctLevel:QRCode.CorrectLevel.M });
+    else qr.classList.add("hidden");
+    const u = document.createElement("p"); u.className = "camurl"; u.textContent = url; card.appendChild(u);
+    const st = document.createElement("p"); st.id = "phoneStat"; card.appendChild(st);
+    const stop = document.createElement("button"); stop.className = "btn"; stop.id = "phoneStop"; stop.textContent = "Stop using phone camera";
+    stop.onclick = () => {
+      me.camKey = uid(); pushState();  // new key: the old phone link stops working for everyone
+      try { camCalls[mySeat]?.close(); } catch {}
+      closeModal(); log("Phone camera disconnected. The old QR code no longer works.");
+    };
+    card.appendChild(stop);
+  }
+  const close = document.createElement("button"); close.className = "btn primary"; close.style.marginLeft = "8px"; close.textContent = "Close"; close.onclick = closeModal;
+  card.appendChild(close);
+  openModal(card); updatePhoneUi();
+};
+function updatePhoneUi(){
+  const on = !!me.camStream;
+  $("#phoneBtn").textContent = on ? "Phone camera on" : "Phone camera";
+  const st = $("#phoneStat"); if (st) st.textContent = on ? "Your phone is connected." : "Waiting for your phone...";
+  const stop = $("#phoneStop"); if (stop) stop.classList.toggle("hidden", !on);
+}
+
+/* =====================================================================
+   Commanders: asked on join and at each new game, shown under names
+   ===================================================================== */
+const cardImg = c => c?.image_uris?.normal || c?.card_faces?.[0]?.image_uris?.normal || "";
+function cleanCmdrs(list){
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 2).map(c => ({
+    name:String(c?.name || "").slice(0, 141),
+    id:/^[0-9a-f-]{36}$/.test(c?.id || "") ? c.id : "",
+    img:/^https:\/\/cards\.scryfall\.io\//.test(c?.img || "") ? String(c.img).slice(0, 300) : ""
+  })).filter(c => c.name);
+}
+function renderCmdrs(el, s){
+  const box = el.querySelector(".cmdrs"), p = players[s], mine = s === mySeat;
+  const sig = JSON.stringify([p.cmdrs, mine]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig; box.innerHTML = "";
+  (p.cmdrs || []).forEach(c => {
+    const b = document.createElement("button"); b.className = "cmdr"; b.textContent = c.name;
+    b.setAttribute("aria-label", `Commander: ${c.name}. Click to open the card.`);
+    const show = () => showCmdrPop(b, c), hide = () => $("#cmdrPop").classList.add("hidden");
+    b.addEventListener("mouseenter", show); b.addEventListener("focus", show);
+    b.addEventListener("mouseleave", hide); b.addEventListener("blur", hide);
+    b.addEventListener("pointerdown", e => e.stopPropagation());
+    b.onclick = async e => {
+      e.stopPropagation(); hide();
+      setStatus("Looking it up...");
+      const card = (c.id && await scry(`/cards/${c.id}`)) || await scry("/cards/named?exact=" + encodeURIComponent(c.name));
+      if (card) showCard(card); else setStatus(`Couldn't load ${c.name}.`);
+    };
+    box.appendChild(b);
+  });
+  if (mine) {
+    const b = document.createElement("button"); b.className = "cmdr ask";
+    b.textContent = p.cmdrs?.length ? "Change" : "Set commander";
+    b.addEventListener("pointerdown", e => e.stopPropagation());
+    b.onclick = e => { e.stopPropagation(); askCommander(); };
+    box.appendChild(b);
+  }
+}
+function showCmdrPop(anchor, c){
+  const pop = $("#cmdrPop");
+  if (!c.img) return;
+  pop.src = c.img; pop.alt = c.name;
+  const r = anchor.getBoundingClientRect(), w = 240, h = 335, gap = 8;
+  let top = r.bottom + gap;
+  if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - gap);
+  const left = Math.min(Math.max(8, r.left), innerWidth - w - 8);
+  pop.style.top = top + "px"; pop.style.left = left + "px";
+  pop.classList.remove("hidden");
+}
+
+// A text box with card suggestions (commander-legal first) and card art thumbnails
+function suggestInput(input, { commandersOnly }){
+  const wrap = input.parentNode, box = document.createElement("div"); box.className = "sugbox hidden"; wrap.appendChild(box);
+  let items = [], on = -1, seq = 0, timer = null;
+  input.picked = null;
+  const hide = () => { box.classList.add("hidden"); items = []; on = -1; };
+  const draw = () => {
+    box.innerHTML = "";
+    if (!items.length) { hide(); return; }
+    items.forEach((c, i) => {
+      const b = document.createElement("button"); b.type = "button"; if (i === on) b.classList.add("on");
+      const img = cardImg(c); if (img) { const im = document.createElement("img"); im.src = img.replace("/normal/", "/small/"); im.alt = ""; b.appendChild(im); }
+      const t = document.createElement("span"); t.textContent = c.name; b.appendChild(t);
+      b.addEventListener("pointerdown", e => e.preventDefault());
+      b.onclick = () => pick(c);
+      box.appendChild(b);
+    });
+    box.classList.remove("hidden");
+  };
+  const pick = c => { input.value = c.name; input.picked = c; hide(); input.dispatchEvent(new CustomEvent("picked")); };
+  input.addEventListener("input", () => {
+    input.picked = null; clearTimeout(timer);
+    const q = input.value.trim(); if (q.length < 2) { hide(); return; }
+    const my = ++seq;
+    timer = setTimeout(async () => {
+      const esc = q.replace(/"/g, "");
+      let r = await scry(`/cards/search?unique=cards&order=edhrec&q=${encodeURIComponent((commandersOnly ? "is:commander " : "") + esc)}`);
+      if (commandersOnly && !r?.data?.length) r = await scry(`/cards/search?unique=cards&order=edhrec&q=${encodeURIComponent(esc)}`);
+      if (my !== seq) return;
+      items = (r?.data || []).slice(0, 10); on = -1; draw();
+    }, 220);
+  });
+  input.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown" && items.length) { e.preventDefault(); on = (on + 1) % items.length; draw(); }
+    else if (e.key === "ArrowUp" && items.length) { e.preventDefault(); on = (on - 1 + items.length) % items.length; draw(); }
+    else if (e.key === "Enter" && on >= 0 && items[on]) { e.preventDefault(); e.stopPropagation(); pick(items[on]); }
+    else if (e.key === "Escape" && items.length) { e.stopPropagation(); hide(); }
+  });
+  input.addEventListener("blur", () => setTimeout(hide, 150));
+}
+
+function askCommander(opts = {}){
+  if (!me) return;
+  if (modalKind && modalKind !== "cmdr") { cmdrAsking = true; return; }  // wait until the dice roll closes
+  cmdrAsking = true;
+  const last = me.cmdrs.length ? me.cmdrs.map(c => c.name)
+    : me.deckCmdrs?.length ? me.deckCmdrs
+    : cleanCmdrs(JSON.parse(store.get("kt-cmdrs", "[]") || "[]")).map(c => c.name);
+  const card = document.createElement("div"); card.className = "modal-card";
+  const h = document.createElement("h2"); h.textContent = opts.again ? "New game. What's your commander?" : "What's your commander?"; card.appendChild(h);
+  const sub = document.createElement("p"); sub.className = "hint";
+  sub.textContent = "It shows under your name so the table can hover to see the card. Playing a 60-card format? Click Skip.";
+  card.appendChild(sub);
+  const form = document.createElement("div"); form.className = "cmdrform"; card.appendChild(form);
+  const field = (label, value, commandersOnly) => {
+    const l = document.createElement("label"); l.className = "field";
+    const sp = document.createElement("span"); sp.textContent = label; l.appendChild(sp);
+    const wrap = document.createElement("div"); wrap.className = "searchwrap";
+    const inp = document.createElement("input"); inp.autocomplete = "off"; inp.value = value || ""; inp.placeholder = "Start typing a card name";
+    wrap.appendChild(inp); l.appendChild(wrap); form.appendChild(l);
+    suggestInput(inp, { commandersOnly });
+    inp.addEventListener("picked", preview); inp.addEventListener("change", preview);
+    return inp;
+  };
+  const a = field("Commander", last[0], true);
+  const b = field("Partner or Background (optional)", last[1], false);
+  const prev = document.createElement("div"); prev.className = "cmdrpreview"; card.appendChild(prev);
+  const err = document.createElement("div"); err.id = "cmdrErr"; card.appendChild(err);
+  const row = document.createElement("div"); row.className = "row"; row.style.justifyContent = "center"; card.appendChild(row);
+  const save = document.createElement("button"); save.className = "btn primary"; save.textContent = last.length ? "Play this commander" : "Save commander";
+  const skip = document.createElement("button"); skip.className = "btn"; skip.textContent = "Skip";
+  row.append(save, skip);
+
+  async function resolve(inp){
+    const v = inp.value.trim(); if (!v) return null;
+    if (inp.picked && inp.picked.name === v) return inp.picked;
+    return await scry("/cards/named?exact=" + encodeURIComponent(v)) || await scry("/cards/named?fuzzy=" + encodeURIComponent(v));
+  }
+  let pv = 0;
+  async function preview(){
+    const my = ++pv;
+    const cards = (await Promise.all([resolve(a), resolve(b)])).filter(Boolean);
+    if (my !== pv) return;
+    prev.innerHTML = "";
+    cards.forEach(c => { const img = cardImg(c); if (img) { const im = document.createElement("img"); im.src = img; im.alt = c.name; prev.appendChild(im); } });
+  }
+  if (last.length) preview();
+
+  save.onclick = async () => {
+    if (!a.value.trim()) { err.textContent = "Type your commander's name, or click Skip."; return; }
+    save.disabled = true; err.textContent = "Looking it up...";
+    const [ca, cb] = await Promise.all([resolve(a), resolve(b)]);
+    save.disabled = false;
+    if (!ca) { err.textContent = `No card matched "${a.value.trim()}". Pick one from the suggestions.`; return; }
+    if (b.value.trim() && !cb) { err.textContent = `No card matched "${b.value.trim()}".`; return; }
+    me.cmdrs = cleanCmdrs([ca, cb].filter(Boolean).map(c => ({ name:c.name, id:c.id, img:cardImg(c) })));
+    store.set("kt-cmdrs", JSON.stringify(me.cmdrs)); setTimeout(artSync, 300);
+    pushState(); render();
+    if (me.cmdrs.length === 1) log("You are playing ", me.cmdrs[0].name); else log(`You are playing ${me.cmdrs.map(c => c.name).join(" and ")}.`);
+    cmdrAsking = false; closeModal();
+  };
+  skip.onclick = () => { cmdrAsking = false; closeModal(); };
+  card.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); save.click(); } });
+  openModal(card, "cmdr");
+  setTimeout(() => (a.value ? save : a).focus(), 50);
+}
+
+/* =====================================================================
+   Dice, coin flips, and the roll for first player
+   ===================================================================== */
+let modalKind = null, cmdrAsking = false;
+function openModal(node, kind = "other"){ const m = $("#modal"); m.innerHTML = ""; m.appendChild(node); m.classList.remove("hidden"); modalKind = kind; }
+function closeModal(){
+  const kind = modalKind; modalKind = null;
+  $("#modal").classList.add("hidden"); $("#modal").innerHTML = ""; rollActive = null;
+  if (kind === "cmdr") cmdrAsking = false;
+  else if (cmdrAsking) setTimeout(() => { if (!modalKind) askCommander({ resume:true }); }, 150);  // bring the question back after a dice roll
+}
+$("#modal").addEventListener("pointerdown", e => { if (e.target.id === "modal") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modal").classList.contains("hidden")) closeModal(); });
+
+function dieSvg(kind, fill, ink){
+  const shapes = {
+    coin:'<circle class="face" cx="50" cy="50" r="44"/>',
+    d4:'<polygon class="face" points="50,6 95,90 5,90"/>',
+    d6:'<rect class="face" x="8" y="8" width="84" height="84" rx="14"/>'
+  };
+  const shape = shapes[kind] || '<polygon class="face" points="50,4 92,28 92,72 50,96 8,72 8,28"/><polygon points="50,20 80,70 20,70" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="2"/>';
+  const y = kind === "d4" ? 72 : 60, size = kind === "coin" ? 22 : 30;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="${fill}" stroke="rgba(0,0,0,.45)" stroke-width="2">${shape}</g><text x="50" y="${y}" text-anchor="middle" font-family="Spectral, Georgia, serif" font-weight="700" font-size="${size}" fill="${ink}"></text></svg>`;
+}
+function makeDie(kind, seat, label){
+  const d = document.createElement("div"); d.className = "die";
+  d.innerHTML = dieSvg(kind, SEAT_HEX[seat - 1] || "#efe6cf", SEAT_INK[seat - 1] || "#1b1608");
+  const who = document.createElement("div"); who.className = "who";
+  const sw = document.createElement("span"); sw.className = "pip"; sw.style.background = SEAT_HEX[seat - 1] || "#efe6cf";
+  const n = document.createElement("span"); n.textContent = label;
+  who.append(sw, n); d.appendChild(who);
+  d.setVal = v => { d.querySelector("text").textContent = v; };
+  return d;
+}
+async function flicker(dies, kind, ms){
+  const sides = kind === "coin" ? 0 : +String(kind).replace("d", "");
+  dies.forEach(d => d.classList.add("rolling"));
+  const iv = setInterval(() => dies.forEach(d => d.setVal(sides ? rnd(sides) : (rnd(2) === 1 ? "H" : "T"))), 70);
+  await sleep(ms);
+  clearInterval(iv);
+  dies.forEach(d => d.classList.remove("rolling"));
+}
+
+let rollActive = null;
+$("#rollBtn").onclick = () => startRollOff();
+function startRollOff(){
+  const seats = presentSeats().filter(s => s === mySeat || players[s].name);
+  const names = {}; seats.forEach(s => { names[s] = nm(s); });
+  const rounds = []; let contenders = seats, winner = seats[0];
+  for (let i = 0; i < 12; i++) {
+    const r = contenders.map(s => ({ s, v:rnd(20) }));
+    rounds.push(r);
+    const top = Math.max(...r.map(x => x.v));
+    const tied = r.filter(x => x.v === top).map(x => x.s);
+    winner = tied[0];
+    if (tied.length === 1) break;
+    contenders = tied;
+  }
+  const msg = { type:"rolloff", id:uid(), by:mySeat, rounds, winner, names };
+  broadcast(msg); playRollOff(msg);
+}
+async function playRollOff(msg){
+  // validate data from other players
+  if (!Array.isArray(msg.rounds) || !msg.rounds.length || msg.rounds.length > 12) return;
+  const rounds = msg.rounds.map(r => (Array.isArray(r) ? r : []).slice(0, MAX).map(x => ({ s:int(x?.s, 1, MAX), v:int(x?.v, 1, 20) })).filter(x => x.s));
+  const winner = int(msg.winner, 1, MAX);
+  const names = {}; rounds[0].forEach(x => { names[x.s] = String(msg.names?.[x.s] || `Seat ${x.s}`).slice(0, 24); });
+  if (!rounds[0].length || !names[winner]) return;
+  const by = int(msg.by, 1, MAX);
+  if (rollActive && Date.now() - rollActive.at < 10000 && by > rollActive.by) return;  // two people clicked at once: lowest seat wins
+  const token = { at:Date.now(), by }; rollActive = token;
+
+  const card = document.createElement("div"); card.className = "modal-card";
+  const h = document.createElement("h2"); h.textContent = "Rolling for first player"; card.appendChild(h);
+  const row = document.createElement("div"); row.className = "dice-row"; card.appendChild(row);
+  const status = document.createElement("p"); status.className = "rollstatus"; card.appendChild(status);
+  const close = document.createElement("button"); close.className = "btn primary"; close.textContent = "Close"; close.onclick = closeModal; card.appendChild(close);
+  const dies = {};
+  rounds[0].forEach(({ s }) => { dies[s] = makeDie("d20", s, names[s]); row.appendChild(dies[s]); });
+  openModal(card, "roll");
+
+  status.textContent = "Rolling a d20 for each player...";
+  for (let i = 0; i < rounds.length; i++) {
+    const r = rounds[i];
+    Object.entries(dies).forEach(([s, d]) => d.classList.toggle("out", !r.some(x => x.s === +s)));
+    await flicker(r.map(x => dies[x.s]).filter(Boolean), "d20", 1400);
+    if (rollActive !== token) return;
+    r.forEach(x => dies[x.s]?.setVal(x.v));
+    if (i < rounds.length - 1) {
+      const top = Math.max(...r.map(x => x.v));
+      status.textContent = `Tie at ${top} between ${r.filter(x => x.v === top).map(x => names[x.s]).join(" and ")}. Rolling again.`;
+      await sleep(1800);
+      if (rollActive !== token) return;
+    }
+  }
+  Object.values(dies).forEach(d => d.classList.remove("out"));
+  dies[winner]?.classList.add("win");
+  status.textContent = `${names[winner]} goes first.`;
+  log(`Roll for first: ${rounds.map(r => r.map(x => `${names[x.s]} ${x.v}`).join(", ")).join("; reroll: ")}. ${names[winner]} goes first.`);
+  turnStartAt = Date.now(); if (!gameStartAt) gameStartAt = Date.now();
+  setTable({ turnSeat:winner }); tableKnown = true; render();
+  setTimeout(() => { if (rollActive === token) closeModal(); }, 6000);
+}
+
+document.querySelectorAll("#diceDd .menu button").forEach(b => b.onclick = () => { $("#diceDd").open = false; rollDice(b.dataset.kind); });
+const KINDS = ["coin", "d4", "d6", "d8", "d10", "d12", "d20"];
+function rollDice(kind){
+  if (!KINDS.includes(kind)) return;
+  const value = kind === "coin" ? (rnd(2) === 1 ? "Heads" : "Tails") : rnd(+kind.slice(1));
+  const msg = { type:"dice", id:uid(), by:mySeat, kind, value };
+  broadcast(msg); playDice(msg, mySeat);
+}
+async function playDice(msg, s){
+  if (!KINDS.includes(msg.kind)) return;
+  const value = msg.kind === "coin" ? (msg.value === "Heads" ? "Heads" : "Tails") : int(msg.value, 1, +msg.kind.slice(1));
+  const who = nm(s);
+  const what = msg.kind === "coin" ? `${who} flipped a coin: ${value}.` : `${who} rolled a ${msg.kind}: ${value}.`;
+  log(what);
+  if (rollActive || modalKind === "cmdr") return;  // don't interrupt a roll for first player or the commander question
+  const card = document.createElement("div"); card.className = "modal-card";
+  const h = document.createElement("h2"); h.textContent = msg.kind === "coin" ? `${who} is flipping a coin` : `${who} is rolling a ${msg.kind}`; card.appendChild(h);
+  const row = document.createElement("div"); row.className = "dice-row"; card.appendChild(row);
+  const die = makeDie(msg.kind, s, who); row.appendChild(die);
+  const status = document.createElement("p"); status.className = "rollstatus"; card.appendChild(status);
+  openModal(card);
+  const mark = card;
+  await flicker([die], msg.kind, 900);
+  die.setVal(value); status.textContent = what;
+  setTimeout(() => { if ($("#modal").contains(mark)) closeModal(); }, 3500);
+}
+
+/* =====================================================================
+   Card recognition by picture: matches the art around your click against
+   every card in the table's decklists (several printings each)
+   ===================================================================== */
+/* ART MATCH CORE (pure functions, no DOM) */
+const GW = 12, GH = 9, ART_ASPECT = 1.36;
+function artNorm(raw){
+  const n = raw.length / 3, out = new Float32Array(raw.length);
+  for (let c = 0; c < 3; c++) {
+    let m = 0; for (let i = c; i < raw.length; i += 3) m += raw[i]; m /= n;
+    let ss = 0; for (let i = c; i < raw.length; i += 3) { const v = raw[i] - m; out[i] = v; ss += v * v; }
+    const k = ss > 1e-6 ? 1 / Math.sqrt(ss * 3) : 0;
+    for (let i = c; i < raw.length; i += 3) out[i] *= k;
+  }
+  return out;
+}
+function artCoarse(raw){
+  const r = new Float32Array(36);
+  for (let cy = 0; cy < 3; cy++) for (let cx = 0; cx < 4; cx++) for (let c = 0; c < 3; c++) {
+    let s = 0; for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) s += raw[((cy * 3 + y) * GW + (cx * 3 + x)) * 3 + c];
+    r[(cy * 4 + cx) * 3 + c] = s / 9;
+  }
+  return r;
+}
+function artEntry(raw, meta){ return { ...meta, fine:artNorm(raw), coarse:artNorm(artCoarse(raw)) }; }
+function dotv(a, b){ let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+// Average an RGBA pixel buffer into the 12x9 art grid
+function rawFromPixels(d, w, h){
+  const raw = new Float32Array(GW * GH * 3), cnt = new Float32Array(GW * GH);
+  for (let y = 0; y < h; y++) { const gy = Math.min(GH - 1, Math.floor(y * GH / h));
+    for (let x = 0; x < w; x++) { const gx = Math.min(GW - 1, Math.floor(x * GW / w)), cell = gy * GW + gx, i = (y * w + x) * 4;
+      raw[cell * 3] += d[i]; raw[cell * 3 + 1] += d[i + 1]; raw[cell * 3 + 2] += d[i + 2]; cnt[cell]++; } }
+  for (let c = 0; c < GW * GH; c++) { const k = cnt[c] || 1; raw[c * 3] /= k; raw[c * 3 + 1] /= k; raw[c * 3 + 2] /= k; }
+  return raw;
+}
+function integral(d, w, h){
+  const W = w + 1, I = [new Float64Array(W * (h + 1)), new Float64Array(W * (h + 1)), new Float64Array(W * (h + 1))];
+  for (let c = 0; c < 3; c++) { const T = I[c];
+    for (let y = 0; y < h; y++) { let row = 0;
+      for (let x = 0; x < w; x++) { row += d[(y * w + x) * 4 + c]; T[(y + 1) * W + x + 1] = T[y * W + x + 1] + row; } } }
+  return { I, W, w, h };
+}
+function boxMean(G, c, x0, y0, x1, y1){
+  const T = G.I[c], W = G.W;
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.max(x0 + 1, Math.round(x1)); y1 = Math.max(y0 + 1, Math.round(y1));
+  return (T[y1 * W + x1] - T[y0 * W + x1] - T[y1 * W + x0] + T[y0 * W + x0]) / ((x1 - x0) * (y1 - y0));
+}
+// Sample the art grid from a camera box, in the card's own orientation (rot = quarter turns clockwise)
+function patchRaw(G, bx, by, bw, bh, rot){
+  const cols = rot % 2 ? GH : GW, rows = rot % 2 ? GW : GH, cw = bw / cols, chh = bh / rows;
+  const raw = new Float32Array(GW * GH * 3);
+  for (let v = 0; v < GH; v++) for (let u = 0; u < GW; u++) {
+    let col, row;
+    if (rot === 0) { col = u; row = v; }
+    else if (rot === 1) { col = GH - 1 - v; row = u; }
+    else if (rot === 2) { col = GW - 1 - u; row = GH - 1 - v; }
+    else { col = v; row = GW - 1 - u; }
+    const x0 = bx + col * cw, y0 = by + row * chh, k = (v * GW + u) * 3;
+    for (let c = 0; c < 3; c++) raw[k + c] = boxMean(G, c, x0, y0, x0 + cw, y0 + chh);
+  }
+  return raw;
+}
+// Search sizes, positions around the click, and 4 rotations. Two stages: cheap 4x3 grid, then full 12x9 on the best spots.
+function artSearch(G, cx, cy, cards, seatBias){
+  const minW = 22, maxW = Math.min(G.w, G.h * ART_ASPECT) * 0.95, patches = [];
+  const offs = [-0.3, -0.15, 0, 0.15, 0.3];
+  for (let aw = minW; aw <= maxW; aw *= 1.18) {
+    const ah = aw / ART_ASPECT;
+    for (let rot = 0; rot < 4; rot++) {
+      const bw = rot % 2 ? ah : aw, bh = rot % 2 ? aw : ah;
+      for (const oy of offs) for (const ox of offs) {
+        const bx = cx + ox * bw - bw / 2, by = cy + oy * bh - bh / 2;
+        if (bx < 0 || by < 0 || bx + bw > G.w || by + bh > G.h) continue;
+        const raw = patchRaw(G, bx, by, bw, bh, rot);
+        const co = artNorm(artCoarse(raw));
+        let best = -2;
+        for (const e of cards) { const sc = dotv(co, e.coarse) + (seatBias(e) || 0); if (sc > best) best = sc; }
+        patches.push({ raw, best, bx, by, bw, bh });
+      }
+    }
+  }
+  patches.sort((a, b) => b.best - a.best);
+  const top = patches.slice(0, 40);
+  const byName = new Map();
+  for (const p of top) {
+    const fine = artNorm(p.raw);
+    for (const e of cards) {
+      const sc = dotv(fine, e.fine) + (seatBias(e) || 0);
+      const cur = byName.get(e.name);
+      if (!cur || sc > cur.score) byName.set(e.name, { name:e.name, id:e.id, score:sc, box:p });
+    }
+  }
+  const ranked = [...byName.values()].sort((a, b) => b.score - a.score);
+  return { best:ranked[0] || null, second:ranked[1] || null, patches:patches.length };
+}
+
+const BASICS = new Set(["plains", "island", "swamp", "mountain", "forest", "wastes", "snow covered plains", "snow covered island", "snow covered swamp", "snow covered mountain", "snow covered forest"]);
+const ART = { entries:[], names:new Map(), running:false, rerun:false, blocked:false };
+function artStat(){
+  const el = $("#artStat"); if (!el) return;
+  const all = [...ART.names.values()], done = all.filter(x => x.state === "done" || x.state === "none").length;
+  if (ART.blocked) el.textContent = "Picture matching isn't available in this browser (card images couldn't be read). Name reading still works.";
+  else if (!all.length) el.textContent = "Tip: paste decklists in the lobby to turn on picture matching.";
+  else if (done < all.length) el.textContent = `Learning card art: ${done} of ${all.length} cards...`;
+  else el.textContent = `Picture matching ready for ${all.length} cards.`;
+}
+function artSync(){
+  if (ART.running) { ART.rerun = true; return; }
+  ART.running = true;
+  (async () => {
+    try {
+      do {
+        ART.rerun = false;
+        for (const [k, v] of deckPool()) { if (!BASICS.has(k) && !ART.names.has(v.name)) ART.names.set(v.name, { state:"todo", count:0 }); }
+        artStat();
+        for (const [name, info] of ART.names) {
+          if (ART.blocked) break;
+          if (info.state !== "todo") continue;
+          info.state = "loading";
+          try { await learnCard(name, info); } catch {}
+          info.state = info.count ? "done" : "none";
+          artStat();
+        }
+      } while (ART.rerun && !ART.blocked);
+    } finally { ART.running = false; artStat(); }
+  })();
+}
+async function artPrintings(name){
+  const key = "kt-pr:" + name;
+  try { const c = JSON.parse(store.get(key, "null")); if (c && Date.now() - c.t < 14 * 864e5) return c.l; } catch {}
+  await sleep(110);  // stay well under Scryfall's rate limit
+  const r = await scry(`/cards/search?unique=art&order=released&dir=desc&q=${encodeURIComponent('!"' + name.replace(/"/g, "") + '"')}`);
+  let list = r?.data || [];
+  if (!list.length) { await sleep(110); const one = await scry("/cards/named?fuzzy=" + encodeURIComponent(name)); if (one) list = [one]; }
+  const l = list.slice(0, 5)
+    .map(c => ({ id:c.id, url:(c.image_uris || c.card_faces?.[0]?.image_uris)?.small }))
+    .filter(x => x.url && /^https:\/\/cards\.scryfall\.io\//.test(x.url));
+  if (l.length) store.set(key, JSON.stringify({ t:Date.now(), l }));
+  return l;
+}
+function loadImg(url){ return new Promise(res => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => res(null); im.src = url; }); }
+async function artDescriptor(p){
+  const key = "kt-art:" + p.id, cached = store.get(key, "");
+  if (cached) { try { const b = atob(cached); if (b.length === GW * GH * 3) return Float32Array.from(b, ch => ch.charCodeAt(0)); } catch {} }
+  const im = await loadImg(p.url); if (!im) return null;
+  const W = im.naturalWidth, H = im.naturalHeight;
+  const cv = document.createElement("canvas"); cv.width = GW * 4; cv.height = GH * 4;
+  const ctx = cv.getContext("2d", { willReadFrequently:true }); if (!ctx) return null;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(im, W * 0.085, H * 0.113, W * 0.83, H * 0.442, 0, 0, cv.width, cv.height);  // the art box of a standard card frame
+  let d; try { d = ctx.getImageData(0, 0, cv.width, cv.height).data; } catch { ART.blocked = true; return null; }
+  const raw = rawFromPixels(d, cv.width, cv.height);
+  store.set(key, btoa(String.fromCharCode(...Array.from(raw, v => Math.max(0, Math.min(255, Math.round(v)))))));
+  return raw;
+}
+async function learnCard(name, info){
+  const prints = await artPrintings(name);
+  await Promise.all(prints.map(async p => {
+    const raw = await artDescriptor(p);
+    if (raw) { ART.entries.push(artEntry(raw, { id:p.id, name })); info.count++; }
+  }));
+}
+function artMatch(video, pt, rot, seat){
+  if (!ART.entries.length) return null;
+  const vw = video.videoWidth, vh = video.videoHeight, c = toVideo(video, pt.x, pt.y, rot);
+  if (c.x < 0 || c.y < 0 || c.x > vw || c.y > vh) return null;
+  const Rr = Math.round(Math.min(vw, vh) * 0.45);
+  const rx0 = Math.max(0, Math.round(c.x - Rr)), ry0 = Math.max(0, Math.round(c.y - Rr));
+  const rx1 = Math.min(vw, Math.round(c.x + Rr)), ry1 = Math.min(vh, Math.round(c.y + Rr));
+  const w0 = rx1 - rx0, h0 = ry1 - ry0; if (w0 < 20 || h0 < 20) return null;
+  const ds = Math.min(1, 400 / Math.max(w0, h0)), cw = Math.max(1, Math.round(w0 * ds)), ch = Math.max(1, Math.round(h0 * ds));
+  const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
+  const ctx = cv.getContext("2d", { willReadFrequently:true }); if (!ctx) return null;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(video, rx0, ry0, w0, h0, 0, 0, cw, ch);
+  const G = integral(ctx.getImageData(0, 0, cw, ch).data, cw, ch);
+  const seatsOf = new Map(); for (const v of deckPool().values()) seatsOf.set(v.name, v.seats);
+  const res = artSearch(G, (c.x - rx0) * ds, (c.y - ry0) * ds, ART.entries, e => seatsOf.get(e.name)?.has(seat) ? 0.02 : 0);
+  if (!res.best) return null;
+  const margin = res.best.score - (res.second ? res.second.score : -1), b = res.best.box;
+  return { ok:res.best.score >= 0.75 && margin >= 0.05, name:res.best.name, id:res.best.id, score:res.best.score,
+           vbox:{ x:rx0 + b.bx / ds, y:ry0 + b.by / ds, w:b.bw / ds, h:b.bh / ds } };
+}
+function fromVideo(video, x, y, rot){
+  const r = video.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
+  const scale = Math.min(r.width / vw, r.height / vh);
+  const ox = r.left + (r.width - vw * scale) / 2, oy = r.top + (r.height - vh * scale) / 2;
+  if (rot) { x = vw - x; y = vh - y; }
+  return { x:ox + x * scale, y:oy + y * scale };
+}
+
+/* =====================================================================
+   Card recognition (uses decklists when players provide them)
+   ===================================================================== */
+let ocrWorker = null, ocrBusy = false;
+async function getWorker(){
+  if (!ocrWorker) {
+    setStatus("Loading text reader (first time only)...");
+    ocrWorker = await Tesseract.createWorker("eng");
+    await ocrWorker.setParameters({ tessedit_pageseg_mode:"7", tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,'-" });
+  }
+  return ocrWorker;
+}
+function attachLookup(el, s){
+  const hit = el.querySelector(".hit"), video = el.querySelector("video");
+  let start = null, box = null;
+  hit.addEventListener("pointerdown", e => {
+    start = { x:e.clientX, y:e.clientY }; hit.setPointerCapture(e.pointerId);
+    box = document.createElement("div"); box.className = "sel"; el.appendChild(box); drawBox(e);
+  });
+  hit.addEventListener("pointermove", e => { if (start) drawBox(e); });
+  hit.addEventListener("pointerup", e => {
+    if (!start) return;
+    const dx = Math.abs(e.clientX - start.x), dy = Math.abs(e.clientY - start.y);
+    const r = (dx < 12 && dy < 12) ? null : { x1:start.x, y1:start.y, x2:e.clientX, y2:e.clientY };
+    const clickPt = { x:start.x, y:start.y };
+    start = null;
+    const b = box; setTimeout(() => b.remove(), 900);
+    identify(video, players[s]?.rot, clickPt, r, b, el, s);
+  });
+  function drawBox(e){
+    const er = el.getBoundingClientRect();
+    const x = Math.min(start.x, e.clientX) - er.left, y = Math.min(start.y, e.clientY) - er.top;
+    Object.assign(box.style, { left:x + "px", top:y + "px", width:Math.abs(e.clientX - start.x) + "px", height:Math.abs(e.clientY - start.y) + "px" });
+  }
+}
+function toVideo(video, cx, cy, rot){
+  const r = video.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
+  const scale = Math.min(r.width / vw, r.height / vh);
+  const ox = r.left + (r.width - vw * scale) / 2, oy = r.top + (r.height - vh * scale) / 2;
+  let x = (cx - ox) / scale, y = (cy - oy) / scale;
+  if (rot) { x = vw - x; y = vh - y; }
+  return { x, y, scale };
+}
+async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
+  if (!video.videoWidth) { setStatus("That camera has not started yet."); return; }
+  if (ocrBusy) return;
+  if (!rect && ART.entries.length) {
+    ocrBusy = true;
+    try {
+      setStatus("Matching card art...");
+      await sleep(16);  // let the status paint before the search runs
+      const m = artMatch(video, pt, rot, seat);
+      if (m?.ok) {
+        const a = fromVideo(video, m.vbox.x, m.vbox.y, rot), b = fromVideo(video, m.vbox.x + m.vbox.w, m.vbox.y + m.vbox.h, rot);
+        const er = tileEl.getBoundingClientRect();
+        Object.assign(boxEl.style, { left:(Math.min(a.x, b.x) - er.left) + "px", top:(Math.min(a.y, b.y) - er.top) + "px", width:Math.abs(b.x - a.x) + "px", height:Math.abs(b.y - a.y) + "px" });
+        const card = await scry(`/cards/${m.id}`) || await scry("/cards/named?exact=" + encodeURIComponent(m.name));
+        if (card) { showCard(card, { share:true }); setStatus(`Matched by picture (${Math.min(99, Math.round(m.score * 100))}% similar).`); return; }
+      }
+      setStatus("No confident picture match. Reading the name instead...");
+    } catch (e) {
+      if (e?.name === "SecurityError") { ART.blocked = true; artStat(); }
+    } finally { ocrBusy = false; }
+  }
+  const vw = video.videoWidth, vh = video.videoHeight;
+  let x1, y1, x2, y2;
+  if (rect) {
+    const a = toVideo(video, rect.x1, rect.y1, rot), b = toVideo(video, rect.x2, rect.y2, rot);
+    x1 = Math.min(a.x, b.x); y1 = Math.min(a.y, b.y); x2 = Math.max(a.x, b.x); y2 = Math.max(a.y, b.y);
+  } else {
+    const c = toVideo(video, pt.x, pt.y, rot);
+    const w = vw * 0.26, h = vh * 0.07;
+    x1 = c.x - w / 2; x2 = c.x + w / 2; y1 = c.y - h / 2; y2 = c.y + h / 2;
+    const er = tileEl.getBoundingClientRect(), s = c.scale;
+    Object.assign(boxEl.style, { left:(pt.x - er.left - w * s / 2) + "px", top:(pt.y - er.top - h * s / 2) + "px", width:(w * s) + "px", height:(h * s) + "px" });
+  }
+  x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(vw, x2); y2 = Math.min(vh, y2);
+  const w = x2 - x1, h = y2 - y1;
+  if (w < 8 || h < 6) { setStatus("That box is too small. Drag around the whole card name."); return; }
+
+  const scale = Math.min(4, Math.max(1, 110 / h));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+  const ctx = cv.getContext("2d", { willReadFrequently:true });
+  if (rot) { ctx.translate(cv.width, cv.height); ctx.rotate(Math.PI); }
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(video, x1, y1, w, h, 0, 0, cv.width, cv.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const img = ctx.getImageData(0, 0, cv.width, cv.height), d = img.data;
+  let lo = 255, hi = 0;
+  for (let i = 0; i < d.length; i += 4) { const g = d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114; d[i] = g; if (g < lo) lo = g; if (g > hi) hi = g; }
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4) { const g = (d[i] - lo) * 255 / span; d[i] = d[i + 1] = d[i + 2] = g; }
+  ctx.putImageData(img, 0, 0);
+
+  ocrBusy = true;
+  try {
+    const worker = await getWorker();
+    setStatus("Reading card...");
+    await worker.setParameters({ tessedit_pageseg_mode:rect && h > vh * 0.12 ? "6" : "7" });
+    const { data } = await worker.recognize(cv);
+    const guess = cleanName(data.text);
+    if (!guess) { setStatus("Could not read a name there. Try dragging a box around just the name."); return; }
+    const fromDeck = poolMatch(guess, seat);
+    setStatus(fromDeck ? `Read "${guess}". Matched ${fromDeck} from a decklist.` : `Read "${guess}". Looking it up...`);
+    const card = fromDeck ? (await scry("/cards/named?exact=" + encodeURIComponent(fromDeck)) || await findCard(fromDeck)) : await findCard(guess);
+    if (!card) { setStatus(`No card matched "${guess}". Drag a tighter box, or type the name above.`); return; }
+    showCard(card, { share:true });
+  } catch {
+    setStatus("The text reader failed to load. Check your connection and try again.");
+  } finally { ocrBusy = false; }
+}
+function cleanName(text){
+  const lines = text.split("\n")
+    .map(l => l.replace(/[^A-Za-z ,'\-]/g, " ").replace(/\s+/g, " ").trim())
+    .map(l => { const t = l.split(" "); while (t.length && t[t.length - 1].length < 3) t.pop(); while (t.length && t[0].length < 2) t.shift(); return t.join(" "); })
+    .filter(l => l.length >= 3);
+  lines.sort((a, b) => b.length - a.length);
+  return lines[0] || "";
+}
+
+/* Decklist pool: every card any player at the table pasted in */
+function deckPool(){
+  const m = new Map();
+  for (const [s, p] of Object.entries(players)) [...(p.deck || []), ...(p.cmdrs || []).map(c => c.name)].forEach(n => {
+    for (const face of n.split(" // ")) {
+      const k = norm(face); if (!k) continue;
+      if (!m.has(k)) m.set(k, { name:face, seats:new Set() });
+      m.get(k).seats.add(+s);
+    }
+  });
+  return m;
+}
+function bigrams(s){ s = " " + s + " "; const a = []; for (let i = 0; i < s.length - 1; i++) a.push(s.slice(i, i + 2)); return a; }
+function similarity(a, b){
+  const A = bigrams(a), B = bigrams(b), m = new Map();
+  B.forEach(x => m.set(x, (m.get(x) || 0) + 1));
+  let hit = 0; A.forEach(x => { const c = m.get(x); if (c) { hit++; m.set(x, c - 1); } });
+  return 2 * hit / (A.length + B.length);
+}
+// OCR text is often slightly wrong or cut off, so compare it to the decklists before searching all of Magic
+function poolMatch(guess, seat){
+  const g = norm(guess); if (g.length < 3) return null;
+  let best = null, bs = 0;
+  for (const [k, v] of deckPool()) {
+    let sc = similarity(g, k);
+    if (k.length > g.length + 2) sc = Math.max(sc, similarity(g, k.slice(0, g.length + 1)) * 0.95);
+    if (v.seats.has(seat)) sc += 0.05;
+    if (sc > bs) { bs = sc; best = v.name; }
+  }
+  return bs >= 0.55 ? best : null;
+}
+
+async function scry(path){
+  try { const r = await fetch("https://api.scryfall.com" + path, { headers:{ Accept:"application/json" } }); return r.ok ? r.json() : null; }
+  catch { return null; }
+}
+async function findCard(q){
+  const words = q.split(" ");
+  const tries = [q];
+  if (words.length > 2) { tries.push(words.slice(0, -1).join(" ")); tries.push(words.slice(1).join(" ")); }
+  for (const t of tries) { const c = await scry("/cards/named?fuzzy=" + encodeURIComponent(t)); if (c) return c; }
+  const long = words.filter(w => w.length > 3).slice(0, 3);
+  if (long.length) {
+    const res = await scry("/cards/search?unique=cards&q=" + encodeURIComponent(long.map(w => "name:" + w.replace(/[^A-Za-z]/g, "")).join(" ")));
+    if (res?.data?.length) return res.data[0];
+  }
+  return null;
+}
+function showCard(card, { share = false, from = null } = {}){
+  const view = $("#cardView"); view.innerHTML = "";
+  if (from) { const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
+  const faces = card.card_faces && !card.image_uris ? card.card_faces : [card];
+  faces.forEach(f => {
+    const src = (f.image_uris || card.image_uris)?.normal;
+    if (src && (f === card || f.image_uris)) { const im = document.createElement("img"); im.src = src; im.alt = f.name; view.appendChild(im); }
+  });
+  (card.card_faces || [card]).forEach(f => {
+    const h = document.createElement("h2"); h.textContent = f.name + (f.mana_cost ? "  " + f.mana_cost : ""); view.appendChild(h);
+    const t = document.createElement("p"); t.className = "type"; t.textContent = f.type_line || ""; view.appendChild(t);
+    const o = document.createElement("p"); o.className = "oracle"; o.textContent = f.oracle_text || ""; view.appendChild(o);
+    if (f.power) { const pt = document.createElement("p"); pt.className = "type"; pt.textContent = `${f.power}/${f.toughness}`; view.appendChild(pt); }
+    if (f.loyalty) { const lo = document.createElement("p"); lo.className = "type"; lo.textContent = `Loyalty ${f.loyalty}`; view.appendChild(lo); }
+  });
+  const row = document.createElement("div"); row.className = "row";
+  if (!from) {
+    const b = document.createElement("button"); b.className = "btn"; b.textContent = "Show everyone";
+    b.onclick = () => { broadcast({ type:"show", id:card.id, name:card.name }); log("You showed everyone ", card.name); b.textContent = "Shown to everyone"; b.disabled = true; };
+    row.appendChild(b);
+  }
+  const a = document.createElement("a"); a.href = card.scryfall_uri; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Rulings and printings on Scryfall";
+  row.appendChild(a); view.appendChild(row);
+  setStatus("");
+  if (share) { broadcast({ type:"card", name:card.name }); log("You looked at ", card.name); }
+}
+let acTimer = null, acItems = [], acOn = -1, acSeq = 0;
+function hideAc(){ $("#acBox").classList.add("hidden"); $("#searchIn").setAttribute("aria-expanded", "false"); acItems = []; acOn = -1; }
+function drawAc(){
+  const box = $("#acBox"); box.innerHTML = "";
+  if (!acItems.length) { hideAc(); return; }
+  acItems.forEach((n, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = n; b.setAttribute("role", "option");
+    if (i === acOn) b.classList.add("on");
+    b.addEventListener("pointerdown", e => e.preventDefault());  // keep focus so the click lands
+    b.onclick = () => pickCard(n);
+    box.appendChild(b);
+  });
+  box.classList.remove("hidden"); $("#searchIn").setAttribute("aria-expanded", "true");
+}
+async function pickCard(name){
+  $("#searchIn").value = name; hideAc();
+  setStatus("Looking it up...");
+  const c = await scry("/cards/named?exact=" + encodeURIComponent(name)) || await findCard(name);
+  if (c) showCard(c, { share:true }); else setStatus(`No card matched "${name}".`);
+}
+$("#searchIn").addEventListener("input", e => {
+  clearTimeout(acTimer);
+  const q = e.target.value.trim(); if (q.length < 2) { hideAc(); return; }
+  const seq = ++acSeq;
+  acTimer = setTimeout(async () => {
+    // cards from the table's decklists first, then everything else
+    const nq = norm(q), fromDecks = [];
+    for (const v of deckPool().values()) if (norm(v.name).includes(nq)) fromDecks.push(v.name);
+    const r = await scry("/cards/autocomplete?q=" + encodeURIComponent(q));
+    if (seq !== acSeq) return;
+    acItems = [...new Set([...fromDecks.slice(0, 5), ...(r?.data || [])])].slice(0, 12); acOn = -1; drawAc();
+  }, 180);
+});
+$("#searchIn").addEventListener("keydown", e => {
+  if (e.key === "ArrowDown" && acItems.length) { e.preventDefault(); acOn = (acOn + 1) % acItems.length; drawAc(); }
+  else if (e.key === "ArrowUp" && acItems.length) { e.preventDefault(); acOn = (acOn - 1 + acItems.length) % acItems.length; drawAc(); }
+  else if (e.key === "Escape") hideAc();
+  else if (e.key === "Enter") { e.preventDefault(); if (acOn >= 0 && acItems[acOn]) pickCard(acItems[acOn]); else manualSearch(); }
+});
+$("#searchIn").addEventListener("blur", () => setTimeout(hideAc, 150));
+async function manualSearch(){
+  const q = $("#searchIn").value.trim(); if (!q) return;
+  hideAc(); setStatus("Looking it up...");
+  const c = await findCard(q);
+  if (c) showCard(c, { share:true }); else setStatus(`No card matched "${q}".`);
+}
+$("#searchBtn").onclick = manualSearch;
+
+/* =====================================================================
+   Captions (speech to text with card links) and voice commands
+   ===================================================================== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let noPhrases = false, quickEnds = 0;
+let rec = null, capOn = false, cardIndex = null, indexLoading = null, maxWords = 1, interimEl = null;
+// One-word card names that are also everyday words or game terms, so they don't link by accident
+const NOT_ALONE = new Set(("sacrifice lifelink deathtouch vigilance trample flying haste reach menace flash hexproof indestructible " +
+  "regenerate regeneration exile mulligan commander graveyard library counter discard destroy attack attacking block blocker blocking " +
+  "token tokens treasure mountain island plains swamp forest wastes resurrection protection opportunity inspiration vengeance " +
+  "retribution anticipate recover reclaim condemn overrun disperse persuasion nevermore evolution negate cancel terror shock " +
+  "anyway another something nothing everything because channel control combat damage double second silence unsummon " +
+  "respite rebuff divine plague sleep shelter scatter answer ransom scrap scrounge demolish reprisal monarch initiative").split(" "));
+function loadIndex(){
+  if (cardIndex) return Promise.resolve(cardIndex);
+  if (indexLoading) return indexLoading;
+  indexLoading = (async () => {
+    let names = null;
+    try { const c = JSON.parse(store.get("kt-names", "null")); if (c && Date.now() - c.t < 7 * 864e5) names = c.n; } catch {}
+    if (!names) {
+      const r = await scry("/catalog/card-names");
+      names = r?.data || [];
+      if (names.length) store.set("kt-names", JSON.stringify({ t:Date.now(), n:names }));
+    }
+    const m = new Map();
+    for (const full of names) for (const face of full.split(" // ")) {
+      const k = norm(face); if (!k || m.has(k)) continue;
+      m.set(k, face); maxWords = Math.max(maxWords, Math.min(10, k.split(" ").length));
+    }
+    cardIndex = m; return m;
+  })();
+  indexLoading.catch(() => { indexLoading = null; });
+  return indexLoading;
+}
+/* Magic keywords: highlighted in captions, click for the definition */
+const KEYWORDS = [
+  ["Deathtouch", "Any amount of damage this deals to a creature is enough to destroy it."],
+  ["Defender", "This creature can't attack."],
+  ["Double strike", "This creature deals both first-strike and regular combat damage."],
+  ["First strike", "This creature deals combat damage before creatures without first strike."],
+  ["Enchant", "Says what an Aura can be attached to. It can only be cast targeting, and stay attached to, that kind of object."],
+  ["Equip", "Pay the equip cost to attach this Equipment to a creature you control. You can only do this when you could cast a sorcery.", "v"],
+  ["Flash", "You may cast this spell any time you could cast an instant."],
+  ["Flying", "Can't be blocked except by creatures with flying or reach."],
+  ["Haste", "This creature can attack and use tap abilities the turn it comes under your control."],
+  ["Hexproof", "Can't be the target of spells or abilities your opponents control."],
+  ["Indestructible", "Can't be destroyed by damage or by effects that say \"destroy.\" It can still be exiled, sacrificed, or have its toughness reduced to 0."],
+  ["Lifelink", "Damage dealt by this source also causes its controller to gain that much life."],
+  ["Menace", "Can't be blocked except by two or more creatures."],
+  ["Protection", "Can't be damaged, enchanted or equipped, blocked, or targeted by anything with the stated quality."],
+  ["Reach", "This creature can block creatures with flying."],
+  ["Trample", "When blocked, combat damage beyond what's lethal to the blockers can be dealt to the player, planeswalker, or battle it's attacking."],
+  ["Vigilance", "Attacking doesn't cause this creature to tap."],
+  ["Ward", "Whenever this becomes the target of a spell or ability an opponent controls, counter it unless that player pays the ward cost."],
+  ["Prowess", "Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn."],
+  ["Scry", "Look at that many cards from the top of your library. Put any number on the bottom and the rest back on top in any order.", "v"],
+  ["Surveil", "Look at that many cards from the top of your library. Put any number into your graveyard and the rest back on top in any order.", "v"],
+  ["Mill", "Put that many cards from the top of a library into its owner's graveyard.", "v"],
+  ["Proliferate", "Choose any number of permanents and/or players, then give each another counter of each kind already there.", "v"],
+  ["Investigate", "Create a Clue token.", "v"],
+  ["Treasure", "An artifact token with \"{T}, Sacrifice this: Add one mana of any color.\"", "p"],
+  ["Food", "An artifact token with \"{2}, {T}, Sacrifice this: You gain 3 life.\"", "p"],
+  ["Clue", "An artifact token with \"{2}, Sacrifice this: Draw a card.\"", "p"],
+  ["Cascade", "When you cast this spell, exile cards from the top of your library until you exile a nonland card with lower mana value. You may cast it without paying its mana cost. Put the rest on the bottom in a random order.", "v"],
+  ["Convoke", "Your creatures can help cast this spell. Each creature you tap while casting it pays for {1} or one mana of that creature's color."],
+  ["Cycling", "Pay the cycling cost and discard this card: draw a card."],
+  ["Flashback", "You may cast this card from your graveyard for its flashback cost. Then exile it."],
+  ["Kicker", "You may pay an additional cost as you cast this spell for an extra effect.", "v"],
+  ["Landfall", "An ability word for abilities that trigger whenever a land enters the battlefield under your control."],
+  ["Storm", "When you cast this spell, copy it for each spell cast before it this turn."],
+  ["Affinity", "This spell costs {1} less to cast for each of the named thing you control."],
+  ["Annihilator", "Whenever this creature attacks, the defending player sacrifices that many permanents."],
+  ["Infect", "Deals damage to creatures as -1/-1 counters and to players as poison counters."],
+  ["Toxic", "Players dealt combat damage by this creature also get that many poison counters."],
+  ["Wither", "Deals damage to creatures as -1/-1 counters."],
+  ["Persist", "When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield with a -1/-1 counter on it."],
+  ["Undying", "When this creature dies, if it had no +1/+1 counters on it, return it to the battlefield with a +1/+1 counter on it."],
+  ["Evoke", "You may cast this spell for its evoke cost. If you do, it's sacrificed when it enters.", "v"],
+  ["Ninjutsu", "Pay the ninjutsu cost and return an unblocked attacker you control to hand: put this card onto the battlefield tapped and attacking."],
+  ["Partner", "You can have two commanders if both have partner."],
+  ["Exalted", "Whenever a creature you control attacks alone, it gets +1/+1 until end of turn for each instance of exalted among permanents you control."],
+  ["Myriad", "Whenever this attacks, for each other opponent, you may create a token copy tapped and attacking that player or their planeswalker. Exile the tokens at end of combat."],
+  ["Split second", "While this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities."],
+  ["Crew", "Tap any number of untapped creatures you control with total power at least the crew number: this Vehicle becomes an artifact creature until end of turn.", "v"],
+  ["Delve", "Each card you exile from your graveyard while casting this spell pays for {1}."],
+  ["Dredge", "If you would draw a card, you may instead mill that many cards and return this card from your graveyard to your hand.", "v"],
+  ["Escape", "You may cast this card from your graveyard for its escape cost, which includes exiling other cards from your graveyard."],
+  ["Foretell", "During your turn, pay {2} and exile this card face down. Cast it on a later turn for its foretell cost.", "v"],
+  ["Connive", "Draw a card, then discard a card. If you discarded a nonland card, put a +1/+1 counter on this creature.", "v"],
+  ["Explore", "Reveal the top card of your library. If it's a land, put it in your hand. Otherwise, put a +1/+1 counter on this creature, then you may put that card into your graveyard.", "v"],
+  ["Amass", "Put that many +1/+1 counters on an Army you control. If you don't control one, create a 0/0 Army creature token first.", "v"],
+  ["Extort", "Whenever you cast a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain that much life."],
+  ["Morph", "You may cast this face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost."],
+  ["Disguise", "You may cast this face down as a 2/2 creature with ward {2} for {3}. Turn it face up any time for its disguise cost."],
+  ["Changeling", "This object is every creature type."],
+  ["Buyback", "You may pay an additional buyback cost as you cast this. If you do, put it into your hand as it resolves."],
+  ["Devour", "As this enters, you may sacrifice any number of creatures. It enters with that many +1/+1 counters for each creature sacrificed.", "v"],
+  ["Echo", "At the beginning of your upkeep, if this came under your control since your last upkeep, sacrifice it unless you pay its echo cost."],
+  ["Fabricate", "When this enters, put that many +1/+1 counters on it or create that many 1/1 Servo artifact creature tokens."],
+  ["Exploit", "When this creature enters, you may sacrifice a creature.", "v"],
+  ["Emerge", "You may cast this by sacrificing a creature and paying the emerge cost, reduced by that creature's mana value."],
+  ["Battle cry", "Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn."],
+  ["Bloodthirst", "If an opponent was dealt damage this turn, this creature enters with that many +1/+1 counters."],
+  ["Goad", "Until your next turn, the goaded creature attacks each combat if able and attacks a player other than you if able.", "v"],
+  ["Suspend", "Exile this from your hand with that many time counters by paying the suspend cost. Remove one each upkeep. When the last is removed, cast it without paying its mana cost.", "v"],
+  ["Rebound", "If you cast this from your hand, exile it as it resolves. At your next upkeep, you may cast it from exile without paying its mana cost."],
+  ["Unearth", "Pay the unearth cost: return this from your graveyard to the battlefield with haste. Exile it at the next end step or if it would leave the battlefield.", "v"],
+  ["Jump-start", "You may cast this from your graveyard by paying its cost and discarding a card. Then exile it."],
+  ["Overload", "You may cast this for its overload cost. If you do, change \"target\" in its text to \"each.\"", "v"],
+  ["Madness", "If you discard this card, you may cast it for its madness cost instead of putting it into your graveyard."],
+  ["Mutate", "Cast this for its mutate cost targeting a non-Human creature you own. Merge it on top or underneath. The merged creature has all their abilities.", "v"],
+  ["Blitz", "Cast this for its blitz cost. It gains haste and \"When this dies, draw a card,\" and is sacrificed at the next end step."],
+  ["Casualty", "As you cast this, you may sacrifice a creature with at least that much power. If you do, copy the spell."],
+  ["Training", "Whenever this creature attacks with another creature with greater power, put a +1/+1 counter on it."],
+  ["Hideaway", "When this enters, look at that many cards from the top of your library, exile one face down, and put the rest on the bottom. You may play it later without paying its mana cost when a condition is met."],
+  ["Commander tax", "Casting your commander from the command zone costs {2} more for each previous time you've cast it from there this game."],
+  ["Mana value", "The total amount of mana in a card's mana cost. X counts as 0 except while the spell is on the stack."],
+  ["Monarch", "The monarch draws an extra card at the beginning of their end step. Deal combat damage to the monarch to become the monarch."],
+  ["Initiative", "When you take the initiative and at the beginning of your upkeep, venture into Undercity. Deal combat damage to the player with the initiative to take it."],
+  ["Venture into the dungeon", "Move your marker into the first room of a dungeon, or to the next room of the one you're in, and get that room's effect."],
+  ["The Ring tempts you", "Choose a creature you control as your Ring-bearer. Your Ring gains its next ability, up to four."],
+  ["Energy", "Counters a player can get, shown as {E}, and spend to pay costs.", "p"],
+  ["Poison", "A player with ten or more poison counters loses the game."],
+  ["Day and night", "If it's day and the active player casts no spells during their turn, it becomes night next turn. If it's night and a player casts two or more spells in a turn, it becomes day next turn."]
+];
+function kwForms(base, flag){
+  const out = [base];
+  if (flag === "p") out.push(base + "s");
+  if (flag === "v") {
+    const cy = /[^aeiou]y$/.test(base), e = base.endsWith("e");
+    out.push(cy ? base.slice(0, -1) + "ies" : /(s|x|sh|ch)$/.test(base) ? base + "es" : base + "s");
+    out.push(cy ? base.slice(0, -1) + "ied" : e ? base + "d" : base + "ed");
+    out.push((e ? base.slice(0, -1) : base) + "ing");
+    if (/[aeiou]l$/.test(base) || /[^aeiou][aeiou][pgdt]$/.test(base)) { out.push(base + base.slice(-1) + "ed", base + base.slice(-1) + "ing"); }
+  }
+  return out;
+}
+const KW = new Map(); let kwMax = 1;
+KEYWORDS.forEach(([name, def, flag]) => kwForms(norm(name), flag).forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } }));
+["equipped", "equipping"].forEach(f => KW.set(f, KW.get("equip")));
+function showKeyword(k){
+  const view = $("#cardView"); view.innerHTML = "";
+  const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
+  const d = document.createElement("p"); d.className = "oracle"; d.textContent = k.def; view.appendChild(d);
+  const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
+  view.appendChild(a); setStatus("");
+}
+
+/* Sound-alike matching against the table's decklists, for names speech recognition gets wrong (like "smog" for Smaug) */
+const STOP = new Set(["the", "of", "a", "an", "with", "and", "to", "in", "on", "for", "from", "my", "his", "her", "their", "your", "that"]);
+function phon(w){
+  w = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (!w) return "";
+  w = w.replace(/^(kn|gn|pn|wr)/, m => m[1]).replace(/ph/g, "f").replace(/ck/g, "k").replace(/q/g, "k").replace(/x/g, "ks").replace(/z/g, "s")
+       .replace(/dg/g, "j").replace(/gh/g, "").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k").replace(/th/g, "0").replace(/sh/g, "x").replace(/wh/g, "w");
+  const first = "aeiou".includes(w[0]) ? "a" : w[0];
+  return (first + w.slice(1).replace(/[aeiouyhw]/g, "")).replace(/(.)\1+/g, "$1");
+}
+// Looser version for player names: treats sound pairs like g/k and b/p as the same
+function phonLoose(w){ return phon(w).replace(/g/g, "k").replace(/b/g, "p").replace(/d/g, "t").replace(/v/g, "f").replace(/j/g, "k").replace(/(.)\1+/g, "$1"); }
+function codeOf(words){ return words.filter(w => !STOP.has(w)).map(phon).filter(Boolean).join(" "); }
+let poolCache = { sig:null, list:[] };
+function poolList(){
+  const pool = deckPool(), sig = [...pool.keys()].join("|");
+  if (poolCache.sig === sig) return poolCache.list;
+  const list = [], mk = (k, name) => { const w = k.split(" "); list.push({ k, name, n:w.length, code:codeOf(w), first:w[0], last:w[w.length - 1] }); };
+  for (const [k, v] of pool) {
+    mk(k, v.name);
+    if (v.name.includes(",")) { const short = norm(v.name.split(",")[0]); if (short.length >= 4 && short !== k) mk(short, v.name); }  // "Smaug" for "Smaug, the Wicked Worm"
+  }
+  poolCache = { sig, list };
+  return list;
+}
+function fuzzyPool(keys, i){
+  let best = null;
+  for (const e of poolList()) {
+    if (!e.code) continue;
+    for (let n = Math.max(1, e.n - 1); n <= e.n + 3 && i + n <= keys.length; n++) {
+      const win = keys.slice(i, i + n).join(" ").split(" ").filter(Boolean);
+      if (STOP.has(win[0]) && !STOP.has(e.first)) continue;
+      if (STOP.has(win[win.length - 1]) && !STOP.has(e.last)) continue;
+      const code = codeOf(win); if (!code || code[0] !== e.code[0]) continue;
+      let sc;
+      if (!e.code.includes(" ")) { if (e.k.length < 4) continue; sc = (code.replace(/ /g, "") === e.code && similarity(win.join(" "), e.k) >= 0.5) ? 0.9 : 0; }
+      else sc = Math.max(similarity(win.join(" "), e.k), n <= e.n + 1 ? similarity(code, e.code) : 0, similarity(code.replace(/ /g, ""), e.code.replace(/ /g, "")) - 0.04);
+      if (sc >= 0.8 && (!best || sc > best.sc || (sc === best.sc && n > best.n))) best = { sc, name:e.name, n };
+    }
+  }
+  return best;
+}
+
+// Split a sentence into plain words, card names, and keywords
+function linkify(text){
+  const words = text.split(/\s+/).filter(Boolean), keys = words.map(norm), out = [];
+  const oneWord = $("#oneWord").checked, pool = deckPool();
+  let mw = maxWords; for (const k of pool.keys()) mw = Math.max(mw, Math.min(10, k.split(" ").length));
+  const span = (i, n) => words.slice(i, i + n).join(" ");
+  const key = (i, n) => keys.slice(i, i + n).filter(Boolean).join(" ");
+  let i = 0;
+  while (i < words.length) {
+    if (!keys[i]) { out.push({ t:words[i] }); i++; continue; }
+    let seg = null;
+    // 1. exact match to a card in someone's decklist
+    for (let n = Math.min(mw, words.length - i); n >= 1 && !seg; n--) { const hit = pool.get(key(i, n)); if (hit) seg = { card:hit.name, t:span(i, n), n }; }
+    // 2. sound-alike match to a decklist card
+    if (!seg) { const f = fuzzyPool(keys, i); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
+    // 3. exact multi-word card name from all of Magic
+    for (let n = Math.min(maxWords, words.length - i); n >= 2 && !seg && cardIndex; n--) { const name = cardIndex.get(key(i, n)); if (name) seg = { card:name, t:span(i, n), n }; }
+    // 4. keyword
+    for (let n = Math.min(kwMax, words.length - i); n >= 1 && !seg; n--) { const k = KW.get(key(i, n)); if (k) seg = { kw:k, t:span(i, n), n }; }
+    // 5. one-word card name from all of Magic
+    if (!seg && oneWord && cardIndex) { const k1 = keys[i], name = cardIndex.get(k1); if (name && k1.length >= 5 && !NOT_ALONE.has(k1)) seg = { card:name, t:words[i], n:1 }; }
+    if (seg) { out.push(seg); i += seg.n; } else { out.push({ t:words[i] }); i++; }
+  }
+  return out;
+}
+async function addCaption(seat, text){
+  try { await loadIndex(); } catch {}
+  const ul = $("#captions");
+  const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
+  const li = document.createElement("li");
+  const who = document.createElement("span"); who.className = "who";
+  who.style.color = SEAT_HEX[seat - 1] || "inherit";
+  who.textContent = (seat === mySeat ? "You" : nm(seat)) + ":";
+  li.appendChild(who);
+  linkify(text).forEach((seg, idx) => {
+    if (idx) li.append(" ");
+    if (seg.kw) {
+      const b = document.createElement("button"); b.className = "kwlink"; b.textContent = seg.t; b.title = `${seg.kw.name}: ${seg.kw.def}`;
+      b.onclick = () => showKeyword(seg.kw);
+      li.appendChild(b);
+    } else if (seg.card) {
+      const b = document.createElement("button"); b.className = "cardlink" + (seg.fuzzy ? " fuzzy" : "");
+      b.textContent = seg.fuzzy ? seg.card : seg.t; b.title = seg.fuzzy ? `Heard "${seg.t}"` : seg.card;
+      b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(seg.card)) || await findCard(seg.card); if (c) showCard(c); else setStatus(`No card matched "${seg.card}".`); };
+      li.appendChild(b);
+    } else li.append(seg.t);
+  });
+  if (interimEl && interimEl.parentNode === ul) ul.insertBefore(li, interimEl); else ul.appendChild(li);
+  while (ul.children.length > 120) ul.firstChild.remove();
+  if (nearBottom) ul.scrollTop = ul.scrollHeight;
+}
+function showInterim(text){
+  const ul = $("#captions");
+  if (!text) { interimEl?.remove(); interimEl = null; return; }
+  if (!interimEl) { interimEl = document.createElement("li"); interimEl.className = "interim"; }
+  interimEl.textContent = "You: " + text;
+  ul.appendChild(interimEl); ul.scrollTop = ul.scrollHeight;
+}
+function micLive(){ return !!localStream?.getAudioTracks()[0]?.enabled; }
+function startBrowserRec(){
+  if (!SR || rec || !micLive()) return;
+  rec = new SR();
+  rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || "en-US";
+  // Newer browsers can be told which phrases to expect. Feed them the table's card names when supported.
+  if (window.SpeechRecognitionPhrase && "phrases" in rec && !noPhrases) {
+    try {
+      const names = [...new Set([...deckPool().values()].map(v => v.name))].slice(0, 200);
+      rec.phrases = names.map(n => new SpeechRecognitionPhrase(n, 5));
+    } catch { noPhrases = true; }
+  }
+  rec.onresult = e => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i], t = r[0].transcript.trim();
+      if (r.isFinal) { if (t) onFinalSpeech(t); }
+      else interim += t + " ";
+    }
+    showInterim(interim.trim());
+  };
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      capOn = false; updateCapBtn();
+      setCapHint("Speech to text was blocked. Allow the microphone for this site (Brave also needs Google services enabled), then turn captions on.");
+    } else if (e.error === "phrases-not-supported") { noPhrases = true; }
+    else if (e.error === "network") setCapHint("Speech to text lost its connection. It will keep retrying.");
+  };
+  const began = Date.now();
+  rec.onend = () => {
+    rec = null; showInterim("");
+    quickEnds = Date.now() - began < 3000 ? quickEnds + 1 : 0;
+    if (quickEnds >= 3) {  // ended right away 3 times: blocked or not working, so stop instead of re-asking forever
+      capOn = false; quickEnds = 0; updateCapBtn();
+      setCapHint("Captions stopped because the microphone kept getting blocked. Click Captions to try again.");
+      return;
+    }
+    if (capOn && micLive() && engine === "browser") setTimeout(startBrowserRec, LOCAL ? 1500 : 300);
+  };
+  try { rec.start(); setCapHint(""); } catch { rec = null; }
+}
+function stopBrowserRec(){ const r = rec; rec = null; if (r) { r.onend = null; try { r.stop(); } catch {} } showInterim(""); }
+
+/* On-device speech engine (Vosk, open source). Runs in a background worker on the microphone you already
+   allowed in the lobby, so it never asks for permission again and never restarts. Audio stays on this computer. */
+let engine = store.get("kt-engine", "") || (LOCAL ? "local" : "browser");
+const VOSK_JS = "https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js";
+const VOSK_MODEL = "https://raw.githubusercontent.com/ccoreilly/vosk-browser/gh-pages/models/vosk-model-small-en-us-0.15.tar.gz";
+const vosk = { model:null, loading:null, rec:null, ctx:null, node:null, src:null, starting:false };
+function loadScript(src){
+  return new Promise((res, rej) => {
+    if (window.Vosk) return res();
+    const s = document.createElement("script"); s.src = src; s.onload = () => res(); s.onerror = () => rej(new Error("couldn't download the speech library"));
+    document.head.appendChild(s);
+  });
+}
+function voskLoad(){
+  if (vosk.model) return Promise.resolve(vosk.model);
+  if (vosk.loading) return vosk.loading;
+  vosk.loading = (async () => {
+    setCapHint("Loading the on-device speech engine. The first time downloads about 45 MB, then it's saved on this computer.");
+    await loadScript(VOSK_JS);
+    if (!window.Vosk?.Model) throw new Error("the speech library didn't load");
+    // Make saving the model to browser storage optional: if a browser blocks storage for local files,
+    // speech still works and just downloads the model again next session instead of failing.
+    const RealWorker = window.Worker;
+    window.Worker = function(url, opts){
+      try {
+        const x = new XMLHttpRequest(); x.open("GET", url, false); x.send();
+        const code = x.responseText
+          .replace("return this.Vosk.syncFilesystem(true);", "return this.Vosk.syncFilesystem(true).catch(e => this.logger.warn(e));")
+          .replace("return this.Vosk.syncFilesystem(false);", "return this.Vosk.syncFilesystem(false).catch(e => this.logger.warn(e));");
+        return new RealWorker(URL.createObjectURL(new Blob([code], { type:"application/javascript" })), opts);
+      } catch { return new RealWorker(url, opts); }
+    };
+    const model = await new Promise((res, rej) => {
+      let m; try { m = new window.Vosk.Model(VOSK_MODEL); } finally { window.Worker = RealWorker; }
+      m.on("load", msg => msg.result ? res(m) : rej(new Error("the speech model failed to load")));
+      m.on("error", msg => rej(new Error(msg.error || "the speech model failed to load")));
+    });
+    vosk.model = model; return model;
+  })();
+  vosk.loading.catch(() => { vosk.loading = null; });
+  return vosk.loading;
+}
+async function startVosk(){
+  if (vosk.rec || vosk.starting || !micLive()) return;
+  vosk.starting = true;
+  try {
+    const model = await voskLoad();
+    if (!capOn || engine !== "local" || !micLive()) return;
+    const track = localStream.getAudioTracks()[0];
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const recog = new model.KaldiRecognizer(ctx.sampleRate);
+    recog.on("result", m => { const t = (m.result?.text || "").trim(); showInterim(""); if (t) onFinalSpeech(t); });
+    recog.on("partialresult", m => showInterim((m.result?.partial || "").trim()));
+    const src = ctx.createMediaStreamSource(new MediaStream([track]));
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = e => { if (capOn && micLive()) { try { recog.acceptWaveform(e.inputBuffer); } catch {} } };
+    src.connect(node); node.connect(ctx.destination);  // the processor only runs when connected; it outputs silence
+    if (ctx.state === "suspended") { try { await ctx.resume(); } catch {} }
+    Object.assign(vosk, { rec:recog, ctx, node, src });
+    setCapHint("Captions are running on this computer. Nothing you say is sent anywhere except the caption text to your table.");
+  } catch (e) {
+    capOn = false; updateCapBtn();
+    setCapHint(`The on-device speech engine couldn't start (${e.message}). Check your internet connection for the first download, or switch the speech engine to Browser.`);
+  } finally { vosk.starting = false; }
+}
+function stopVosk(){
+  try { vosk.src?.disconnect(); vosk.node?.disconnect(); } catch {}
+  try { vosk.rec?.remove(); } catch {}
+  try { vosk.ctx?.close(); } catch {}
+  Object.assign(vosk, { rec:null, ctx:null, node:null, src:null });
+  showInterim("");
+}
+function startRec(){ if (engine === "local") startVosk(); else startBrowserRec(); }
+function stopRec(){ stopVosk(); stopBrowserRec(); }
+function onFinalSpeech(t){ addCaption(mySeat, t); broadcast({ type:"caption", text:t }); runVoice(t); }
+$("#engineSel").onchange = e => {
+  stopRec(); engine = e.target.value; store.set("kt-engine", engine);
+  if (engine === "browser" && !SR) { setCapHint("This browser doesn't have built-in speech to text. Use On this computer instead."); capOn = false; }
+  else { capOn = true; setCapHint(""); startRec(); if (engine === "browser" && LOCAL) toast("Heads up: the Browser engine may ask for the microphone repeatedly while this page is opened as a file."); }
+  updateCapBtn();
+};
+function updateCapBtn(){ const b = $("#capBtn"); b.textContent = capOn ? "Captions on" : "Captions off"; b.classList.toggle("off", !capOn); b.disabled = engine === "browser" && !SR; }
+function setCapHint(t){ $("#capHint").textContent = t; }
+$("#capBtn").onclick = () => {
+  capOn = !capOn; quickEnds = 0;
+  if (capOn) { startRec(); if (LOCAL && engine === "browser") toast("Captions on. Because this page is a local file, the Browser engine may ask for the microphone each time it restarts."); }
+  else stopRec();
+  updateCapBtn();
+};
+$("#voiceIn").onchange = e => store.set("kt-voice", e.target.checked ? "1" : "0");
+$("#oneWord").onchange = e => store.set("kt-oneword", e.target.checked ? "1" : "0");
+
+/* Voice commands: only your own speech, only finished sentences, always undoable */
+const NUMW = { zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13,
+  fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50 };
+const NUM_SOUNDALIKE = { to:2, too:2, for:4, fore:4, free:3, tree:3, won:1, ate:8, tin:10, sex:6 };
+function numIn(str){
+  const d = str.match(/\b(\d{1,3})\b/); if (d) return +d[1];
+  const first = str.trim().split(/\s+/)[0];
+  if (NUM_SOUNDALIKE[first] != null) return NUM_SOUNDALIKE[first];  // "take free" is almost always "take three"
+  const w = str.match(/\b(twenty|thirty|forty|fifty)(?:[\s-](one|two|three|four|five|six|seven|eight|nine))?\b|\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)\b/);
+  if (!w) return null;
+  return w[3] ? NUMW[w[3]] : NUMW[w[1]] + (w[2] ? NUMW[w[2]] : 0);
+}
+function matchSource(rest){
+  const m = rest.match(/\bfrom (.+)/); if (!m) return null;
+  const w = norm(m[1].replace(/\b(commander|damage|his|her|their|the)\b/g, " "));
+  if (/^(myself|me)\b/.test(w)) return mySeat;
+  for (const s of presentSeats()) {
+    if (s === mySeat) continue;
+    const n = norm(nm(s)); if (!n) continue;
+    if (w.startsWith(n) || w.split(" ")[0] === n.split(" ")[0]) return s;
+    if (phonLoose(w.split(" ")[0]) && phonLoose(w.split(" ")[0]) === phonLoose(n.split(" ")[0])) return s;  // "rig" for Rick
+  }
+  return null;
+}
+function runVoice(raw){
+  if (!$("#voiceIn").checked) return;
+  const t = raw.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim()
+    .replace(/\b(maga|manna|mona|mono)\b/g, "mana").replace(/\b(read|reed)(?= mana\b)/g, "red").replace(/\bblew(?= mana\b)/g, "blue");
+  let m;
+  if (/\broll (off|for first|to see who goes first|for who goes first)\b/.test(t)) { startRollOff(); toast("Heard: roll for first player"); return; }
+  if (/\bflip (a )?coin\b/.test(t)) { rollDice("coin"); toast("Heard: flip a coin"); return; }
+  if ((m = t.match(/\broll (?:a |an |the )?d ?(4|6|8|10|12|20|four|six|eight|ten|twelve|twenty)\b/))) {
+    const n = /\d/.test(m[1]) ? +m[1] : NUMW[m[1]]; rollDice("d" + n); toast(`Heard: roll a d${n}`); return;
+  }
+  if (/\b(pass(ing)? (the |my )?turn|end (of )?my turn|i pass|go to (the )?next turn)\b/.test(t)) {
+    if (table.turnSeat === mySeat || !table.turnSeat) { passTurn(); toast("Heard: pass turn"); }
+    return;
+  }
+  if (/\bmonarch\b/.test(t) && /\b(i|i'm|im|me)\b/.test(t) && /\b(become|became|am|i'm|im|take|took|get|got)\b/.test(t) && !/\b(not|lose|lost)\b/.test(t)) {
+    const prev = table.monarch; changeTable({ monarch:mySeat }); toast("Heard: you are the monarch", () => changeTable({ monarch:prev })); return;
+  }
+  if (/\binitiative\b/.test(t) && /\b(i|i'm|im|me)\b/.test(t) && /\b(take|took|have|get|got)\b/.test(t) && !/\b(not|lose|lost)\b/.test(t)) {
+    const prev = table.initiative; changeTable({ initiative:mySeat }); toast("Heard: you have the initiative", () => changeTable({ initiative:prev })); return;
+  }
+  if ((m = t.match(/\b(?:it'?s|it is|it becomes|becomes|now) (day|night)\b/))) {
+    const prev = table.dayNight; changeTable({ dayNight:m[1] }); toast(`Heard: it's ${m[1]}`, () => changeTable({ dayNight:prev })); return;
+  }
+  if (me.manaOn && (m = t.match(/\b(add|adding|added|float|floating|spend|spending|spent|use|using|used|remove|pay|paying)\s+(.+?)\s*(white|blue|black|red|green|colorless)(\s+mana)?\b/))) {
+    const n = numIn(m[2]) ?? (/^(a|an|one)$/.test(m[2].trim()) ? 1 : null); if (!n || n > 99) return;
+    const c = { white:"W", blue:"U", black:"B", red:"R", green:"G", colorless:"C" }[m[3]];
+    const d = /^(add|adding|added|float|floating)$/.test(m[1]) ? n : -n;
+    const prev = me.mana[c]; bumpMana(c, d);
+    toast(`Heard: ${d > 0 ? "add" : "remove"} ${n} ${m[3]} mana`, () => { me.mana[c] = prev; pushState(); render(); }); return;
+  }
+  if (me.manaOn && /\bempty (my )?(mana )?pool\b/.test(t)) {
+    const prev = { ...me.mana }; emptyMana(); toast("Heard: empty mana pool", () => { me.mana = prev; pushState(); render(); }); return;
+  }
+  if (/\bpoison\b/.test(t) && /\b(take|took|get|got|gain|gained|give me|add)\b/.test(t)) {
+    const n = numIn(t) ?? 1; if (n > 20) return;
+    me.poison += n; pushState(); render();
+    toast(`Heard: ${n} poison`, () => { me.poison = Math.max(0, me.poison - n); pushState(); render(); }); return;
+  }
+  if ((m = t.match(/\b(?:set my life to|my life is|i'?m at|i am at|i'?m now at|i am now at)\s+(.+)/))) {
+    const n = numIn(m[1]); if (n == null || n > 999) return;
+    const prev = me.life; me.life = n; pushState(); render(true);
+    toast(`Heard: life set to ${n}`, () => { me.life = prev; pushState(); render(true); }); return;
+  }
+  if ((m = t.match(/\b(?:gain|gained|gaining)\s+(.+?)\s*life\b/))) {
+    const n = numIn(m[1]); if (!n || n > 200) return;
+    changeLife(n, { noAsk:true }); toast(`Heard: gain ${n} life`, () => changeLife(-n, { noAsk:true })); return;
+  }
+  if ((m = t.match(/\b(?:i|i'll|i will|i'm|im|i am)\s+(?:going to\s+)?(?:take|taking|took|lose|losing|lost)\s+(.+)/)) ||
+      (m = t.match(/\b(?:take|taking|took|lose|losing)\s+(.+?\s+(?:damage|life)\b.*)/))) {
+    const rest = m[1];
+    const n = numIn(rest.split(/\bfrom\b/)[0]); if (!n || n > 200) return;
+    const src = matchSource(rest), cmd = /\bcommander\b/.test(rest);
+    if (src !== null) {
+      me.life -= n;
+      const e = recordDamage({ source:src, amount:n, cmd:cmd && src !== mySeat });
+      pushState(); render(true);
+      toast(`Heard: took ${n}${e.cmd ? " commander damage" : ""} from ${src === mySeat ? "yourself" : nm(src)}`, () => undoDamage(e.id));
+    } else {
+      changeLife(-n);
+      toast(`Heard: lost ${n} life. Pick who it was from on your screen.`, () => changeLife(n));
+    }
+  }
+}
+
+/* =====================================================================
+   Helpers
+   ===================================================================== */
+let toastTimer = null;
+function toast(text, undo){
+  const t = $("#toast"); t.innerHTML = "";
+  const s = document.createElement("span"); s.textContent = text; t.appendChild(s);
+  if (undo) { const b = document.createElement("button"); b.className = "btn"; b.style.padding = "4px 10px"; b.textContent = "Undo"; b.onclick = () => { undo(); t.classList.add("hidden"); }; t.appendChild(b); }
+  t.classList.remove("hidden");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hidden"), 7000);
+}
+function setStatus(t){ $("#status").textContent = t; }
+function log(text, cardName){
+  const li = document.createElement("li");
+  const tm = document.createElement("span"); tm.className = "t"; tm.textContent = gameStartAt ? fmt(gameSeconds()) : "--:--"; li.appendChild(tm);
+  li.append(text);
+  if (cardName) {
+    const b = document.createElement("button"); b.className = "linkbtn"; b.textContent = cardName;
+    b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(cardName)) || await findCard(cardName); if (c) showCard(c); };
+    li.appendChild(b); li.append(".");
+  }
+  const ul = $("#log"); ul.prepend(li);
+  while (ul.children.length > 80) ul.lastChild.remove();
+}
+})();
+</script>
+</body>
+</html>
