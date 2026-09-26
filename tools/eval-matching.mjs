@@ -12,7 +12,7 @@
    Usage (from the repo root, with the index in site/index):
      node tools/eval-matching.mjs [cards=100] [dtype] [mode]     dtype: q8 (what browsers without WebGPU use) or fp32
    mode "refs" instead tries ways of preparing pictures (for both the index and the click) on the perfectly found art,
-   against the test cards plus 900 others, to see which closes the gap between webcam and Scryfall pictures
+   against the test cards plus 900 others (EXTRA=n for more; PREPS=shrink48,shrink32 picks the ways to try), to see which closes the gap between webcam and Scryfall pictures
    Needs the web (Scryfall, Hugging Face, jsDelivr). Writes eval-results/summary.md, results.json, and pictures of misses. */
 import http from "node:http";
 import fs from "node:fs";
@@ -39,7 +39,7 @@ await new Promise(r => server.listen(PORT, "127.0.0.1", r));
 const meta = JSON.parse(fs.readFileSync(path.join(ROOT, "site", "index", "cards.json"), "utf8"));
 let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 const pickCards = n => Array.from({ length:n }, () => meta.cards[Math.floor(rnd() * meta.cards.length)]);
-const tests = pickCards(N), mats = pickCards(12), others = pickCards(16), extra = MODE === "refs" ? pickCards(900) : [];
+const tests = pickCards(N), mats = pickCards(12), others = pickCards(16), extra = MODE === "refs" ? pickCards(+process.env.EXTRA || 900) : [];
 console.log(`Index: ${meta.cards.length} artworks, model ${meta.model}. Testing ${N} cards with ${DTYPE}.`);
 
 const browser = await chromium.launch();
@@ -77,7 +77,7 @@ await page.evaluate(async ({ tests, mats, others, extra }) => {
 }, { tests, mats, others, extra });
 
 if (MODE === "refs") {
-  const res = await page.evaluate(async () => {
+  const res = await page.evaluate(async want => {
     const b = window.bench, E = window.ktEval;
     // Ways to prepare a picture of art before the AI sees it (the same for the index and for the click)
     const canvasOf = (src, w) => { const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height, c = document.createElement("canvas");
@@ -91,7 +91,8 @@ if (MODE === "refs") {
       x.putImageData(im, 0, 0); return c; };
     // shrink: the page's own block-averaging shrink, handed to the AI small (its preprocessor enlarges it)
     const shrink = w => src => E.shrink(canvasOf(src, 240), w);
-    const T = { down64:down(64), shrink64:shrink(64), shrink48:shrink(48), shrink40:shrink(40), shrink32:shrink(32), shrink48norm:src => norm(shrink(48)(src)) };
+    const all = { clean:src => canvasOf(src, 240), down64:down(64), norm, shrink64:shrink(64), shrink48:shrink(48), shrink40:shrink(40), shrink32:shrink(32), shrink24:shrink(24) };
+    const T = Object.fromEntries(want.map(k => [k, all[k]]).filter(x => x[1]));
     const refs = [...b.tests.filter(Boolean).map(t => ({ name:t.name, art:t.art })), ...b.extra];
     // The test cards' art as found perfectly on the made-up webcam pictures
     const shots = [];
@@ -115,7 +116,7 @@ if (MODE === "refs") {
       console.log("refs", k, JSON.stringify(out[k]));
     }
     return { n:shots.length, refs:refs.length, out };
-  });
+  }, (process.env.PREPS || "shrink48,shrink40,shrink32").split(","));
   const lines = [`## Picture preparation: ${res.n} webcam-like shots (art found perfectly) against ${res.refs} cards, ${DTYPE}`, "",
     "| preparation | right card first | in top 5 | mean score of the right card |", "|---|---|---|---|",
     ...Object.entries(res.out).map(([k, v]) => `| ${k} | ${Math.round(v.top1 * 100)}% | ${Math.round(v.top5 * 100)}% | ${v.trueScore.toFixed(3)} |`)].join("\n");

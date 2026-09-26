@@ -46,6 +46,9 @@ jobs:
           curl -fsSL "$site/index/cards.json" -o site/index/cards.json
           curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin
       - name: Run the benchmark
+        env:
+          EXTRA: "4900"
+          PREPS: shrink48,shrink40,shrink32
         run: node tools/eval-matching.mjs "${{ github.event.inputs.cards || '100' }}" "${{ github.event.inputs.dtype || 'q8' }}" "${{ github.event.inputs.mode || 'refs' }}"
       - uses: actions/upload-artifact@v6
         if: always()
