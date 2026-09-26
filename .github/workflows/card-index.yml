@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: card-index
   cancel-in-progress: false
 
 jobs:
@@ -65,8 +65,12 @@ jobs:
           path: site/index
           key: card-index-${{ github.run_id }}
 
-      - name: Assemble the site
-        run: cp index.html README.md site/
+      # The build can take hours; publish the newest app from main, not the one this run started with
+      - name: Assemble the site with the latest app
+        run: |
+          git fetch --depth=1 origin main
+          git checkout FETCH_HEAD -- index.html README.md
+          cp index.html README.md site/
 
       - uses: actions/configure-pages@v5
 

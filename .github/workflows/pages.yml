@@ -14,9 +14,10 @@ permissions:
   pages: write
   id-token: write
 
+# Its own queue, so publishing the app never waits behind a long index build
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: deploy-site
+  cancel-in-progress: true
 
 jobs:
   app:
