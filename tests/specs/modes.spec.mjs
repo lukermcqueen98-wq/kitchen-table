@@ -17,6 +17,7 @@ test("1v1 Commander: the host's mode syncs, a third player is turned away, and o
 
   // Mid-game switch starts a new game for everyone at the new starting life
   await a.click("#startBtn");
+  await a.click("#tab-table");
   await a.selectOption("#tblMode", "cmdr");
   await expect.poll(() => lifeOf(b, 2)).toBe(40);
   await expect(b.locator("#roomLabel")).toHaveText(/Commander/);

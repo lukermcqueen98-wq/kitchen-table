@@ -17,10 +17,12 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await b.click("#capBtn"); await b.click("#capBtn");
   await expect(a.locator("#capPeers")).toContainText("can't reach its speech service");
 
-  // Clicking a caption card link scrolls the side panel up to the card
+  // Clicking a caption card link switches to the Card tab and scrolls the side panel up to the card
   await a.$eval("aside", e => { e.scrollTop = e.scrollHeight; });
+  await a.click("#tab-captions");
   await a.locator("#captions .cardlink").first().click();
   await expect(a.locator("#cardView h2").first()).toHaveText("Sol Ring");
+  await expect(a.locator("#tab-card")).toHaveAttribute("aria-selected", "true");
   // (the panel scrolls smoothly, so wait for it to arrive)
   await expect.poll(() => a.evaluate(() => { const s = document.querySelector("#cardSec").getBoundingClientRect(), p = document.querySelector("aside").getBoundingClientRect(); return s.top >= p.top - 1 && s.top < p.bottom; })).toBe(true);
 
@@ -36,6 +38,7 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect.poll(() => a.$$eval("#captions li[title]", l => l.length), { timeout:20000 }).toBeGreaterThan(0);
   await expect(a.locator("#capPeers .caplive")).toContainText(/Their audio: \u25AE+\. Phrases heard [1-9]/);
   // The diagnostics button copies a report covering both sides
+  await a.click("#tab-captions");  // showing the card switched to the Card tab
   await a.click("#capDiag");
   const report = await a.evaluate(() => navigator.clipboard.readText());
   expect(report).toContain("Rick: their captions off");

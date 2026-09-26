@@ -15,6 +15,18 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
   await tile(a, 1).locator('.life button[data-d="1"]').click();
   await expect.poll(() => logLines(b), { timeout:8000 }).toContainEqual(expect.stringContaining("Luke lost 2 life (40 → 38)"));
   await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("You lost 2 life (40 → 38)"));
+  // The Log tab counts what arrived while you were on another tab; opening it clears the count
+  await expect(b.locator("#tab-log .badge")).toHaveText(/^[1-9]/);
+  await b.click("#tab-log");
+  await expect(b.locator("#tab-log .badge")).toBeHidden();
+  await expect(b.locator("#log")).toBeVisible();
+  // Hiding the side panel gives the cameras the whole width
+  const w0 = (await tile(b, 1).boundingBox()).width;
+  await b.click("#panelBtn");
+  await expect(b.locator("aside")).toBeHidden();
+  expect((await tile(b, 1).boundingBox()).width).toBeGreaterThan(w0 + 100);
+  await b.click("#panelBtn");
+  await expect(b.locator("aside")).toBeVisible();
 
   // Other counters sync
   await tile(a, 1).locator(".ctr.add").click();
@@ -38,6 +50,7 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
   await expect.poll(() => logLines(b)).toContainEqual(expect.stringMatching(/turn 2 \(game turn 3\)/));
 
   // New game asks who won; the result is saved on both screens
+  await a.click("#moreDd summary");
   await a.click("#newBtn");
   await a.locator(".modal-card button", { hasText:"Rick" }).click();
   for (const p of [a, b]) await p.keyboard.press("Escape");

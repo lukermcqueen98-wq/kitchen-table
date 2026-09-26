@@ -28,6 +28,11 @@ button{cursor:pointer}
 /* Lobby and phone camera */
 .screen{min-height:100%;display:grid;place-items:center;padding:24px}
 .lobby-card{width:min(100%,480px)}
+#lobby .lobby-card{width:min(100%,940px)}
+.lobby-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 36px;align-items:start}
+@media (max-width:860px){.lobby-cols{grid-template-columns:1fr}}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:10px;cursor:pointer}
+.btn.big{width:100%;padding:13px 16px;font-size:17px;margin-top:4px}
 .lobby-card h1{font:700 clamp(40px,8vw,64px)/1 var(--serif);margin:0 0 8px;letter-spacing:-.01em}
 .lede{color:var(--muted);margin:0 0 24px;max-width:42ch}
 .preview{width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;margin:8px 0 14px;object-fit:contain}
@@ -50,10 +55,17 @@ details.adv summary{cursor:pointer}
 
 /* Table layout */
 #table{height:100%;display:grid;grid-template-columns:1fr 350px;grid-template-rows:auto 1fr}
-header.bar{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap;position:relative;z-index:20}
-header.bar .room{font:700 20px var(--serif);margin-right:4px}
-header.bar .spacer{flex:1}
-header.bar .btn{padding:6px 11px;font-size:14px}
+header.bar{grid-column:1/-1;display:flex;align-items:center;gap:8px 18px;padding:7px 14px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap;position:relative;z-index:30}
+header.bar .grp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+header.bar .grp.game{flex:1;justify-content:center}
+header.bar .room{font:700 19px var(--serif);margin-right:4px;white-space:nowrap}
+header.bar .btn{padding:6px 11px;font-size:14px;white-space:nowrap}
+header.bar .btn.primary{padding:6px 16px}
+#passBtn:not(.primary){background:rgba(0,0,0,.2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Side panel hidden: the cameras get the whole width */
+#table.nopanel{grid-template-columns:1fr}
+#table.nopanel aside{display:none}
 #waitNote{color:var(--muted);font-size:14px}
 #netWarn{flex-basis:100%;display:flex;gap:12px;align-items:flex-start;background:rgba(224,118,92,.14);border:1px solid var(--danger);border-radius:8px;padding:8px 12px;font-size:14px}
 #netWarn.slow{background:rgba(201,164,76,.12);border-color:var(--brass)}
@@ -148,11 +160,17 @@ header.bar .btn{padding:6px 11px;font-size:14px}
 .dmgask .skip{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px}
 
 /* Side panel */
-aside{border-left:1px solid var(--felt-edge);min-height:0;overflow:auto;padding:14px}
+aside{border-left:1px solid var(--felt-edge);min-height:0;overflow:auto;padding:0 14px 14px}
 aside h2{font:700 18px var(--serif);margin:0 0 8px}
 aside section+section{margin-top:22px}
+.tabs{position:sticky;top:0;z-index:25;display:flex;gap:2px;margin:0 -14px 14px;padding:8px 10px 0;background:var(--felt-deep);border-bottom:1px solid var(--felt-edge)}
+.tabs button{flex:1;position:relative;background:none;border:0;border-bottom:3px solid transparent;padding:8px 4px 7px;color:var(--muted);font-weight:600;font-size:14px}
+.tabs button:hover{color:var(--parchment)}
+.tabs button[aria-selected="true"]{color:var(--parchment);border-bottom-color:var(--brass)}
+.tabs .badge{display:inline-block;min-width:18px;height:18px;margin-left:5px;padding:0 5px;border-radius:9px;background:var(--brass);color:#1b1608;font-size:11px;line-height:18px;vertical-align:1px}
 .search{display:flex;gap:6px;margin-bottom:10px}
 .search input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);min-width:0}
+#cardSec{scroll-margin-top:52px}
 #cardView img{width:100%;border-radius:4.75% / 3.5%;display:block;margin-bottom:10px}
 #cardView .type{color:var(--muted);font-size:14px;margin:0 0 6px}
 #cardView .oracle{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
@@ -245,6 +263,8 @@ button.mpip{cursor:pointer}
   #grid.n2,#grid.n3,#grid.n4{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto}
   #grid .tile{grid-column:auto !important;aspect-ratio:16/9}
   aside{border-left:0;border-top:1px solid var(--felt-edge)}
+  #panelBtn{display:none}
+  header.bar .grp.game{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){
   .life output{transition:none}.tile.enter{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
@@ -257,42 +277,46 @@ button.mpip{cursor:pointer}
   <div class="lobby-card">
     <h1>Kitchen Table</h1>
     <p class="lede">Play paper Magic over webcam. Point a camera at your playmat, share the table, and click any card on screen to read it.</p>
-    <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
-    <p class="hint hidden" id="noCam">No webcam found. You can still sit down and use your phone as the camera from the table.</p>
-    <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" placeholder="Luke"></label>
-    <label class="field"><span>Camera</span><select id="camSel"></select></label>
-    <label class="field"><span>Microphone</span><select id="micSel"></select></label>
-    <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
-      <select id="modeSel"></select></label>
-    <div class="field"><span>Your decks (saved in this browser)</span>
-      <div class="row deckbar">
-        <select id="deckSel" aria-label="Saved decks"></select>
-        <input id="deckName" maxlength="40" placeholder="Deck name" aria-label="Deck name">
-        <button class="btn" id="deckSave" type="button">Save deck</button>
-        <button class="btn" id="deckDel" type="button">Delete</button>
+    <div class="lobby-cols">
+      <div class="col">
+      <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
+      <p class="hint hidden" id="noCam">No webcam found. You can still sit down and use your phone as the camera from the table.</p>
+      <label class="field"><span>Camera</span><select id="camSel"></select></label>
+      <label class="field"><span>Microphone</span><select id="micSel"></select></label>
+      <label class="check"><input type="checkbox" id="rotIn"> My camera is upside down</label>
+      <details class="adv">
+        <summary>Connection settings (TURN relay)</summary>
+        <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
+        <label class="field"><span>TURN URL</span><input id="turnUrl" placeholder="turn:example.com:3478"></label>
+        <label class="field"><span>Username</span><input id="turnUser"></label>
+        <label class="field"><span>Credential</span><input id="turnCred" type="password"></label>
+      </details>
       </div>
-      <div class="row deckbar">
-        <input id="deckUrl" placeholder="Or paste a Moxfield or Archidekt deck link" aria-label="Deck link">
-        <button class="btn" id="deckImport" type="button">Import</button>
+      <div class="col">
+      <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" placeholder="Luke"></label>
+      <label class="field"><span>Table code (leave blank to start a new table)</span><input id="roomIn" maxlength="16" autocomplete="off"></label>
+      <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
+        <select id="modeSel"></select></label>
+      <div class="field"><span>Your decks (saved in this browser)</span>
+        <div class="row deckbar">
+          <select id="deckSel" aria-label="Saved decks"></select>
+          <input id="deckName" maxlength="40" placeholder="Deck name" aria-label="Deck name">
+          <button class="btn" id="deckSave" type="button">Save deck</button>
+          <button class="btn" id="deckDel" type="button">Delete</button>
+        </div>
+        <div class="row deckbar">
+          <input id="deckUrl" placeholder="Or paste a Moxfield or Archidekt deck link" aria-label="Deck link">
+          <button class="btn" id="deckImport" type="button">Import</button>
+        </div>
+        <p class="hint" id="deckMsg" role="status"></p>
       </div>
-      <p class="hint" id="deckMsg" role="status"></p>
+      <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
+        <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
+      <p class="hint" id="deckCount"></p>
+      <button class="btn primary big" id="joinBtn">Sit down</button>
+      <div id="lobbyErr" role="alert"></div>
+      </div>
     </div>
-    <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
-      <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
-    <p class="hint" id="deckCount"></p>
-    <label class="field"><span>Table code (leave blank to start a new table)</span><input id="roomIn" maxlength="16" autocomplete="off"></label>
-    <div class="row">
-      <button class="btn primary" id="joinBtn">Sit down</button>
-      <label class="btn"><input type="checkbox" id="rotIn"> Camera is upside down</label>
-    </div>
-    <div id="lobbyErr" role="alert"></div>
-    <details class="adv">
-      <summary>Connection settings (TURN relay)</summary>
-      <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
-      <label class="field"><span>TURN URL</span><input id="turnUrl" placeholder="turn:example.com:3478"></label>
-      <label class="field"><span>Username</span><input id="turnUser"></label>
-      <label class="field"><span>Credential</span><input id="turnCred" type="password"></label>
-    </details>
   </div>
 </section>
 
@@ -313,108 +337,133 @@ button.mpip{cursor:pointer}
 
 <section id="table" class="hidden">
   <header class="bar">
-    <span class="room" id="roomLabel"></span>
-    <button class="btn" id="copyBtn">Copy invite link</button>
-    <button class="btn" id="phoneBtn">Phone camera</button>
-    <span id="waitNote">Waiting for players to join</span>
-    <span class="clock" id="gameClock">Game not started</span>
-    <span class="daychip hidden" id="dayChip"></span>
-    <button class="btn" id="startBtn">Start game</button>
-    <button class="btn" id="newBtn">New game</button>
-    <span class="spacer"></span>
-    <button class="btn" id="rollBtn">Roll for first</button>
-    <details class="dd" id="diceDd">
-      <summary class="btn">Dice</summary>
-      <div class="menu">
-        <button data-kind="coin">Flip a coin</button>
-        <button data-kind="d4">Roll a d4</button>
-        <button data-kind="d6">Roll a d6</button>
-        <button data-kind="d8">Roll a d8</button>
-        <button data-kind="d10">Roll a d10</button>
-        <button data-kind="d12">Roll a d12</button>
-        <button data-kind="d20">Roll a d20</button>
-      </div>
-    </details>
-    <button class="btn" id="passBtn">Pass turn</button>
-    <button class="btn" id="capBtn">Captions on</button>
-    <button class="btn" id="micBtn">Mute mic</button>
-    <button class="btn" id="camBtn">Hide camera</button>
-    <button class="btn" id="rotBtn">Flip my camera</button>
-    <button class="btn" id="leaveBtn">Leave</button>
+    <div class="grp">
+      <span class="room" id="roomLabel"></span>
+      <button class="btn" id="copyBtn">Copy invite link</button>
+      <span id="waitNote">Waiting for players to join</span>
+    </div>
+    <div class="grp game">
+      <span class="clock" id="gameClock"></span>
+      <span class="daychip hidden" id="dayChip"></span>
+      <button class="btn" id="startBtn">Start game</button>
+      <button class="btn primary" id="passBtn" title="Pass the turn to the next player">Pass turn</button>
+      <details class="dd" id="diceDd">
+        <summary class="btn">Dice</summary>
+        <div class="menu">
+          <button id="rollBtn" type="button">Roll for who goes first</button>
+          <button data-kind="coin">Flip a coin</button>
+          <button data-kind="d4">Roll a d4</button>
+          <button data-kind="d6">Roll a d6</button>
+          <button data-kind="d8">Roll a d8</button>
+          <button data-kind="d10">Roll a d10</button>
+          <button data-kind="d12">Roll a d12</button>
+          <button data-kind="d20">Roll a d20</button>
+        </div>
+      </details>
+    </div>
+    <div class="grp mine">
+      <button class="btn" id="micBtn" title="Mute or unmute your microphone">Mic on</button>
+      <button class="btn" id="camBtn" title="Hide or show your camera">Camera on</button>
+      <button class="btn" id="capBtn">Captions on</button>
+      <details class="dd" id="moreDd">
+        <summary class="btn">More</summary>
+        <div class="menu">
+          <button id="phoneBtn" type="button">Use my phone as the camera</button>
+          <button id="rotBtn" type="button">Flip my camera</button>
+          <button id="newBtn" type="button">New game</button>
+          <button id="leaveBtn" type="button">Leave the table</button>
+        </div>
+      </details>
+      <button class="btn" id="panelBtn" type="button" aria-controls="side" aria-expanded="true">Hide panel</button>
+    </div>
     <div id="netWarn" class="hidden" role="alert"><span id="netText"></span><button id="netDismiss">Dismiss</button></div>
   </header>
   <div id="grid"></div>
-  <aside>
-    <section id="cardSec">
-      <h2>Card</h2>
-      <div class="search">
-        <div class="searchwrap">
-          <input id="searchIn" placeholder="Type a card name" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="acBox">
-          <div id="acBox" class="hidden" role="listbox"></div>
+  <aside id="side">
+    <nav class="tabs" role="tablist" aria-label="Side panel">
+      <button role="tab" id="tab-card" data-tab="card" aria-selected="true">Card<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-log" data-tab="log" aria-selected="false">Log<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-captions" data-tab="captions" aria-selected="false">Captions<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-table" data-tab="table" aria-selected="false">Table<span class="badge hidden"></span></button>
+    </nav>
+    <div class="pane" role="tabpanel" data-pane="card" aria-labelledby="tab-card">
+      <section id="cardSec">
+        <h2 class="sr">Card</h2>
+        <div class="search">
+          <div class="searchwrap">
+            <input id="searchIn" placeholder="Type a card name" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="acBox">
+            <div id="acBox" class="hidden" role="listbox"></div>
+          </div>
+          <button class="btn" id="searchBtn">Find</button>
         </div>
-        <button class="btn" id="searchBtn">Find</button>
+        <div id="status" aria-live="polite"></div>
+        <p class="hint" id="artStat"></p>
+        <details id="matchStats" class="small">
+          <summary>Matching log (<span id="msCount">0</span>)</summary>
+          <p class="hint" id="msText"></p>
+          <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
+        </details>
+        <details id="histBox" class="hidden" open>
+          <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
+          <div id="histList"></div>
+        </details>
+        <div id="alts" class="hidden"></div>
+        <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
+      </section>
       </div>
-      <div id="status" aria-live="polite"></div>
-      <p class="hint" id="artStat"></p>
-      <details id="matchStats" class="small">
-        <summary>Matching log (<span id="msCount">0</span>)</summary>
-        <p class="hint" id="msText"></p>
-        <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
-      </details>
-      <details id="histBox" class="hidden" open>
-        <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
-        <div id="histList"></div>
-      </details>
-      <div id="alts" class="hidden"></div>
-      <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
-    </section>
-    <section>
-      <h2>Table</h2>
-      <div class="tbl">
-        <label for="tblMode">Game mode</label><select id="tblMode"></select>
-        <span></span><span class="hint" id="modeHint"></span>
-        <label for="monSel">Monarch</label><select id="monSel"></select>
-        <label for="iniSel">Initiative</label><select id="iniSel"></select>
-        <label for="dnSel">Day or night</label>
-        <select id="dnSel"><option value="">Neither yet</option><option value="day">Day</option><option value="night">Night</option></select>
-        <label for="clockSel">Turn clock</label>
-        <select id="clockSel"><option value="off">Off</option><option value="up">Count up</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option></select>
+    <div class="pane hidden" role="tabpanel" data-pane="log" aria-labelledby="tab-log">
+      <section>
+        <h2>Table log</h2>
+        <ul class="list" id="log"></ul>
+      </section>
+        <section>
+        <div class="dmghead"><h2 style="margin:0">Damage history</h2><span class="spacer" style="flex:1"></span>
+          <select id="dmgFilter" aria-label="Filter damage history"></select>
+          <button class="btn small" id="csvBtn" style="padding:5px 10px">Export CSV</button></div>
+        <div id="dmgTotals"></div>
+        <ul class="list" id="dmgList"></ul>
+      </section>
       </div>
-    </section>
-    <section>
-      <div class="dmghead"><h2 style="margin:0">Damage history</h2><span class="spacer" style="flex:1"></span>
-        <select id="dmgFilter" aria-label="Filter damage history"></select>
-        <button class="btn small" id="csvBtn" style="padding:5px 10px">Export CSV</button></div>
-      <div id="dmgTotals"></div>
-      <ul class="list" id="dmgList"></ul>
-    </section>
-    <section>
-      <h2>Captions</h2>
-      <p class="hint" id="capHint"></p>
-      <div id="capPeers"></div>
-      <button class="linkbtn small" id="capDiag" type="button">Copy caption diagnostics</button>
-      <ul id="captions"></ul>
-      <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
-      <label class="opts-line">Speech engine
-        <select id="engineSel" style="padding:4px 6px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)">
-          <option value="browser">Chrome or Edge speech (most accurate)</option>
-          <option value="device">Chrome on-device (private, audio stays on this computer)</option>
-        </select></label>
-      <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
-      <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
-    </section>
-    <section>
-      <details id="recBox">
-        <summary class="rechead"><h2>Game records</h2><span class="hint">(<span id="recCount">0</span>)</span></summary>
-        <p class="hint" id="recTotals"></p>
-        <ul class="list" id="recList"></ul>
-        <div class="row" style="margin-top:8px"><button class="btn small" id="recWin" type="button">Record a winner</button><button class="btn small" id="recCsv" type="button">Export CSV</button><button class="linkbtn small" id="recClear" type="button">Clear</button></div>
-      </details>
-    </section>
-    <section>
-      <h2>Table log</h2>
-      <ul class="list" id="log"></ul>
-    </section>
+    <div class="pane hidden" role="tabpanel" data-pane="captions" aria-labelledby="tab-captions">
+      <section>
+        <h2>Captions</h2>
+        <p class="hint" id="capHint"></p>
+        <div id="capPeers"></div>
+        <button class="linkbtn small" id="capDiag" type="button">Copy caption diagnostics</button>
+        <ul id="captions"></ul>
+        <label class="opts-line"><input type="checkbox" id="oneWord" checked> Link one-word card names (like Doomsday)</label>
+        <label class="opts-line">Speech engine
+          <select id="engineSel" style="padding:4px 6px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)">
+            <option value="browser">Chrome or Edge speech (most accurate)</option>
+            <option value="device">Chrome on-device (private, audio stays on this computer)</option>
+          </select></label>
+        <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
+        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
+      </section>
+      </div>
+    <div class="pane hidden" role="tabpanel" data-pane="table" aria-labelledby="tab-table">
+      <section>
+        <h2>Table</h2>
+        <div class="tbl">
+          <label for="tblMode">Game mode</label><select id="tblMode"></select>
+          <span></span><span class="hint" id="modeHint"></span>
+          <label for="monSel">Monarch</label><select id="monSel"></select>
+          <label for="iniSel">Initiative</label><select id="iniSel"></select>
+          <label for="dnSel">Day or night</label>
+          <select id="dnSel"><option value="">Neither yet</option><option value="day">Day</option><option value="night">Night</option></select>
+          <label for="clockSel">Turn clock</label>
+          <select id="clockSel"><option value="off">Off</option><option value="up">Count up</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option></select>
+        </div>
+      </section>
+        <section>
+        <details id="recBox">
+          <summary class="rechead"><h2>Game records</h2><span class="hint">(<span id="recCount">0</span>)</span></summary>
+          <p class="hint" id="recTotals"></p>
+          <ul class="list" id="recList"></ul>
+          <div class="row" style="margin-top:8px"><button class="btn small" id="recWin" type="button">Record a winner</button><button class="btn small" id="recCsv" type="button">Export CSV</button><button class="linkbtn small" id="recClear" type="button">Clear</button></div>
+        </details>
+      </section>
+      </div>
   </aside>
 </section>
 
@@ -1243,13 +1292,13 @@ function passTurn(){
 }
 $("#micBtn").onclick = e => {
   const t = localStream.getAudioTracks()[0]; if (!t) return;
-  t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mute mic" : "Unmute mic"; e.target.classList.toggle("off", !t.enabled);
+  t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mic on" : "Mic muted"; e.target.classList.toggle("off", !t.enabled);
   if (!t.enabled) stopRec(); else if (capOn) startRec();
   pushState();
 };
 $("#camBtn").onclick = e => {
   camHidden = !camHidden; applyWebcam();
-  e.target.textContent = camHidden ? "Show camera" : "Hide camera"; e.target.classList.toggle("off", camHidden);
+  e.target.textContent = camHidden ? "Camera hidden" : "Camera on"; e.target.classList.toggle("off", camHidden);
 };
 $("#rotBtn").onclick = () => { me.rot = !me.rot; pushState(); render(); };
 $("#leaveBtn").onclick = () => {
@@ -1363,7 +1412,7 @@ function turnText(s){
 }
 function updateClocks(){
   updateNetWarn(); syncRemoteCaps();
-  $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "Game not started";
+  $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "";
   $("#startBtn").classList.toggle("hidden", !!gameStartAt);
   document.querySelectorAll("#grid .tile").forEach(el => {
     const [txt, over] = turnText(+el.dataset.seat);
@@ -1381,6 +1430,7 @@ function render(bumpMine){
   grid.className = "n" + Math.max(1, Math.min(MAX, seats.length));
   $("#roomLabel").textContent = `Table ${roomCode}, ${modeOf(table.mode).short}`;
   $("#waitNote").classList.toggle("hidden", seats.length > 1);
+  $("#passBtn").classList.toggle("primary", !table.turnSeat || table.turnSeat === mySeat);
   [...grid.children].forEach(el => { if (!seats.includes(+el.dataset.seat)) el.remove(); });
   seats.forEach(s => {
     const p = players[s];
@@ -1612,7 +1662,7 @@ function addCounterDialog(){
 function closeMenus(){ document.querySelectorAll(".tilemenu").forEach(m => m.remove()); }
 document.addEventListener("pointerdown", e => {
   if (!e.target.closest(".tilemenu") && !e.target.closest(".ctr.add")) closeMenus();
-  const dd = $("#diceDd"); if (dd?.open && !e.target.closest("#diceDd")) dd.open = false;
+  for (const dd of document.querySelectorAll("header details.dd")) if (dd.open && !dd.contains(e.target)) dd.open = false;
 });
 function openCounterMenu(el){
   closeMenus();
@@ -1815,7 +1865,7 @@ $("#phoneBtn").onclick = () => {
 };
 function updatePhoneUi(){
   const on = !!me.camStream;
-  $("#phoneBtn").textContent = on ? "Phone camera on" : "Phone camera";
+  $("#phoneBtn").textContent = on ? "Phone camera is on (tap to see its link)" : "Use my phone as the camera";
   const st = $("#phoneStat"); if (st) st.textContent = on ? "Your phone is connected." : "Waiting for your phone...";
   const stop = $("#phoneStop"); if (stop) stop.classList.toggle("hidden", !on);
 }
@@ -2023,7 +2073,8 @@ async function flicker(dies, kind, ms){
 }
 
 let rollActive = null;
-$("#rollBtn").onclick = () => startRollOff();
+$("#rollBtn").onclick = () => { $("#diceDd").open = false; startRollOff(); };
+document.querySelectorAll("#moreDd .menu button").forEach(b => b.addEventListener("click", () => { $("#moreDd").open = false; }));
 function startRollOff(){
   const seats = presentSeats().filter(s => s === mySeat || players[s].name);
   const names = {}; seats.forEach(s => { names[s] = nm(s); });
@@ -2083,7 +2134,7 @@ async function playRollOff(msg){
   setTimeout(() => { if (rollActive === token) closeModal(); }, 6000);
 }
 
-document.querySelectorAll("#diceDd .menu button").forEach(b => b.onclick = () => { $("#diceDd").open = false; rollDice(b.dataset.kind); });
+document.querySelectorAll("#diceDd .menu button[data-kind]").forEach(b => b.onclick = () => { $("#diceDd").open = false; rollDice(b.dataset.kind); });
 const KINDS = ["coin", "d4", "d6", "d8", "d10", "d12", "d20"];
 function rollDice(kind){
   if (!KINDS.includes(kind)) return;
@@ -2593,6 +2644,8 @@ function attachLookup(el, s){
     Object.assign(box.style, { left:x + "px", top:y + "px", width:Math.abs(e.clientX - start.x) + "px", height:Math.abs(e.clientY - start.y) + "px" });
   }
 }
+// A click outline can't follow the card through a layout change, so a resize clears it
+addEventListener("resize", () => document.querySelectorAll(".tile .sel.card").forEach(b => b.remove()));
 function toVideo(video, cx, cy, rot){
   const r = video.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
   const scale = Math.min(r.width / vw, r.height / vh);
@@ -2742,8 +2795,9 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
     const vid = (x, y) => { const c = toVideo(video, x, y, rot); return { x:c.x * fr.k, y:c.y * fr.k }; };
     const showBox = b => {
       const a = fromVideo(video, b.x / fr.k, b.y / fr.k, rot), z = fromVideo(video, (b.x + b.w) / fr.k, (b.y + b.h) / fr.k, rot);
-      const er = tileEl.getBoundingClientRect();
-      Object.assign(boxEl.style, { left:(Math.min(a.x, z.x) - er.left) + "px", top:(Math.min(a.y, z.y) - er.top) + "px", width:Math.abs(z.x - a.x) + "px", height:Math.abs(z.y - a.y) + "px" });
+      const er = tileEl.getBoundingClientRect(), pc = (v, of) => (v / of * 100) + "%";  // in % of the tile, so it stays put if the window resizes
+      Object.assign(boxEl.style, { left:pc(Math.min(a.x, z.x) - er.left, er.width), top:pc(Math.min(a.y, z.y) - er.top, er.height),
+                                   width:pc(Math.abs(z.x - a.x), er.width), height:pc(Math.abs(z.y - a.y), er.height) });
     };
     setStatus("Matching card art...");
     await sleep(16);  // let the status paint before the search runs
@@ -2889,7 +2943,7 @@ function showCard(card, { share = false, from = null, fromHistory = false } = {}
   const view = $("#cardView"); view.innerHTML = "";
   cardCache.set(card.id, card); remember(card, fromHistory); learnLater(card.name);
   if (!from) focusCardView();  // you asked for it, so bring the card into view; cards others show don't move your panel
-  if (from) { const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
+  if (from) { bumpTab("card"); const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
   const faces = card.card_faces && !card.image_uris ? card.card_faces : [card];
   faces.forEach(f => {
     const src = (f.image_uris || card.image_uris)?.normal;
@@ -2913,9 +2967,43 @@ function showCard(card, { share = false, from = null, fromHistory = false } = {}
   setStatus("");
   if (share) { broadcast({ type:"card", name:card.name }); log("You looked at ", card.name); }
 }
+/* Side panel tabs. A tab you're not looking at counts what arrived there since you last opened it. */
+var tabNow = "card";  // var: log() can run before this line
+function showTab(name){
+  tabNow = name;
+  document.querySelectorAll("#side .tabs button").forEach(b => {
+    const on = b.dataset.tab === name; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1;
+    if (on) { const g = b.querySelector(".badge"); g.textContent = ""; g.classList.add("hidden"); }
+  });
+  document.querySelectorAll("#side .pane").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== name));
+  store.set("kt-tab", name);
+  if (name === "captions") { const ul = $("#captions"); ul.scrollTop = ul.scrollHeight; }
+}
+function bumpTab(name){
+  if (name === tabNow && !$("#table").classList.contains("nopanel")) return;
+  const g = $(`#tab-${name} .badge`); if (!g) return;
+  const n = (+g.textContent || 0) + 1; g.textContent = n > 99 ? "99+" : n; g.classList.remove("hidden");
+}
+document.querySelectorAll("#side .tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+$("#side .tabs").addEventListener("keydown", e => {  // arrow keys move between tabs
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const t = [...document.querySelectorAll("#side .tabs button")], i = t.findIndex(b => b.dataset.tab === tabNow);
+  const n = t[(i + (e.key === "ArrowRight" ? 1 : t.length - 1)) % t.length]; showTab(n.dataset.tab); n.focus();
+});
+// Hide the side panel to give the cameras the whole width. Looking a card up brings it back.
+function showPanel(on){
+  $("#table").classList.toggle("nopanel", !on);
+  const b = $("#panelBtn"); b.textContent = on ? "Hide panel" : "Show panel"; b.setAttribute("aria-expanded", on);
+  store.set("kt-panel", on ? "1" : "0");
+  if (on) { const g = $(`#tab-${tabNow} .badge`); if (g) { g.textContent = ""; g.classList.add("hidden"); } }
+}
+$("#panelBtn").onclick = () => showPanel($("#table").classList.contains("nopanel"));
+showTab(["card", "log", "captions", "table"].includes(store.get("kt-tab", "")) ? store.get("kt-tab", "") : "card");
+showPanel(store.get("kt-panel", "1") !== "0");
 // Scroll the side panel (or the page, on narrow screens) up to the Card section and flash it
 function focusCardView(){
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  showPanel(true); showTab("card");
   $("#cardSec").scrollIntoView({ behavior:reduce ? "auto" : "smooth", block:"start" });
   const v = $("#cardView"); v.classList.remove("flash"); void v.offsetWidth; v.classList.add("flash");
 }
@@ -3270,6 +3358,7 @@ async function addCaption(seat, text, heardHere){
     } else li.append(seg.t);
   });
   if (interimEl && interimEl.parentNode === ul) ul.insertBefore(li, interimEl); else ul.appendChild(li);
+  if (seat !== mySeat) bumpTab("captions");
   while (ul.children.length > 120) ul.firstChild.remove();
   if (nearBottom) ul.scrollTop = ul.scrollHeight;
 }
@@ -3699,7 +3788,7 @@ function log(text, cardName){
     b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(cardName)) || await findCard(cardName); if (c) showCard(c); };
     li.appendChild(b); li.append(".");
   }
-  const ul = $("#log"); ul.prepend(li);
+  const ul = $("#log"); ul.prepend(li); bumpTab("log");
   while (ul.children.length > 80) ul.lastChild.remove();
 }
 })();
