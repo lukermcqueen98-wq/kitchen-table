@@ -68,12 +68,15 @@ export async function newPlayer(browser, { lisp = false } = {}){
 // Open the lobby (optionally for a table code), fill in the name and deck, and sit down
 export async function sitDown(page, name, { room = "", deck, mode } = {}){
   await page.goto(`${BASE}/index.html${room ? "?room=" + room : ""}`);
-  await expect(page.locator("#lobby")).toBeVisible();
+  await expect(page.locator("#lobby")).toBeVisible({ timeout:10000 });
   await page.fill("#nameIn", name);
   if (deck !== undefined) await page.fill("#deckIn", deck);
   if (mode) await page.selectOption("#modeSel", mode);
   await page.click("#joinBtn");
-  await expect(page.locator("#table")).toBeVisible({ timeout:15000 });
+  // (on failure, say what the lobby showed: its error line and the button's text)
+  await expect(page.locator("#table")).toBeVisible({ timeout:15000 }).catch(async e => {
+      throw new Error(e.message + `\nAfter waiting: lobby said "${await page.textContent("#lobbyErr")}", button "${await page.textContent("#joinBtn")}"`);
+    });
   await page.waitForTimeout(700);
   await page.keyboard.press("Escape");  // skip the commander question
   return new URL(page.url()).searchParams.get("room");

@@ -2395,7 +2395,15 @@ const TJS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/di
 // DINOv2-small in browser-ready form, under the names it's published as. The first that loads is used.
 // tools/build-index.mjs tries the same list in the same order, and the index records which one built it.
 const AI_MODELS = ["Xenova/dinov2-small", "onnx-community/dinov2-small-ONNX", "onnx-community/dinov2-small"];
-const aiKey = () => (AI.model || AI_MODELS[0]) + ":v3:";  // saved fingerprints; bump the version when the recipe changes
+// Saved fingerprints are kept per model and per way of preparing pictures; bump the version when the recipe changes
+const aiKey = () => (AI.model || AI_MODELS[0]) + ":v3:" + (prepWidth() || "full") + ":";
+// Pictures are shrunk to this width before fingerprinting (see shrinkArt). The all-cards index says which it was built
+// with ("prep" in cards.json), and clicks must match it; an index from before shrinking was added used full pictures.
+const SHRINK_DEFAULT = 48;
+function prepWidth(){
+  if (!IDX.n) return SHRINK_DEFAULT;
+  const m = /^shrink(\d+)$/.exec(IDX.prep || ""); return m ? +m[1] : 0;
+}
 const AI = { ext:null, loading:null, failed:false, device:"", model:"", refs:[], learned:new Set(), camLoaded:new Set() };
 async function aiLoad(){
   if (AI.ext) return AI.ext;
@@ -2446,7 +2454,8 @@ function fingerprints(out){
 }
 async function aiEmbed(canvases){
   const ext = await aiLoad(); if (!ext || !canvases.length) return null;
-  return fingerprints(await ext(canvases));
+  const w = prepWidth();
+  return fingerprints(await ext(w ? canvases.map(c => shrinkArt(c, w)) : canvases));
 }
 
 /* The all-cards index: a fingerprint of every Magic card's art, built by the GitHub Action (tools/build-index.mjs)
@@ -2468,7 +2477,7 @@ function loadCardIndex(){
       const n = meta.cards.length;
       if (buf.byteLength !== n * 4 + n * meta.dims) throw new Error("index file is incomplete");
       // Layout: n float32 scales, then n fingerprints of dims signed bytes (value = byte / scale)
-      Object.assign(IDX, { n, dims:meta.dims, model:meta.model, scales:new Float32Array(buf, 0, n), vecs:new Int8Array(buf, n * 4),
+      Object.assign(IDX, { n, dims:meta.dims, model:meta.model, prep:meta.prep || "", scales:new Float32Array(buf, 0, n), vecs:new Int8Array(buf, n * 4),
                            ids:meta.cards.map(c => c[0]), names:meta.cards.map(c => c[1]) });
       aiLoad();  // warm up the model so the first click is quick
     } catch (e) { IDX.missing = true; console.info("All-cards picture index not available:", e.message || e); }
