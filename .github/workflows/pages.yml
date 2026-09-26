@@ -1,19 +1,12 @@
-# Publishes Kitchen Table to GitHub Pages together with the all-cards picture index.
-# The index is built by tools/build-index.mjs and kept between runs in the Actions cache, so each run only
-# processes new cards. The first build takes a few hours; if it hits the time limit it deploys what it has
-# and the next run continues. It also runs weekly to pick up new sets.
-#
-# The app itself is published first (the "app" job, about a minute) with whatever index already exists, so app
-# changes go live right away; then the index is updated and the site is published again.
+# Publishes Kitchen Table to GitHub Pages in about a minute, keeping whatever all-cards picture index was
+# built last. The index itself is only built when you run "Build card index" (card-index.yml).
 #
 # One-time setup: repo Settings > Pages > Build and deployment > Source: GitHub Actions.
-name: Deploy site and card index
+name: Deploy site
 
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: "17 7 * * 1"  # Mondays, 07:17 UTC
   workflow_dispatch:
 
 permissions:
@@ -63,71 +56,3 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: app
-
-  build:
-    needs: app
-    runs-on: ubuntu-latest
-    timeout-minutes: 340
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: tools/package-lock.json
-
-      - name: Restore the card index from the last run
-        uses: actions/cache/restore@v4
-        with:
-          path: site/index
-          key: card-index-${{ github.run_id }}
-          restore-keys: card-index-
-
-      # GitHub drops cached data unused for 7 days. Without it, start from the index the live site already
-      # publishes, so a missed week means a quick update instead of rebuilding every card from scratch.
-      - name: Fall back to the published card index
-        if: hashFiles('site/index/cards.json') == ''
-        run: |
-          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          mkdir -p site/index
-          if curl -fsSL "$site/index/cards.json" -o site/index/cards.json && curl -fsSL "$site/index/cards.bin" -o site/index/cards.bin; then
-            echo "Starting from the published index."
-          else
-            rm -f site/index/cards.json site/index/cards.bin
-            echo "No published index yet; building from scratch."
-          fi
-
-      - name: Install the index builder
-        run: npm ci --prefix tools --no-audit --no-fund
-
-      - name: Build or update the card index
-        env:
-          MAX_MINUTES: "300"
-        run: node tools/build-index.mjs site/index
-
-      - name: Save the card index for the next run
-        if: always() && hashFiles('site/index/cards.json') != ''
-        uses: actions/cache/save@v4
-        with:
-          path: site/index
-          key: card-index-${{ github.run_id }}
-
-      - name: Assemble the site
-        run: cp index.html README.md site/
-
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
