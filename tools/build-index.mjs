@@ -177,11 +177,17 @@ async function mapPool(items, limit, fn){
   return out;
 }
 
+// Keep using the model that built the saved index (switching models means re-fingerprinting every card), and ride out
+// a model host that's briefly unavailable before falling back to another copy of the model
+function savedModel(){ try { return JSON.parse(fs.readFileSync(path.join(OUT, "cards.json"), "utf8")).model; } catch { return ""; } }
 async function loadModel(){
   if (FAKE) return fakeExtractor;
-  for (const m of MODELS) {
-    try { const ext = await pipeline("image-feature-extraction", m, { dtype:"fp32" }); MODEL = m; console.log(`Using model ${m}.`); return ext; }
-    catch (e) { console.log(`Model ${m} didn't load: ${e.message}`); }
+  const prev = savedModel(), order = MODELS.includes(prev) ? [prev, ...MODELS.filter(m => m !== prev)] : MODELS;
+  for (const m of order) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try { const ext = await pipeline("image-feature-extraction", m, { dtype:"fp32" }); MODEL = m; console.log(`Using model ${m}.`); return ext; }
+      catch (e) { console.log(`Model ${m} didn't load (try ${attempt} of 3): ${e.message}`); if (attempt < 3) await sleep(15000 * attempt); }
+    }
   }
   throw new Error("None of the DINOv2-small models could be loaded.");
 }

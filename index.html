@@ -2188,7 +2188,7 @@ const ART = { entries:[], names:new Map(), running:false, rerun:false, blocked:f
 function artStat(){
   const el = $("#artStat"); if (!el) return;
   if (IDX.n || IDX.loading) {
-    el.textContent = IDX.loading ? "Downloading the all-cards picture index (one time, about 17 MB)..."
+    el.textContent = IDX.loading ? "Downloading the all-cards picture index (one time, about 20 MB)..."
       : AI.failed ? "The AI matcher couldn't load in this browser, so only basic picture matching works."
       : AI.loading ? "Loading the AI card matcher (one-time download)..."
       : `AI picture matching ready for all ${IDX.n.toLocaleString()} card artworks${AI.device === "webgpu" ? " (using your graphics card)" : ""}.`;
@@ -2329,7 +2329,10 @@ async function aiLoad(){
       let adapter = null;
       try { adapter = await navigator.gpu?.requestAdapter(); } catch {}
       const tries = adapter ? [["webgpu", adapter.features?.has("shader-f16") ? "fp16" : "fp32"], ["webgpu", "fp32"], ["wasm", "q8"]] : [["wasm", "q8"]];
-      for (const model of AI_MODELS) for (const [device, dtype] of tries) {
+      // The all-cards index only works with the model that built it, so try that one first
+      try { await loadCardIndex(); } catch {}
+      const models = AI_MODELS.includes(IDX.model) ? [IDX.model, ...AI_MODELS.filter(m => m !== IDX.model)] : AI_MODELS;
+      for (const model of models) for (const [device, dtype] of tries) {
         try {
           AI.ext = await T.pipeline("image-feature-extraction", model, { device, dtype });
           AI.device = device; AI.model = model; return AI.ext;
