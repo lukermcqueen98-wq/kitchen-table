@@ -1,0 +1,8 @@
+{
+  "name": "kitchen-table-tools",
+  "private": true,
+  "type": "module",
+  "description": "Builds the all-cards picture index for Kitchen Table",
+  "scripts": { "build-index": "node build-index.mjs ../site/index" },
+  "dependencies": { "@huggingface/transformers": "3.8.1" }
+}
