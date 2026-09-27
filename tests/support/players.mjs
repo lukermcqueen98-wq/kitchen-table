@@ -58,6 +58,9 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false }
     } stop(){} }
     if (rejectPhrases) { FakeSR.prototype.phrases = null; window.SpeechRecognitionPhrase = class { constructor(phrase, boost){ this.phrase = phrase; this.boost = boost; } }; }
     window.SpeechRecognition = FakeSR;
+    // Every WebRTC connection the page opens, so a test can cut one (like a network hiccup)
+    const RPC = window.RTCPeerConnection; window.__pcs = [];
+    window.RTCPeerConnection = class extends RPC { constructor(...x){ super(...x); window.__pcs.push(this); } };
     if (lisp) try { localStorage.setItem("kt-lisp-me", "1"); } catch {}
   }, [PEER_PORT, lisp, rejectPhrases]);
   const page = await ctx.newPage();
