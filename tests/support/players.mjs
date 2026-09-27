@@ -1,5 +1,5 @@
 /* Test players: each one is a Chromium browser with a fake camera and microphone, pointed at the local signaling
-   server, with stand-ins for the CDN libraries, Scryfall, deck sites, the AI models, and speech recognition. */
+   server, with stand-ins for the CDN libraries, Scryfall, the AI models, and speech recognition. */
 import { chromium, expect } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
@@ -44,9 +44,6 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false }
     if (k >= 0) return json(r, u.includes("/search") ? { data:[card(k)] } : card(k));
     return json(r, {}, 404);
   });
-  await ctx.route(/api2\.moxfield\.com/, r => json(r, { name:"Mox Test", boards:{ commanders:{ cards:{ a:{ quantity:1, card:{ name:"Gamma Card" } } } },
-    mainboard:{ cards:{ b:{ quantity:1, card:{ name:"Sol Ring" } }, c:{ quantity:30, card:{ name:"Mountain" } } } } } }));
-  await ctx.route(/archidekt\.com\/api/, r => r.abort("failed"));  // a site that blocks other pages from reading its decks
   await ctx.addInitScript(([peerPort, lisp, rejectPhrases]) => {
     // Point PeerJS at the local signaling server
     let P; Object.defineProperty(window, "Peer", { configurable:true, get(){ return P; },
@@ -70,12 +67,11 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false }
   return page;
 }
 
-// Open the lobby (optionally for a table code), fill in the name and deck, and sit down
-export async function sitDown(page, name, { room = "", deck, mode } = {}){
+// Open the lobby (optionally for a table code), fill in the name, and sit down
+export async function sitDown(page, name, { room = "", mode } = {}){
   await page.goto(`${BASE}/index.html${room ? "?room=" + room : ""}`);
   await expect(page.locator("#lobby")).toBeVisible({ timeout:10000 });
   await page.fill("#nameIn", name);
-  if (deck !== undefined) await page.fill("#deckIn", deck);
   if (mode) await page.selectOption("#modeSel", mode);
   await page.click("#joinBtn");
   // (on failure, say what the lobby showed: its error line and the button's text)

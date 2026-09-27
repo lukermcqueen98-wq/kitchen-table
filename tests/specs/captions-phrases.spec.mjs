@@ -5,7 +5,7 @@ import { launchBrowser, newPlayer, sitDown, say } from "../support/players.mjs";
 // doesn't say why) must not stop captions: they carry on without the list.
 test("captions keep working when the speech service rejects the phrase list", async () => {
   const browser = await launchBrowser(), a = await newPlayer(browser, { rejectPhrases:true });
-  await sitDown(a, "Luke", { deck:"1 Sol Ring" });
+  await sitDown(a, "Luke");
   await say(a, "I cast Sol Ring");
   await expect(a.locator("#captions li", { hasText:"Sol Ring" })).toHaveCount(1, { timeout:8000 });
   await expect(a.locator("#capBtn")).toHaveText("Captions on");
