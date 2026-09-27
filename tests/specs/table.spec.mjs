@@ -30,7 +30,7 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
 
   // Other counters sync
   await tile(a, 1).locator(".ctr.add").click();
-  await a.getByText("Other counters").click();
+  await a.locator(".tilemenu").getByText("Other counters").click();
   await a.locator(".modal-card button", { hasText:"Charge" }).first().click();
   await a.locator('.modal-card input[placeholder="Start typing a card name"]').fill("Sol Ring");
   await a.locator(".modal-card button", { hasText:"Add counter" }).click();

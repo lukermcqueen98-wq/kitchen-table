@@ -9,7 +9,7 @@ test("rejoining restores life, counters and the turn: same browser, new device, 
   const minus = tile(b, 2).locator('.life button[data-d="-1"]');
   for (let i = 0; i < 9; i++) await minus.click();
   await b.locator(".dmgask .skip").click();
-  await tile(b, 2).locator(".ctr.add").click(); await b.getByText("Poison counters").click();
+  await tile(b, 2).locator(".ctr.add").click(); await b.locator(".tilemenu").getByText("Poison counters").click();
   await tile(b, 2).locator(".ctr", { hasText:"Poison" }).locator("button", { hasText:"+" }).click();
   await a.click("#passBtn"); await a.waitForTimeout(600); await b.click("#passBtn"); await a.waitForTimeout(600); await a.click("#passBtn");
   await expect(tile(a, 2).locator(".turnflag")).toHaveText("Their turn 2");

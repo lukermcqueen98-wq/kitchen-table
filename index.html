@@ -270,8 +270,14 @@ button.mpip{cursor:pointer}
 #acBox button{display:block;width:100%;text-align:left;background:none;border:0;padding:7px 9px;border-radius:6px}
 #acBox button:hover,#acBox button.on{background:rgba(255,255,255,.08)}
 /* keyword highlights in captions */
-.kwlink{background:rgba(143,111,201,.22);border:0;border-bottom:1px dotted #b9a2e6;padding:0 3px;border-radius:3px;color:#d9ccf5;font:inherit}
 .fuzzy{font-style:italic}
+/* Terms library */
+#termSearch{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);margin-bottom:6px}
+#termList details{border-bottom:1px solid var(--felt-edge);padding:7px 0}
+#termList summary{cursor:pointer;font-weight:600}
+#termList p{margin:6px 0 4px;font-size:14px}
+#termList a{color:var(--brass);font-size:13px}
+#captions .gap{color:var(--muted)}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--felt-deep);border:1px solid var(--brass);border-radius:10px;padding:10px 14px;z-index:60;display:flex;gap:12px;align-items:center;max-width:92vw}
 
 @media (max-width:900px){
@@ -313,22 +319,6 @@ button.mpip{cursor:pointer}
       <label class="field"><span>Table code (leave blank to start a new table)</span><input id="roomIn" maxlength="16" autocomplete="off"></label>
       <label class="field"><span>Game mode (joining a table? The host's mode is used)</span>
         <select id="modeSel"></select></label>
-      <div class="field"><span>Your decks (saved in this browser)</span>
-        <div class="row deckbar">
-          <select id="deckSel" aria-label="Saved decks"></select>
-          <input id="deckName" maxlength="40" placeholder="Deck name" aria-label="Deck name">
-          <button class="btn" id="deckSave" type="button">Save deck</button>
-          <button class="btn" id="deckDel" type="button">Delete</button>
-        </div>
-        <div class="row deckbar">
-          <input id="deckUrl" placeholder="Or paste a Moxfield or Archidekt deck link" aria-label="Deck link">
-          <button class="btn" id="deckImport" type="button">Import</button>
-        </div>
-        <p class="hint" id="deckMsg" role="status"></p>
-      </div>
-      <label class="field"><span>Decklist (optional). Paste your list to make card recognition and captions more accurate.</span>
-        <textarea id="deckIn" placeholder="1 Smaug, the Wicked Worm&#10;1 Sol Ring&#10;36 Mountain"></textarea></label>
-      <p class="hint" id="deckCount"></p>
       <button class="btn primary big" id="joinBtn">Sit down</button>
       <div id="lobbyErr" role="alert"></div>
       </div>
@@ -401,6 +391,7 @@ button.mpip{cursor:pointer}
       <button role="tab" id="tab-log" data-tab="log" aria-selected="false">Log<span class="badge hidden"></span></button>
       <button role="tab" id="tab-captions" data-tab="captions" aria-selected="false">Captions<span class="badge hidden"></span></button>
       <button role="tab" id="tab-table" data-tab="table" aria-selected="false">Table<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-terms" data-tab="terms" aria-selected="false">Terms<span class="badge hidden"></span></button>
     </nav>
     <div class="pane" role="tabpanel" data-pane="card" aria-labelledby="tab-card">
       <section id="cardSec">
@@ -454,10 +445,19 @@ button.mpip{cursor:pointer}
             <option value="device">Chrome on-device (private, audio stays on this computer)</option>
           </select></label>
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
+        <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I heal", "I pay 2 life", "I play...", "I cast...")</label>
         <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
         <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
       </section>
       </div>
+    <div class="pane hidden" role="tabpanel" data-pane="terms" aria-labelledby="tab-terms">
+      <section>
+        <h2>Magic terms</h2>
+        <input id="termSearch" type="search" placeholder="Search terms, like trample or ward" aria-label="Search Magic terms" autocomplete="off">
+        <p class="hint" id="termCount"></p>
+        <div id="termList"></div>
+      </section>
+    </div>
     <div class="pane hidden" role="tabpanel" data-pane="table" aria-labelledby="tab-table">
       <section>
         <h2>Table</h2>
@@ -640,125 +640,12 @@ for (const sel of [$("#modeSel"), $("#tblMode")]) for (const [k, m] of Object.en
   const o = document.createElement("option"); o.value = k; o.textContent = sel.id === "modeSel" ? m.label : `${m.short}, ${m.life} life`; sel.appendChild(o);
 }
 $("#modeSel").value = store.get("kt-mode", "") || ({ 20:"sixty", 30:"brawl" })[store.get("kt-life", "40")] || "cmdr";
-$("#deckIn").value = store.get("kt-deck", "");
 $("#turnUrl").value = store.get("kt-turn-url", "");
 $("#turnUser").value = store.get("kt-turn-user", "");
 $("#turnCred").value = store.get("kt-turn-cred", "");
 if (params.get("room")) $("#roomIn").value = params.get("room");
 if (params.get("full")) $("#lobbyErr").textContent = `That table is set to ${modeOf(params.get("full")).short} and already has ${modeOf(params.get("full")).max} players.`;
 
-// Finds commanders in a pasted list: a "Commander" section, or Archidekt-style [Commander] tags
-function deckCommanders(txt){
-  const out = []; let inCmdr = false;
-  for (let line of String(txt).split(/\r?\n/)) {
-    line = line.trim();
-    if (!line) { inCmdr = false; continue; }
-    const header = line.replace(/\s*\(\d+\)\s*$/, "").replace(/:$/, "").trim();
-    if (!/^\d/.test(line) && /^[a-z ]+$/i.test(header)) { inCmdr = /^commanders?$/i.test(header); continue; }
-    if (inCmdr || /\[commander/i.test(line)) {
-      const n = line.replace(/^\d+\s*x?\s+/i, "").replace(/\s*[\(\[].*$/, "").replace(/\s+\*[A-Za-z]+\*.*$/, "").trim();
-      if (n && !out.includes(n)) out.push(n);
-    }
-  }
-  return out.slice(0, 2);
-}
-function parseDeck(txt){
-  const out = new Set();
-  for (let line of String(txt).split(/\r?\n/)) {
-    line = line.trim();
-    if (!line || /^(\/\/|#)/.test(line) || /:$/.test(line)) continue;
-    if (/^(commander|companion|deck|main|mainboard|sideboard|maybeboard|creatures?|lands?|instants?|sorcery|sorceries|artifacts?|enchantments?|planeswalkers?|battles?|other)(\s*\(\d+\))?$/i.test(line)) continue;
-    line = line.replace(/^\d+\s*x?\s+/i, "").replace(/\s*[\(\[].*$/, "").replace(/\s+\*[A-Za-z]+\*.*$/, "").replace(/\s+#.*$/, "").trim();
-    if (line.length >= 2 && line.length <= 141) out.add(line);
-  }
-  return [...out].slice(0, 300);
-}
-function showDeckCount(){ const n = parseDeck($("#deckIn").value).length; $("#deckCount").textContent = n ? `${n} unique cards recognized from your list.` : ""; }
-$("#deckIn").addEventListener("input", showDeckCount); showDeckCount();
-
-/* Saved decks: several decklists kept in this browser, picked in the lobby */
-let savedDecks = [];
-try { savedDecks = JSON.parse(store.get("kt-decks", "[]")).filter(d => d && typeof d.id === "string" && typeof d.text === "string").slice(0, 50); } catch { savedDecks = []; }
-const deckMsg = t => { $("#deckMsg").textContent = t; };
-function storeDecks(){ store.set("kt-decks", JSON.stringify(savedDecks)); }
-function renderDeckSel(pick){
-  const sel = $("#deckSel"); sel.innerHTML = "";
-  const o = document.createElement("option"); o.value = ""; o.textContent = savedDecks.length ? "New deck (not saved yet)" : "No saved decks yet"; sel.appendChild(o);
-  [...savedDecks].sort((a, b) => a.name.localeCompare(b.name)).forEach(d => { const x = document.createElement("option"); x.value = d.id; x.textContent = d.name; sel.appendChild(x); });
-  sel.value = savedDecks.some(d => d.id === pick) ? pick : "";
-  $("#deckDel").disabled = !sel.value;
-}
-function pickDeck(id){
-  const d = savedDecks.find(x => x.id === id);
-  store.set("kt-deck-last", id || "");
-  $("#deckName").value = d ? d.name : "";
-  if (d) $("#deckIn").value = d.text;
-  $("#deckDel").disabled = !d; showDeckCount();
-}
-$("#deckSel").onchange = e => { pickDeck(e.target.value); deckMsg(""); };
-function saveDeck(quiet){
-  const text = $("#deckIn").value.trim();
-  if (!text) { if (!quiet) deckMsg("Paste a decklist first."); return; }
-  const name = $("#deckName").value.trim() || deckCommanders(text)[0] || `Deck ${savedDecks.length + 1}`;
-  let d = savedDecks.find(x => x.id === $("#deckSel").value);
-  if (!d) { if (savedDecks.length >= 50) { deckMsg("You can save up to 50 decks. Delete one first."); return; } d = { id:uid() }; savedDecks.push(d); }
-  Object.assign(d, { name:name.slice(0, 40), text:text.slice(0, 30000), at:Date.now() });
-  storeDecks(); renderDeckSel(d.id); pickDeck(d.id);
-  if (!quiet) deckMsg(`Saved "${d.name}".`);
-}
-$("#deckSave").onclick = () => saveDeck(false);
-$("#deckDel").onclick = () => {
-  const d = savedDecks.find(x => x.id === $("#deckSel").value); if (!d) return;
-  if (!confirm(`Delete the saved deck "${d.name}"?`)) return;
-  savedDecks = savedDecks.filter(x => x !== d); storeDecks(); renderDeckSel(""); $("#deckName").value = ""; deckMsg(`Deleted "${d.name}".`);
-};
-renderDeckSel(store.get("kt-deck-last", ""));
-if ($("#deckSel").value) pickDeck($("#deckSel").value);
-
-// Import from a deck link. Works only if the site lets other pages read its decks; otherwise we say how to copy the text.
-async function fetchDeckFromLink(url){
-  let m;
-  const lines = (list) => list.filter(c => c.name && c.qty > 0).map(c => `${c.qty} ${c.name}`).join("\n");
-  const build = (name, cmdrs, main) => ({ name, text:(cmdrs.length ? "Commander\n" + lines(cmdrs) + "\n\nDeck\n" : "") + lines(main) });
-  if ((m = /moxfield\.com\/decks\/([A-Za-z0-9_-]+)/i.exec(url))) {
-    const r = await fetch(`https://api2.moxfield.com/v3/decks/all/${m[1]}`, { headers:{ Accept:"application/json" } });
-    if (!r.ok) throw new Error(r.status === 404 ? "That Moxfield deck wasn't found. Is it public?" : `Moxfield answered ${r.status}.`);
-    const j = await r.json();
-    const board = b => Object.values(b?.cards || b || {}).map(e => ({ qty:+e.quantity || 1, name:e.card?.name || "" }));
-    const bs = j.boards || {};
-    return build(j.name || "Moxfield deck", board(bs.commanders || j.commanders), [...board(bs.mainboard || j.mainboard), ...board(bs.companions || j.companions)]);
-  }
-  if ((m = /archidekt\.com\/(?:api\/)?decks\/(\d+)/i.exec(url))) {
-    const r = await fetch(`https://archidekt.com/api/decks/${m[1]}/`, { headers:{ Accept:"application/json" } });
-    if (!r.ok) throw new Error(r.status === 404 ? "That Archidekt deck wasn't found. Is it public?" : `Archidekt answered ${r.status}.`);
-    const j = await r.json(), cmdrs = [], main = [];
-    for (const c of j.cards || []) {
-      const cats = (c.categories || []).map(x => String(x).toLowerCase());
-      if (cats.includes("maybeboard") || cats.includes("sideboard")) continue;
-      const e = { qty:+c.quantity || 1, name:c.card?.oracleCard?.name || c.card?.name || "" };
-      (cats.includes("commander") ? cmdrs : main).push(e);
-    }
-    return build(j.name || "Archidekt deck", cmdrs, main);
-  }
-  throw new Error("That doesn't look like a Moxfield or Archidekt deck link.");
-}
-$("#deckImport").onclick = async () => {
-  const url = $("#deckUrl").value.trim(); if (!url) { deckMsg("Paste a deck link first."); return; }
-  const site = /moxfield/i.test(url) ? "Moxfield" : /archidekt/i.test(url) ? "Archidekt" : "that site";
-  $("#deckImport").disabled = true; deckMsg("Importing...");
-  try {
-    const d = await fetchDeckFromLink(url);
-    if (!parseDeck(d.text).length) throw new Error("The deck came back empty.");
-    $("#deckSel").value = ""; $("#deckName").value = d.name.slice(0, 40); $("#deckIn").value = d.text; showDeckCount();
-    saveDeck(true); $("#deckUrl").value = "";
-    deckMsg(`Imported and saved "${d.name}" (${parseDeck(d.text).length} unique cards).`);
-  } catch (e) {
-    // A blocked request shows up as a network TypeError: the site doesn't allow other pages to read its decks
-    deckMsg(e instanceof TypeError
-      ? `${site} didn't let this page read the deck. On ${site}, open the deck, use its Export option to copy the list as text, and paste it in the box below.`
-      : e.message || "Couldn't import that deck.");
-  } finally { $("#deckImport").disabled = false; }
-};
 
 // The camera being started, so "Sit down" can wait for it instead of saying there's no camera
 let cameraStarting = null;
@@ -823,8 +710,7 @@ $("#joinBtn").onclick = async () => {
   }
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
-  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-deck", $("#deckIn").value);
-  if ($("#deckSel").value) saveDeck(true);  // edits to a saved deck are kept
+  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value);
   store.set("kt-turn-url", $("#turnUrl").value.trim()); store.set("kt-turn-user", $("#turnUser").value.trim()); store.set("kt-turn-cred", $("#turnCred").value);
   roomCode = $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || randomCode();
   $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Finding a seat...";
@@ -846,8 +732,8 @@ $("#joinBtn").onclick = async () => {
   const startLife = modeOf(table.mode).life;
   joinedAt = Date.now();
   me = { name, startLife, life:startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, rot:$("#rotIn").checked,
-         manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 }, cmdrs:[], deckCmdrs:deckCommanders($("#deckIn").value), manaEmptyOnPass:store.get("kt-mana-empty", "0") === "1",
-         stream:localStream, deck:parseDeck($("#deckIn").value), camKey:uid() };
+         manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 }, cmdrs:[], manaEmptyOnPass:store.get("kt-mana-empty", "0") === "1",
+         stream:localStream, deck:[], camKey:uid() };
   players[mySeat] = me; lastLife = me.life;
   enterTable();
 };
@@ -2337,7 +2223,7 @@ function artStat(){
   }
   const all = [...ART.names.values()], done = all.filter(x => x.state === "done" || x.state === "none").length;
   if (ART.blocked) el.textContent = "Picture matching isn't available in this browser (card images couldn't be read). Name reading still works.";
-  else if (!all.length) el.textContent = "Tip: paste decklists in the lobby so picture matching knows every card at the table. Cards you look up get learned too.";
+  else if (!all.length) el.textContent = "Picture matching learns the table's commanders and every card anyone looks up. On the hosted page it knows every Magic card.";
   else if (done < all.length) el.textContent = `Learning card art: ${done} of ${all.length} cards...`;
   else if (AI.loading) el.textContent = "Loading the AI card matcher (one-time download, about 25 to 45 MB)...";
   else if (AI.failed) el.textContent = `Basic picture matching ready for ${all.length} cards. The AI matcher couldn't load in this browser.`;
@@ -3176,7 +3062,7 @@ async function identify(video, rot, pt, rect, boxEl, tileEl, seat){
   if (lookBusy) return false;
   if (!AI.refs.length && !ART.entries.length && !IDX.n) {
     setStatus(ART.running || IDX.loading ? "Still getting picture matching ready. Try again in a moment."
-      : "Picture matching doesn't know any cards yet. Paste your decklist in the lobby, or look a card up by name once.");
+      : "Picture matching doesn't know any cards yet. Look a card up by name once, or set your commander.");
     return false;
   }
   lookBusy = true; showAlts(null);
@@ -3302,7 +3188,7 @@ function learnLater(name){
   ART.names.set(name, { state:"todo", count:0 }); artSync();
 }
 
-/* Decklist pool: every card any player at the table pasted in */
+/* The table's cards: every commander (and decklists sent by players on older versions of the page) */
 function deckPool(){
   const m = new Map();
   for (const [s, p] of Object.entries(players)) [...(p.deck || []), ...(p.cmdrs || []).map(c => c.name)].forEach(n => {
@@ -3396,7 +3282,7 @@ function showPanel(on){
   if (on) { const g = $(`#tab-${tabNow} .badge`); if (g) { g.textContent = ""; g.classList.add("hidden"); } }
 }
 $("#panelBtn").onclick = () => showPanel($("#table").classList.contains("nopanel"));
-showTab(["card", "log", "captions", "table"].includes(store.get("kt-tab", "")) ? store.get("kt-tab", "") : "card");
+showTab(["card", "log", "captions", "table", "terms"].includes(store.get("kt-tab", "")) ? store.get("kt-tab", "") : "card");
 showPanel(store.get("kt-panel", "1") !== "0");
 // Scroll the side panel (or the page, on narrow screens) up to the Card section and flash it
 function focusCardView(){
@@ -3524,12 +3410,16 @@ function loadIndex(){
       names = r?.data || [];
       if (names.length) store.set("kt-names", JSON.stringify({ t:Date.now(), n:names }));
     }
-    const m = new Map();
+    const m = new Map(), alias = [];
     for (const full of names) for (const face of full.split(" // ")) {
       const k = norm(face); if (!k || m.has(k)) continue;
       m.set(k, face); maxWords = Math.max(maxWords, Math.min(10, k.split(" ").length));
+      // How people say names: "Gwenom" for "Gwenom, Remorseless", "Commander Sphere" for "Commander's Sphere"
+      if (face.includes(",")) { const sh = norm(face.split(",")[0]); if (sh.length >= 4) alias.push([sh, face]); }
+      if (/'s\b/i.test(face)) alias.push([norm(face.replace(/'s\b/gi, "")), face]);
     }
-    cardIndex = m; phonAll = null; lispPhonAll = null;
+    for (const [k, face] of alias) if (k && !m.has(k)) m.set(k, face);  // (a real card with that name comes first)
+    cardIndex = m; phonAll = null; lispPhonAll = null; phonOne = null;
     loadKeywordCatalogs().catch(() => {});
     return m;
   })();
@@ -3676,6 +3566,7 @@ function kwForms(base, flag){
 const KW = new Map(); let kwMax = 1;
 KEYWORDS.forEach(([name, def, flag]) => kwForms(norm(name), flag).forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } }));
 ["equipped", "equipping"].forEach(f => KW.set(f, KW.get("equip")));
+renderTerms();
 /* Every other keyword Magic has, from Scryfall's lists, so new sets are covered too. They link to MTG Wiki for the rules.
    Single common English words are left out ("fear", "gift", "plot"), or everyday talk would light up. */
 const KW_COMMON = new Set(("fear shadow gift craft backup station sneak companion bargain discover plot suspect manifest adapt bolster support " +
@@ -3699,7 +3590,26 @@ async function loadKeywordCatalogs(){
     kwForms(k, j === 1 ? "v" : "").forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } });
   }));
   lispKW = null;  // rebuilt with these next time it's needed
+  renderTerms();
 }
+/* Terms tab: every Magic term with what it means, searchable */
+function renderTerms(){
+  const list = $("#termList"); if (!list) return;
+  const q = norm($("#termSearch").value || ""), byName = new Map();
+  for (const k of KW.values()) if (k && !byName.has(k.name)) byName.set(k.name, k);
+  const all = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const shown = q ? all.filter(k => norm(k.name).includes(q) || norm(k.def).includes(q)) : all;
+  $("#termCount").textContent = q ? `${shown.length} of ${all.length} terms` : `${all.length} terms. Search, or open one to read what it means.`;
+  list.innerHTML = "";
+  for (const k of shown.slice(0, 400)) {
+    const d = document.createElement("details"), sm = document.createElement("summary"); sm.textContent = k.name; d.appendChild(sm);
+    const p = document.createElement("p"); p.textContent = k.def; d.appendChild(p);
+    const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
+    d.appendChild(a); list.appendChild(d);
+    if (shown.length === 1) d.open = true;
+  }
+}
+$("#termSearch").addEventListener("input", renderTerms);
 function showKeyword(k){
   const view = $("#cardView"); view.innerHTML = ""; focusCardView();
   const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
@@ -3720,7 +3630,8 @@ function phon(w){
 }
 // Looser version for player names: treats sound pairs like g/k and b/p as the same
 function phonLoose(w){ return phon(w).replace(/[0x]/g, "s").replace(/g/g, "k").replace(/b/g, "p").replace(/d/g, "t").replace(/v/g, "f").replace(/j/g, "k").replace(/(.)\1+/g, "$1"); }
-function codeOf(words){ return words.filter(w => !STOP.has(w)).map(phon).filter(Boolean).join(" "); }
+// (a trailing s doesn't count: "commander sphere" sounds like "Commander's Sphere", "treasure" like "Treasures")
+function codeOf(words){ return words.filter(w => !STOP.has(w)).map(w => phon(w.length > 3 ? w.replace(/s$/, "") : w)).filter(Boolean).join(" "); }
 let poolCache = { sig:null, list:[] };
 /* Lisp-friendly matching: "th", "sh" and "z" all count as "s", on both the words heard and the card names,
    so "Thol Ring" still links Sol Ring. Used for players marked as having a lisp. */
@@ -3785,7 +3696,25 @@ function phonMap(lisp){
   if (lisp) lispPhonAll = m; else phonAll = m;
   return m;
 }
+/* One-word names the speech recognizer splits up ("Gwen um" for Gwenom): sounds of 6+ letter one-word names */
+var phonOne = null;
+function phonOneMap(){
+  if (phonOne || !cardIndex) return phonOne;
+  phonOne = new Map();
+  // (each sound keeps the one-word name it came from, which can be a short name like "gwenom", for the spelling check)
+  for (const [k, name] of cardIndex) if (!k.includes(" ") && k.length >= 6 && !NOT_ALONE.has(k)) {
+    const c = phon(k); if (c.length >= 3) phonOne.set(c, phonOne.has(c) && phonOne.get(c).name !== name ? { name:"" } : { name, k });
+  }
+  return phonOne;
+}
 function fuzzyAll(keys, i, lisp){
+  const one = phonOneMap();
+  if (one) for (let n = Math.min(3, keys.length - i); n >= 2; n--) {
+    const win = keys.slice(i, i + n).join(" ").split(" ").filter(Boolean);
+    if (win.length < 2 || win.some(w => STOP.has(w))) continue;
+    const joined = win.join(""), hit = one.get(phon(joined));
+    if (hit?.name && similarity(joined, hit.k) >= 0.55) return { name:hit.name, n };
+  }
   const m = phonMap(lisp); if (!m) return null;
   for (let n = Math.min(maxWords + 1, keys.length - i); n >= 2; n--) {
     const win = keys.slice(i, i + n).join(" ").split(" ").filter(Boolean);
@@ -3827,9 +3756,22 @@ function linkify(text, lisp){
   }
   return out;
 }
+/* Captions switch on for what players do, not all table talk: "I take 3", "I gain 2", "I heal", "I pay 2 life",
+   "I play Sol Ring", "I cast Counterspell". A shown line starts at that phrase. Card names in it are underlined (click
+   to read the card); after "I play" or "I cast", the words that follow get a closer look for a card name
+   (Scryfall's spelling-tolerant search too), so a name the speech recognizer mangles still links. */
+const ACTION_PHRASE = /\bi(?:'m| am|'ll| will)?\s+(?:going to |gonna )?(?:take|taking|took|lose|losing|lost|gain|gaining|gained|heal|healing|healed|pay|paying|paid|play|playing|played|cast|casting)\b/;
+const TAIL_PHRASE = /\b(?:play|playing|played|cast|casting)\s+(?:a |an |my )?(.+)$/;
 async function addCaption(seat, text, heardHere){
   if (seat !== mySeat && !heardHere) lastCapFrom[seat] = Date.now();
   try { await loadIndex(); } catch {}
+  const gameOnly = $("#gameOnly").checked, low = text.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ");
+  const phrase = ACTION_PHRASE.exec(low);
+  if (gameOnly && !phrase) return;  // not something a player did
+  // Only cards are linked in captions (Magic terms are in the Terms tab); a shown line starts at its phrase
+  let segs = linkify(text, lispFor(seat)).map(x => x.kw ? { t:x.t } : x);
+  if (gameOnly) segs = fromPhrase(segs, phrase.index);
+  const found = segs.some(x => x.card);
   const ul = $("#captions");
   const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
   const li = document.createElement("li");
@@ -3838,13 +3780,10 @@ async function addCaption(seat, text, heardHere){
   who.textContent = (seat === mySeat ? "You" : nm(seat)) + ":";
   li.appendChild(who);
   if (heardHere) li.title = "Captioned on this computer from their audio";
-  linkify(text, lispFor(seat)).forEach((seg, idx) => {
+  segs.forEach((seg, idx) => {
     if (idx) li.append(" ");
-    if (seg.kw) {
-      const b = document.createElement("button"); b.className = "kwlink"; b.textContent = seg.t; b.title = `${seg.kw.name}: ${seg.kw.def}`;
-      b.onclick = () => showKeyword(seg.kw);
-      li.appendChild(b);
-    } else if (seg.card) {
+    if (seg.gap) { const g = document.createElement("span"); g.className = "gap"; g.textContent = "…"; li.appendChild(g); }
+    else if (seg.card) {
       const b = document.createElement("button"); b.className = "cardlink" + (seg.fuzzy ? " fuzzy" : "");
       b.textContent = seg.fuzzy ? seg.card : seg.t; b.title = seg.fuzzy ? `Heard "${seg.t}"` : seg.card;
       b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(seg.card)) || await findCard(seg.card); if (c) showCard(c); else setStatus(`No card matched "${seg.card}".`); };
@@ -3853,11 +3792,39 @@ async function addCaption(seat, text, heardHere){
   });
   if (interimEl && interimEl.parentNode === ul) ul.insertBefore(li, interimEl); else ul.appendChild(li);
   if (seat !== mySeat) bumpTab("captions");
+  // A game phrase with no card after it: ask Scryfall what card the words after it could be
+  const tail = phrase && TAIL_PHRASE.exec(low.slice(phrase.index))?.[1];
+  if (tail && !found && !NOT_A_CARD.test(tail)) cardFromWords(tail, lispFor(seat)).then(card => {
+    if (!card) return;
+    const b = document.createElement("button"); b.className = "cardlink fuzzy"; b.textContent = card.name; b.title = `Heard "${tail}"`;
+    b.onclick = () => showCard(card);
+    li.append(" → "); li.appendChild(b);
+  });
   while (ul.children.length > 120) ul.firstChild.remove();
   if (nearBottom) ul.scrollTop = ul.scrollHeight;
 }
+// The part of a line from the action phrase on (at most about 20 words), dropping the chat before it
+function fromPhrase(segs, at){
+  let pos = 0, words = 0; const out = [];
+  for (const x of segs) {
+    const start = pos; pos += x.t.length + 1;
+    if (pos <= at) continue;
+    words += x.t.split(/\s+/).length;
+    if (words > 20 && !x.card) { out.push({ gap:true }); break; }
+    out.push(x);
+  }
+  return out.length ? out : segs;
+}
+// The card some words name, if Scryfall's guess is close to what was said
+async function cardFromWords(words, lisp){
+  const q = words.split(" ").slice(0, 6).join(" "), c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
+  if (!c) return null;
+  const named = norm(c.name.split(" // ")[0]), said = norm(q).split(" ").slice(0, named.split(" ").length + 1).join(" ");
+  return similarity(lisp ? lispNorm(said) : said, lisp ? lispNorm(named) : named) >= 0.6 ? c : null;
+}
 function showInterim(text){
   const ul = $("#captions");
+  if ($("#gameOnly").checked) text = "";  // (game talk only: no word-by-word preview)
   if (!text) { interimEl?.remove(); interimEl = null; return; }
   if (!interimEl) { interimEl = document.createElement("li"); interimEl.className = "interim"; }
   interimEl.textContent = "You: " + text;
@@ -3879,6 +3846,9 @@ function startBrowserRec(){
                      ...terms.map(t => new SpeechRecognitionPhrase(t, 2))];
     } catch { noPhrases = true; }
   }
+  // A speech service that won't take the phrase list doesn't always say so by name: if it fails with one, captions
+  // carry on without it rather than giving up
+  const withPhrases = !noPhrases && !!rec.phrases?.length;
   rec.onresult = e => {
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -3889,6 +3859,7 @@ function startBrowserRec(){
     showInterim(interim.trim());
   };
   rec.onerror = e => {
+    if (withPhrases && !["no-speech", "aborted", "network", "not-allowed"].includes(e.error)) { noPhrases = true; console.info("Speech: retrying without the phrase list after", e.error); }
     if (CAP_ERRORS[e.error]) setCapErr(e.error);
     // Some browsers can't take the lobby's microphone directly; use the default microphone from then on
     if (e.error === "audio-capture" && trackInput) { trackInput = false; return; }
@@ -3904,7 +3875,9 @@ function startBrowserRec(){
   const began = Date.now();
   rec.onend = () => {
     rec = null; showInterim("");
-    quickEnds = Date.now() - began < 3000 ? quickEnds + 1 : 0;
+    const quick = Date.now() - began < 3000;
+    if (quick && withPhrases && !noPhrases) { noPhrases = true; if (capOn && micLive()) setTimeout(startBrowserRec, 300); return; }  // try once without the phrase list
+    quickEnds = quick ? quickEnds + 1 : 0;
     if (quickEnds >= 3) {  // ended right away 3 times: blocked or not working, so stop instead of re-asking forever
       capOn = false; quickEnds = 0; updateCapBtn();
       setCapHint("Captions stopped because the microphone kept getting blocked. Click Captions to try again.");
@@ -4150,6 +4123,8 @@ $("#capBtn").onclick = () => {
 };
 $("#voiceIn").onchange = e => store.set("kt-voice", e.target.checked ? "1" : "0");
 $("#playIn").checked = store.get("kt-play", "1") === "1";
+$("#gameOnly").checked = store.get("kt-gameonly", "1") === "1";
+$("#gameOnly").onchange = e => store.set("kt-gameonly", e.target.checked ? "1" : "0");
 $("#playIn").onchange = e => store.set("kt-play", e.target.checked ? "1" : "0");
 $("#lispIn").onchange = e => { store.set("kt-lisp-me", e.target.checked ? "1" : "0"); if (me) { me.lisp = e.target.checked; pushState(); } };
 $("#oneWord").onchange = e => store.set("kt-oneword", e.target.checked ? "1" : "0");

@@ -7,8 +7,8 @@ test("picture matching finds a card on another player's camera from the all-card
   a.on("download", d => (a.downloads ||= []).push(d.suggestedFilename()));
   await a.addInitScript(() => { const f = window.createImageBitmap; window.__stills = 0; window.createImageBitmap = (...x) => { window.__stills++; return f(...x); }; });
   let binDownloads = 0; a.on("request", r => { if (r.url().includes("cards.bin")) binDownloads++; });
-  const room = await sitDown(a, "Luke", { deck:"" }); await settle(a);
-  await sitDown(b, "Rick", { room, deck:"" });
+  const room = await sitDown(a, "Luke"); await settle(a);
+  await sitDown(b, "Rick", { room });
   await expect(a.locator("#artStat")).toHaveText(/ready for all 5/, { timeout:30000 });
   // The matcher downloads right after sitting down, before any click
   expect(await a.evaluate(() => window.__tjs?.task)).toBe("image-feature-extraction");
