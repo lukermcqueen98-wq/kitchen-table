@@ -112,6 +112,43 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await a.locator(".modal").getByRole("button", { name:"Done", exact:true }).click();
   await expect(b.locator("#log li").last()).toContainText("Luke scried 2: 2 on top");
 
+  // Arrows: Luke points his card at Rick's card; both see the arrow
+  await b.locator("#hand .card").first().dblclick();
+  await expect(opp(a, "Rick").locator(".obf .card")).toHaveCount(1);
+  await a.locator("#bf .card").first().click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Target with an arrow..." }).click();
+  await opp(a, "Rick").locator(".obf .card").first().click();
+  for (const p of [a, b]) await expect(p.locator("#arrows > path")).toHaveCount(1);
+  await expect(b.locator("#log li").last()).toContainText("Luke pointed");
+
+  // Attaching: Luke plays another card and attaches it to his first; it tucks behind it, on both screens
+  await a.locator("#hand .card").first().dblclick();
+  await expect(a.locator("#bf .card")).toHaveCount(2);
+  const second = await a.locator("#bf .card").nth(1).getAttribute("data-iid");
+  await a.locator(`#bf .card[data-iid="${second}"]`).click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Attach to..." }).click();
+  await a.locator("#bf .card:not(.attached)").first().click();
+  await expect(a.locator("#bf .card.attached")).toHaveCount(1);
+  await expect(opp(b, "Luke").locator(".obf .card.attached")).toHaveCount(1);
+
+  // Another player's cards: Rick takes control of Luke's first card, then destroys it; it goes to Luke's graveyard
+  const host = await a.locator("#bf .card:not(.attached)").first().getAttribute("data-iid");
+  await opp(b, "Luke").locator(`.obf .card[data-iid="${host}"]`).click({ button:"right" });
+  await b.getByRole("menuitem", { name:"Gain control of it" }).click();
+  await expect(b.locator(`#bf .card.theirs[data-iid="${host}"]`)).toHaveCount(1);
+  await expect(a.locator(`#bf .card[data-iid="${host}"]`)).toHaveCount(0);
+  await expect(a.locator("#bf .card.attached")).toHaveCount(0);  // (the equipment stays behind on Luke's side)
+  const gyBefore = +(await a.locator("#gyPile").textContent()).match(/\d+/)[0];
+  await b.locator(`#bf .card[data-iid="${host}"]`).click({ button:"right" });
+  await b.getByRole("menuitem", { name:"To graveyard" }).click();
+  await expect(a.locator("#gyPile")).toContainText(`Graveyard ${gyBefore + 1}`);
+  await expect(b.locator(`#bf .card[data-iid="${host}"]`)).toHaveCount(0);
+  // ...and Rick can tap Luke's remaining card from his screen
+  await opp(b, "Luke").locator(".obf .card").first().click({ button:"right" });
+  await b.getByRole("menuitem", { name:/^(Tap|Untap) it$/ }).click();
+  await expect.poll(() => ktp(a, () => ktPlay.me.zones.bf[0].tapped)).toBeDefined();
+  await expect(a.locator("#log li").last()).toContainText(/Rick (tapped|untapped) Luke's/);
+
   // Coming back: a refresh offers to continue, and the game is as it was
   const bfCount = await a.locator("#bf .card").count(), handCount = await a.locator("#hand .card").count();
   await a.goto(`${BASE}/play.html?kt-test&room=${room}`);
