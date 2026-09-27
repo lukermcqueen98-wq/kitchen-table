@@ -3832,6 +3832,7 @@ const STOP = new Set(["the", "of", "a", "an", "with", "and", "to", "in", "on", "
   "se", "wis", "seir", "sat"]);  // the last four: "the", "with", "their", "that" after lisp-friendly matching
 function phon(w){
   w = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (!w) return "";
+  w = w.replace(/^x/, "z").replace(/^gh/, "g").replace(/^kh/, "k");  // Xenagos, Ghave, Khalni
   w = w.replace(/^(kn|gn|pn|wr)/, m => m[1]).replace(/ph/g, "f").replace(/ck/g, "k").replace(/q/g, "k").replace(/x/g, "ks").replace(/z/g, "s")
        .replace(/dg/g, "j").replace(/gh/g, "").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k").replace(/th/g, "0").replace(/sh/g, "x").replace(/wh/g, "w");
   const first = "aeiou".includes(w[0]) ? "a" : w[0];
@@ -4622,13 +4623,19 @@ const NOT_A_CARD = /^(it|that|this|them|those|these|a land|land|lands|my land|so
    said (commanders, cards seen, looked up, or played this game) win close calls. Returns { name, score, margin }. */
 function sounds(w){
   w = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (!w) return "";
+  // How Americans say fantasy names: a leading x is a z (Xenagos, Xyris), a leading gh or kh is a hard g or k
+  // (Ghave, Ghalta, Khalni), and a final e after a consonant is silent (Ghave, "gav")
+  w = w.replace(/^x/, "z").replace(/^gh/, "g").replace(/^kh/, "k");
+  if (w.length > 3) w = w.replace(/([^aeiouy])e$/, "$1");
   w = w.replace(/^(kn|gn|pn|wr)/, m => m[1]).replace(/ph/g, "f").replace(/ck/g, "k").replace(/q/g, "k").replace(/x/g, "ks").replace(/z/g, "s")
        .replace(/dg/g, "j").replace(/gh/g, "").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k").replace(/th/g, "0").replace(/sh/g, "x").replace(/wh/g, "w");
-  return w.replace(/[aeiouy]+/g, "a").replace(/([^a])h/g, "$1").replace(/(.)\1+/g, "$1");
+  // (an h that isn't first is silent: "gahv", "brah go")
+  return w.replace(/[aeiouy]+/g, "a").replace(/(?!^)h/g, "").replace(/(.)\1+/g, "$1");
 }
 const soundOf = (words, lisp, keepSmall = false) => words.filter(w => keepSmall || !STOP.has(w)).map(w => sounds((lisp ? lispNorm(w) : w).replace(/(\w{3,})s$/, "$1"))).join("");
 // First sounds that speech recognition mixes up ("tree" for "three", "vault" for "fault")
-const SOUND_KIN = { t:"t0d", "0":"0tdf", d:"dt0", f:"fv0", v:"vfb", s:"sx0", x:"xsj", j:"jxg", k:"kg", g:"gkj", b:"bpv", p:"pb", a:"a" };
+// (x and k: "ch" is said as "sh" in Chandra and as "k" in Chaos)
+const SOUND_KIN = { t:"t0d", "0":"0tdf", d:"dt0", f:"fv0", v:"vfb", s:"sx0", x:"xsjk", j:"jxg", k:"kgx", g:"gkj", b:"bpv", p:"pb", a:"a" };
 const FILLER = new Set(["uh", "um", "like", "the", "a", "an", "my", "this", "that", "ah", "er", "erm", "okay", "ok", "so"]);
 var soundIdx = null, lispSoundIdx = null;  // var: the name list can load before this line runs
 function soundIndex(lisp){
