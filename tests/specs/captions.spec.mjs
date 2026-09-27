@@ -56,6 +56,10 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "I cast gwen um and a commander sphere");
   await expect(a.locator("#captions .cardlink", { hasText:"Gwenom, Remorseless" })).toHaveCount(1);
   await expect(a.locator("#captions .cardlink", { hasText:"Commander's Sphere" })).toHaveCount(1);
+  // every card in a caption pops up on the speaker's camera, side by side, and on the other players' screens too
+  await expect(tile(a, 1).locator(".playedrow .played")).toHaveCount(2);
+  await expect(tile(b, 1).locator(".playedrow .played")).toHaveCount(2);
+  await expect(b.locator("#captions li", { hasText:"Commander's Sphere" }).last()).toContainText("Gwenom, Remorseless");
   await say(a, "I cast commander spear");
   await expect(a.locator("#captions li", { hasText:"I cast Commander's Sphere" })).toHaveCount(1);
 
