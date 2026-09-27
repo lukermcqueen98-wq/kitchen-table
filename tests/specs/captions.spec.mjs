@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, sitDown, settle, say, lifeOf } from "../support/players.mjs";
+import { launchBrowser, newPlayer, sitDown, settle, say, lifeOf, tile, logLines } from "../support/players.mjs";
 
 test("captions: status, asking, lisp matching, voice commands, voice lookup, and captioning a friend from their audio", async () => {
   const b1 = await launchBrowser(), b2 = await launchBrowser({ mic:"phrases" });
@@ -11,6 +11,16 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(b, "I cast Thol Ring and I take thix from Luke");
   await expect(a.locator("#captions .cardlink", { hasText:"Thol Ring" })).toHaveAttribute("title", "Sol Ring");
   expect(await lifeOf(b, 2)).toBe(34);
+  // ...and saying he cast it pops Sol Ring up on Rick's camera on Luke's screen
+  await expect(tile(a, 2).locator(".played")).toContainText("Sol Ring");
+  await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("Rick played Sol Ring"));
+
+  // Lands aren't popped up, and a card name that can't be made out gets "Please repeat"
+  await say(a, "I play a Forest");
+  await a.waitForTimeout(800);
+  await expect(tile(a, 1).locator(".played")).toHaveCount(0);
+  await say(a, "I play blorptastic wizzlequark");
+  await expect(tile(a, 1).locator(".repeatask")).toHaveText("Please repeat what card you played");
 
   // Misheard names of cards nobody has in their deck still link, and every Magic keyword (from Scryfall's lists) does too,
   // but not everyday words that happen to be keywords

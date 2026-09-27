@@ -8,7 +8,8 @@ import { BASE, PEER_PORT } from "./global-setup.mjs";
 
 const MODULES = path.resolve(import.meta.dirname, "..", "node_modules");
 const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js", "opencv.js":"@techstark/opencv-js/dist/opencv.js" };
-const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:"Artifact", oracle_text:"Test card.", scryfall_uri:"https://scryfall.com",
+const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : "Artifact", oracle_text:"Test card.", scryfall_uri:"https://scryfall.com",
+  color_identity:k === 2 ? ["G", "U"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
   image_uris:{ small:`https://cards.scryfall.io/small/${k % 3}.png`, normal:`https://cards.scryfall.io/normal/${k % 3}.png`, art_crop:`https://cards.scryfall.io/art_crop/${k % 3}.png` } });
 const json = (route, body, status = 200) => route.fulfill({ status, contentType:"application/json", headers:{ "access-control-allow-origin":"*" }, body:JSON.stringify(body) });
 
@@ -33,6 +34,7 @@ export async function newPlayer(browser, { lisp = false } = {}){
   await ctx.route(/api\.scryfall\.com/, r => {
     const u = decodeURIComponent(r.request().url()).toLowerCase(), byId = /\/cards\/(0{7}\d)/.exec(u);
     const k = NAMES.findIndex(n => u.includes(n.toLowerCase()));
+    if (/named\?(exact|fuzzy)=forest$/.test(u)) return json(r, { object:"card", id:"00000009-0000-4000-8000-000000000009", name:"Forest", type_line:"Basic Land — Forest", oracle_text:"({T}: Add {G}.)", image_uris:{ normal:"https://cards.scryfall.io/normal/0.png" } });
     if (u.includes("/catalog/keyword-abilities")) return json(r, { data:["Flying", "Offspring", "Fear"] });
     if (u.includes("/catalog/keyword-actions")) return json(r, { data:["Forage", "Cast"] });
     if (u.includes("/catalog/ability-words")) return json(r, { data:["Coven", "Eerie"] });

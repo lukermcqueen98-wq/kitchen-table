@@ -112,6 +112,13 @@ header.bar .btn.primary{padding:6px 16px}
 .tile .sel.miss{border-color:var(--danger);background:rgba(224,118,92,.18);animation:selMiss .6s ease-out forwards}
 @keyframes selMiss{to{opacity:0;transform:scale(1.3)}}
 .tile .sel.fade{opacity:0;transition:opacity .4s}
+/* A card a player says they play, popped up on their camera */
+.played{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:min(34%,230px);z-index:4;cursor:pointer;border:0;padding:0;background:none;animation:playIn .35s ease-out}
+.played img{width:100%;display:block;border-radius:4.75%/3.5%;box-shadow:0 8px 30px rgba(0,0,0,.6),0 0 0 2px var(--brass)}
+.played span{display:block;margin-top:6px;text-align:center;font-size:13px;font-weight:600;background:rgba(0,0,0,.7);border-radius:6px;padding:3px 6px}
+.played.out{opacity:0;transform:translateY(-50%) scale(.9);transition:opacity .4s,transform .4s}
+@keyframes playIn{from{opacity:0;transform:translateY(-50%) scale(.6)}to{opacity:1;transform:translateY(-50%) scale(1)}}
+.repeatask{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:rgba(13,32,29,.96);border:1px solid var(--brass);border-radius:10px;padding:8px 14px;font-weight:600;white-space:nowrap}
 .nocam{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;pointer-events:none;text-align:center;padding:20px}
 .plate{position:absolute;left:10px;top:10px;right:130px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;pointer-events:none}
 .prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -119,6 +126,11 @@ header.bar .btn.primary{padding:6px 16px}
 .cmdrs:empty{display:none}
 .cmdr{pointer-events:auto;background:rgba(0,0,0,.65);border:0;border-radius:6px;padding:3px 9px;font-size:13px;color:var(--parchment);font-style:italic;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmdr.ask{font-style:normal;color:var(--brass);border:1px dashed var(--brass)}
+.cmdrwrap{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:100%}
+.cmdrinfo{display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.65);border-radius:6px;padding:2px 7px}
+.cmdrinfo:empty{display:none}
+.msym-img{width:16px;height:16px;display:block}
+.cmdrinfo .pt{margin-left:5px;font:700 14px var(--serif);font-variant-numeric:tabular-nums}
 #cmdrPop{position:fixed;width:240px;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.6);z-index:70;pointer-events:none}
 .cmdrform{text-align:left;margin-top:14px}
 .cmdrform .searchwrap{margin-bottom:4px}
@@ -178,7 +190,7 @@ aside section+section{margin-top:22px}
 #cardView .from{background:rgba(201,164,76,.15);border:1px solid var(--brass);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:14px}
 #cardView.flash{animation:cardFlash .9s ease-out}
 @keyframes cardFlash{from{box-shadow:0 0 0 3px var(--brass);border-radius:6px}to{box-shadow:0 0 0 3px transparent}}
-#histBox{margin:0 0 10px;font-size:13px}
+#histBox{margin:16px 0 0;font-size:13px}
 #matchStats{margin:0 0 8px;color:var(--muted)}
 .rechead{cursor:pointer;display:flex;align-items:baseline;gap:8px}
 .rechead h2{display:inline;margin:0}
@@ -187,11 +199,15 @@ aside section+section{margin-top:22px}
 #matchStats .btn{padding:4px 10px}
 #histBox summary{cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:8px}
 #histBox summary .spacer{flex:1}
-#histList{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;max-height:132px;overflow:auto}
-#histList button{display:flex;align-items:center;gap:6px;max-width:100%;padding:3px 8px 3px 3px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);font-size:13px}
-#histList button.on{border-color:var(--brass);color:var(--brass)}
-#histList img{width:30px;height:22px;object-fit:cover;border-radius:3px;flex:none}
+/* Card history: a picture of every card looked up or played, newest first (like SpellTable's) */
+#histList{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px}
+#histList button{display:flex;flex-direction:column;gap:4px;padding:0;border:0;background:none;text-align:left;font-size:12px;color:var(--muted);min-width:0}
+#histList img{width:100%;aspect-ratio:488/680;object-fit:cover;border-radius:4.75%/3.5%;display:block;background:rgba(0,0,0,.3);border:2px solid transparent}
+#histList button:hover img,#histList button:focus-visible img{border-color:var(--muted)}
+#histList button.on img{border-color:var(--brass)}
+#histList button.on{color:var(--brass)}
 #histList span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#histList .who{font-size:11px;opacity:.8}
 #alts{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:13px;color:var(--muted);margin:0 0 8px}
 #alts button{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 3px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);font-size:13px}
 #alts img{width:30px;height:22px;object-fit:cover;border-radius:3px}
@@ -267,7 +283,7 @@ button.mpip{cursor:pointer}
   header.bar .grp.game{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){
-  .life output{transition:none}.tile.enter{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
+  .life output{transition:none}.tile.enter{animation:none}.played{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
 }
 </style>
 </head>
@@ -403,12 +419,12 @@ button.mpip{cursor:pointer}
           <p class="hint" id="msText"></p>
           <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
         </details>
-        <details id="histBox" class="hidden" open>
-          <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
-          <div id="histList"></div>
-        </details>
         <div id="alts" class="hidden"></div>
         <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
+        <details id="histBox" class="hidden" open>
+          <summary><span>Card history (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
+          <div id="histList"></div>
+        </details>
       </section>
       </div>
     <div class="pane hidden" role="tabpanel" data-pane="log" aria-labelledby="tab-log">
@@ -438,6 +454,7 @@ button.mpip{cursor:pointer}
             <option value="device">Chrome on-device (private, audio stays on this computer)</option>
           </select></label>
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
+        <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
         <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
       </section>
       </div>
@@ -743,7 +760,14 @@ $("#deckImport").onclick = async () => {
   } finally { $("#deckImport").disabled = false; }
 };
 
-async function startCamera(deviceId, micId){
+// The camera being started, so "Sit down" can wait for it instead of saying there's no camera
+let cameraStarting = null;
+function startCamera(deviceId, micId){
+  const run = startCameraNow(deviceId, micId);
+  cameraStarting = run.finally(() => { if (cameraStarting === run) cameraStarting = null; });
+  return run;
+}
+async function startCameraNow(deviceId, micId){
   if (localStream) localStream.getTracks().forEach(t => t.stop());
   const video = { width:{ ideal:1920 }, height:{ ideal:1080 }, ...(deviceId ? { deviceId:{ exact:deviceId } } : {}) };
   const audio = { echoCancellation:true, noiseSuppression:true, ...(micId ? { deviceId:{ exact:micId } } : {}) };
@@ -751,7 +775,7 @@ async function startCamera(deviceId, micId){
     localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
     $("#noCam").classList.add("hidden");
   } catch (e) {
-    if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCamera();
+    if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCameraNow();
     if (e.name === "NotAllowedError") throw e;
     localStream = await navigator.mediaDevices.getUserMedia({ audio });
     $("#noCam").classList.remove("hidden");
@@ -792,6 +816,11 @@ function randomCode(){ const a = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; 
 
 $("#joinBtn").onclick = async () => {
   const err = $("#lobbyErr"); err.textContent = "";
+  if (!localStream && cameraStarting) {  // still starting (a slow camera, or the permission prompt is open): wait for it
+    $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Starting your camera...";
+    await cameraStarting.catch(() => {});
+    $("#joinBtn").disabled = false; $("#joinBtn").textContent = "Sit down";
+  }
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
   store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-deck", $("#deckIn").value);
@@ -1197,6 +1226,11 @@ function onMessage(s, msg){
     case "hellopls": if (conns[s]) sendHello(conns[s].conn); break;
     case "table": applyTable(msg.table); break;
     case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500)); break;
+    case "played":
+      if ($("#playIn").checked && typeof msg.name === "string")
+        fetchCard(typeof msg.id === "string" ? msg.id.slice(0, 40) : null, msg.name.slice(0, 141)).then(c => { if (c) showPlayed(s, c); });
+      break;
+    case "repeatcard": askRepeat(mySeat); break;
     case "card": if (typeof msg.name === "string") log(`${p.name || "Someone"} looked at `, msg.name.slice(0, 141)); break;
     case "show":
       if (typeof msg.id === "string" && /^[0-9a-f-]{36}$/.test(msg.id)) {
@@ -1883,8 +1917,22 @@ function cleanCmdrs(list){
   return list.slice(0, 2).map(c => ({
     name:String(c?.name || "").slice(0, 141),
     id:/^[0-9a-f-]{36}$/.test(c?.id || "") ? c.id : "",
-    img:/^https:\/\/cards\.scryfall\.io\//.test(c?.img || "") ? String(c.img).slice(0, 300) : ""
+    img:/^https:\/\/cards\.scryfall\.io\//.test(c?.img || "") ? String(c.img).slice(0, 300) : "",
+    // color identity (as W U B R G) and base power/toughness or starting loyalty, shown under the name
+    ...(Array.isArray(c?.colors) ? { colors:c.colors.filter(x => "WUBRG".includes(x) && x.length === 1).slice(0, 5) } : {}),
+    ...(typeof c?.stats === "string" && /^[0-9*+\-X?½∞.]{1,4}(\/[0-9*+\-X?½∞.]{1,4})?$/.test(c.stats) ? { stats:c.stats } : {})
   })).filter(c => c.name);
+}
+// What's shown under a commander's name, from its Scryfall card: color identity and power/toughness (or loyalty)
+function cmdrFacts(card){
+  const f = card.card_faces?.[0] || {}, pw = card.power ?? f.power, tg = card.toughness ?? f.toughness, loy = card.loyalty ?? f.loyalty;
+  return { colors:(card.color_identity || []).filter(x => "WUBRG".includes(x)), stats:pw != null && tg != null ? `${pw}/${tg}` : loy != null ? String(loy) : "" };
+}
+const cmdrFactCache = new Map();  // commanders set before this was added: looked up once
+async function cmdrFactsFor(c){
+  const k = c.id || c.name;
+  if (!cmdrFactCache.has(k)) cmdrFactCache.set(k, (async () => { const card = await fetchCard(c.id, c.name); return card ? cmdrFacts(card) : null; })());
+  return cmdrFactCache.get(k);
 }
 function renderCmdrs(el, s){
   const box = el.querySelector(".cmdrs"), p = players[s], mine = s === mySeat;
@@ -1892,6 +1940,7 @@ function renderCmdrs(el, s){
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig; box.innerHTML = "";
   (p.cmdrs || []).forEach(c => {
+    const wrap = document.createElement("div"); wrap.className = "cmdrwrap";
     const b = document.createElement("button"); b.className = "cmdr"; b.textContent = c.name;
     b.setAttribute("aria-label", `Commander: ${c.name}. Click to open the card.`);
     const show = () => showCmdrPop(b, c), hide = () => $("#cmdrPop").classList.add("hidden");
@@ -1904,7 +1953,21 @@ function renderCmdrs(el, s){
       const card = (c.id && await scry(`/cards/${c.id}`)) || await scry("/cards/named?exact=" + encodeURIComponent(c.name));
       if (card) showCard(card); else setStatus(`Couldn't load ${c.name}.`);
     };
-    box.appendChild(b);
+    wrap.appendChild(b);
+    // Under the name: its color identity as mana symbols, and base power/toughness (or starting loyalty)
+    const info = document.createElement("div"); info.className = "cmdrinfo";
+    const fill = f => {
+      if (!f) return;
+      info.innerHTML = "";
+      for (const col of f.colors.length ? f.colors : ["C"]) {
+        const im = document.createElement("img"); im.className = "msym-img"; im.src = `https://svgs.scryfall.io/card-symbols/${col}.svg`;
+        im.alt = { W:"White", U:"Blue", B:"Black", R:"Red", G:"Green", C:"Colorless" }[col]; im.title = im.alt; info.appendChild(im);
+      }
+      if (f.stats) { const st = document.createElement("span"); st.className = "pt"; st.textContent = f.stats; st.title = f.stats.includes("/") ? "Base power/toughness" : "Starting loyalty"; info.appendChild(st); }
+    };
+    if (c.colors) fill({ colors:c.colors, stats:c.stats || "" }); else cmdrFactsFor(c).then(fill);
+    wrap.appendChild(info);
+    box.appendChild(wrap);
   });
   if (mine) {
     const b = document.createElement("button"); b.className = "cmdr ask";
@@ -2021,7 +2084,7 @@ function askCommander(opts = {}){
     save.disabled = false;
     if (!ca) { err.textContent = `No card matched "${a.value.trim()}". Pick one from the suggestions.`; return; }
     if (b.value.trim() && !cb) { err.textContent = `No card matched "${b.value.trim()}".`; return; }
-    me.cmdrs = cleanCmdrs([ca, cb].filter(Boolean).map(c => ({ name:c.name, id:c.id, img:cardImg(c) })));
+    me.cmdrs = cleanCmdrs([ca, cb].filter(Boolean).map(c => ({ name:c.name, id:c.id, img:cardImg(c), ...cmdrFacts(c) })));
     store.set("kt-cmdrs", JSON.stringify(me.cmdrs)); setTimeout(artSync, 300);
     pushState(); render();
     if (me.cmdrs.length === 1) log("You are playing ", me.cmdrs[0].name); else log(`You are playing ${me.cmdrs.map(c => c.name).join(" and ")}.`);
@@ -2612,116 +2675,133 @@ const qdist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 // A point inside a quadrilateral, u and v from 0 to 1 across and down it (can reach outside it, for the card around its art)
 const quadAt = (q, u, v) => ({ x:(1 - v) * ((1 - u) * q[0].x + u * q[1].x) + v * ((1 - u) * q[3].x + u * q[2].x),
                                y:(1 - v) * ((1 - u) * q[0].y + u * q[1].y) + v * ((1 - u) * q[3].y + u * q[2].y) });
-/* Rectangles around a point built from straight edges. On a busy playmat a card's outline touches the patterns and
-   the cards next to it, so it rarely traces as a closed loop, but its four straight sides still show up as lines.
-   Finds line segments, groups them into the two directions a turned rectangle has, and scores every set of four
-   lines around the point that makes a card or art shape by how much of each side the segments cover. */
-function lineRects(cv, gray, P){
-  const W = gray.cols, H = gray.rows, S = Math.round(Math.min(W, H) * 0.95);
-  const x0 = Math.max(0, Math.min(W - S, Math.round(P.x - S / 2))), y0 = Math.max(0, Math.min(H - S, Math.round(P.y - S / 2)));
-  const mats = [], keep = m => (mats.push(m), m), segs = [];
+/* The card around a point, found by fitting a card-shaped outline to the picture's edges (oriented chamfer matching).
+   On a blurred, busy picture a card's sides often only show up in pieces, so rather than look for whole lines, this
+   slides a card outline around the point (every angle, every likely size, anywhere the point could be inside it)
+   and scores each by how close its whole outline runs to edges facing the same way. The best few are then fitted
+   more closely, each side on its own, so a card seen at an angle is outlined well too. Returns quads (corners in
+   the gray picture's pixels) with scores, best first. */
+function cardFits(cv, gray, P){
+  const W = gray.cols, H = gray.rows, R = 260;  // look this far around the point (a card up to about 300 pixels tall here)
+  const x0 = Math.max(0, Math.round(P.x - R)), y0 = Math.max(0, Math.round(P.y - R));
+  const rw = Math.min(W, Math.round(P.x + R)) - x0, rh = Math.min(H, Math.round(P.y + R)) - y0;
+  if (rw < 40 || rh < 40) return [];
+  const mats = [], keep = m => (mats.push(m), m), NB = 8, dts = [];
+  let grayPx = null;
   try {
-    const roi = keep(gray.roi(new cv.Rect(x0, y0, Math.min(S, W - x0), Math.min(S, H - y0)))), edges = keep(new cv.Mat()), lines = keep(new cv.Mat());
-    cv.Canny(roi, edges, 10, 30);
-    cv.HoughLinesP(edges, lines, 1, Math.PI / 180, 14, Math.max(10, S * 0.035), 4);
-    for (let i = 0; i < lines.rows; i++) {
-      const [ax, ay, bx, by] = lines.data32S.subarray(i * 4, i * 4 + 4);
-      const len = Math.hypot(bx - ax, by - ay); if (len < 6) continue;
-      segs.push({ ax:ax + x0, ay:ay + y0, bx:bx + x0, by:by + y0, len, ang:(Math.atan2(by - ay, bx - ax) + Math.PI) % Math.PI });
+    const roi = keep(gray.roi(new cv.Rect(x0, y0, rw, rh))), edges = keep(new cv.Mat()), gx = keep(new cv.Mat()), gy = keep(new cv.Mat());
+    cv.Canny(roi, edges, 12, 36);
+    cv.Sobel(roi, gx, cv.CV_32F, 1, 0, 3); cv.Sobel(roi, gy, cv.CV_32F, 0, 1, 3);
+    // One edge map per edge direction (8 of them, 22.5 degrees each), each turned into "distance to the nearest edge"
+    const E = edges.data, GX = gx.data32F, GY = gy.data32F, n = rw * rh, bin = new Uint8Array(n);
+    grayPx = new Uint8Array(n); for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) grayPx[y * rw + x] = roi.ucharAt(y, x);
+    for (let i = 0; i < n; i++) if (E[i]) bin[i] = 1 + Math.floor(((Math.atan2(GY[i], GX[i]) + Math.PI) % Math.PI) / Math.PI * NB) % NB;
+    for (let b = 0; b < NB; b++) {
+      const m = keep(new cv.Mat(rh, rw, cv.CV_8UC1)), d = keep(new cv.Mat()), md = m.data;
+      for (let i = 0; i < n; i++) md[i] = bin[i] === b + 1 ? 0 : 255;
+      cv.distanceTransform(m, d, cv.DIST_L2, 3);
+      dts.push(Float32Array.from(d.data32F));
     }
   } finally { mats.forEach(m => m.delete()); }
-  if (segs.length < 4) return [];
-  // The directions the rectangles could be turned to: peaks of segment direction, folded so both sides count
-  const bins = new Float32Array(45);
-  for (const g of segs) bins[Math.floor(((g.ang % (Math.PI / 2)) / (Math.PI / 2)) * 45) % 45] += g.len;
-  const peaks = [];
-  for (let i = 0; i < 45; i++) { const v = bins[i] + 0.5 * (bins[(i + 1) % 45] + bins[(i + 44) % 45]); peaks.push({ i, v }); }
-  peaks.sort((a, b) => b.v - a.v);
-  const angles = [];
-  for (const p of peaks) { if (angles.length >= 5) break; if (angles.every(a => Math.min(Math.abs(a - p.i), 45 - Math.abs(a - p.i)) > 2)) angles.push(p.i); }
-  const found = [], minSide = S * 0.1, maxSide = S * 0.95;
-  for (const bi of angles) {
-    const th = (bi + 0.5) / 45 * Math.PI / 2, co = Math.cos(th), si = Math.sin(th);
-    const U = (x, y) => x * co + y * si, V = (x, y) => -x * si + y * co;
-    const uc = U(P.x, P.y), vc = V(P.x, P.y), tol = 6 * Math.PI / 180;
-    // Group segments into lines: "rows" run along the turned direction, "cols" across it
-    const group = (want, pos, along) => {
-      const list = segs.filter(g => { const d = Math.abs(((g.ang - want) % Math.PI + Math.PI * 1.5) % Math.PI - Math.PI / 2); return d < tol; })
-        .map(g => ({ g, p:(pos(g.ax, g.ay) + pos(g.bx, g.by)) / 2, a:Math.min(along(g.ax, g.ay), along(g.bx, g.by)), b:Math.max(along(g.ax, g.ay), along(g.bx, g.by)) }))
-        .sort((a, b) => a.p - b.p);
-      const out = [];
-      for (const x of list) {
-        const last = out[out.length - 1];
-        if (last && x.p - last.p1 < 3) { last.items.push(x); last.p1 = x.p; last.p = last.items.reduce((s, y) => s + y.p * (y.b - y.a), 0) / last.items.reduce((s, y) => s + (y.b - y.a), 0); }
-        else out.push({ p:x.p, p1:x.p, items:[x] });
-      }
-      return out;
-    };
-    const rows = group(th, V, U), cols = group((th + Math.PI / 2) % Math.PI, U, V);
-    // How much of the stretch from a to b the line's segments cover (0 to 1)
-    const cover = (ln, a, b) => {
-      const iv = ln.items.map(x => [Math.max(a, x.a), Math.min(b, x.b)]).filter(([p, q]) => q > p).sort((x, y) => x[0] - y[0]);
-      let tot = 0, end = a; for (const [p, q] of iv) { if (q <= end) continue; tot += q - Math.max(p, end); end = q; }
-      return tot / (b - a);
-    };
-    // The longest lines on each side of the point (the art's own shapes make many short lines closer in)
-    const len = l => l.len ??= l.items.reduce((s, x) => s + x.b - x.a, 0);
-    const near = (arr, side, c) => (side < 0 ? arr.filter(l => l.p < c - minSide * 0.2) : arr.filter(l => l.p > c + minSide * 0.2))
-      .filter(l => len(l) >= minSide * 0.3).sort((a, b) => len(b) - len(a)).slice(0, 26);
-    const tops = near(rows, -1, vc), bots = near(rows, 1, vc), lefts = near(cols, -1, uc), rights = near(cols, 1, uc);
-    for (const t of tops) for (const b of bots) {
-      const h = b.p - t.p; if (h < minSide || h > maxSide) continue;
-      for (const l of lefts) for (const r of rights) {
-        const w = r.p - l.p; if (w < minSide || w > maxSide) continue;
-        const sh = Math.min(w, h) / Math.max(w, h); if (sh < 0.64 || sh > 0.82) continue;
-        const cs = [cover(t, l.p, r.p), cover(b, l.p, r.p), cover(l, t.p, b.p), cover(r, t.p, b.p)];
-        const low = Math.min(...cs); if (low < 0.3) continue;
-        const score = cs.reduce((x, y) => x + y, 0) / 4 + 0.5 * low - 0.15 * Math.abs(sh - 0.72) / 0.08;
-        found.push({ score, th, t, b, l, r, co, si, rows, cols, cover });
+  // A side's edges may lean a little: take the nearest edge in its own direction or either neighbor
+  const near = [];
+  for (let b = 0; b < NB; b++) { const a = dts[b], l = dts[(b + NB - 1) % NB], r = dts[(b + 1) % NB], o = new Float32Array(a.length);
+    for (let i = 0; i < a.length; i++) o[i] = Math.min(a[i], l[i], r[i]); near.push(o); }
+  const px = P.x - x0, py = P.y - y0, TAU = 3;
+  // Sample points along a side: from (ax, ay) to (bx, by), skipping the rounded corners
+  const along = K => Array.from({ length:K }, (_, i) => 0.08 + 0.84 * i / (K - 1)), FINE = along(10), COARSE = along(6);
+  let ts = FINE;  // (the coarse search looks at fewer points per side)
+  const sideScore = (ax, ay, bx, by, map) => {
+    let s = 0;
+    for (const t of ts) {
+      const x = Math.round(ax + (bx - ax) * t), y = Math.round(ay + (by - ay) * t);
+      if (x < 0 || y < 0 || x >= rw || y >= rh) continue;
+      const d = map[y * rw + x]; if (d < TAU) s += 1 - d / TAU;
+    }
+    return s / ts.length;
+  };
+  // Direction of an edge along a line at angle a (the gradient points across it)
+  const binOf = a => Math.floor((((a + Math.PI / 2) % Math.PI + Math.PI) % Math.PI) / Math.PI * NB) % NB;
+  const score = (c) => {  // c: { cx, cy, th, h, w }
+    const co = Math.cos(c.th), si = Math.sin(c.th), hw = c.w / 2, hh = c.h / 2;
+    const pt = (u, v) => [c.cx + u * co - v * si, c.cy + u * si + v * co];
+    const [ax, ay] = pt(-hw, -hh), [bx, by] = pt(hw, -hh), [cx2, cy2] = pt(hw, hh), [dx, dy] = pt(-hw, hh);
+    const mh = near[binOf(c.th)], mv = near[binOf(c.th + Math.PI / 2)];
+    const sides = [sideScore(ax, ay, bx, by, mh), sideScore(dx, dy, cx2, cy2, mh), sideScore(ax, ay, dx, dy, mv), sideScore(bx, by, cx2, cy2, mv)];
+    // every side should show: the weakest side counts extra, so a lucky mix of clutter scores low
+    return (sides[0] + sides[1] + sides[2] + sides[3]) / 4 * 0.7 + Math.min(...sides) * 0.3;
+  };
+  // Coarse search: angle, size, and where in the card the point is
+  const cands = []; ts = COARSE;
+  for (let ti = 0; ti < 45; ti++) {
+    const th = ti * Math.PI / 45, co = Math.cos(th), si = Math.sin(th);
+    for (let h = 40; h <= 300; h *= 1.09) {
+      const w = h * 63 / 88, g = Math.max(1.5, h * 0.06);
+      for (let a = -0.42 * w; a <= 0.42 * w; a += g) for (let b = -0.44 * h; b <= 0.44 * h; b += g) {
+        const c = { cx:px - (a * co - b * si), cy:py - (a * si + b * co), th, h, w };
+        const s = score(c); if (s > 0.3) cands.push({ ...c, s });
       }
     }
   }
-  found.sort((a, b) => b.score - a.score);
-  // Corners: each side's own line (fitted to its segments, so a side seen at an angle keeps its slant), intersected
-  const fit = (ln, horizontal, co, si, lo, hi) => {
-    // least squares through the end points of the segments along this side (not ones that carry on past it), as
-    // p = c0 + c1 * along, in the turned frame
-    let n = 0, sa = 0, sp = 0, saa = 0, sap = 0;
-    for (const { g, a, b } of ln.items) if (b > lo && a < hi) for (const [x, y] of [[g.ax, g.ay], [g.bx, g.by]]) {
-      const u = x * co + y * si, v = -x * si + y * co, a = horizontal ? u : v, p = horizontal ? v : u;
-      n++; sa += a; sp += p; saa += a * a; sap += a * p;
-    }
-    const den = n * saa - sa * sa, c1 = n >= 2 && Math.abs(den) > 1e-6 ? (n * sap - sa * sp) / den : 0;
-    if (!n || Math.abs(c1) > 0.12) return { c0:ln.p, c1:0 };
-    const c0 = (sp - c1 * sa) / n, mid = (lo + hi) / 2;
-    // keep it only if it stays near the side it was found as
-    return Math.abs(c0 + c1 * mid - ln.p) > (hi - lo) * 0.04 ? { c0:ln.p, c1:0 } : { c0, c1 };
-  };
-  // A side found on the card's inner frame line moves out to the card's edge: a line just outside it, running its length
-  const outward = (f, key, arr, dir, lo, hi, size) => {
-    let side = f[key];
-    for (const l of arr) {
-      const d = (l.p - f[key].p) * dir;
-      if (d > 1 && d < size * 0.07 && f.cover(l, lo, hi) >= 0.6 && (l.p - side.p) * dir > 0) side = l;
-    }
-    f[key] = side;
-  };
+  cands.sort((a, b) => b.s - a.s); ts = FINE;
+  const picked = [];
+  for (const c of cands) {
+    if (picked.length >= 15) break;
+    const same = picked.some(p => Math.hypot(p.cx - c.cx, p.cy - c.cy) < 0.25 * c.h && Math.abs(Math.log(p.h / c.h)) < 0.15 &&
+      Math.min(Math.abs(p.th - c.th), Math.PI - Math.abs(p.th - c.th)) < 0.2);
+    if (!same) picked.push(c);
+  }
+  // Fine fit: nudge angle, size and place, then let each side move and lean on its own (a card seen at an angle)
   const out = [];
-  for (const f of found) {
-    if (out.length >= 5) break;
-    const hh = f.b.p - f.t.p, ww = f.r.p - f.l.p;
-    outward(f, "t", f.rows, -1, f.l.p, f.r.p, hh); outward(f, "b", f.rows, 1, f.l.p, f.r.p, hh);
-    outward(f, "l", f.cols, -1, f.t.p, f.b.p, ww); outward(f, "r", f.cols, 1, f.t.p, f.b.p, ww);
-    const T = fit(f.t, true, f.co, f.si, f.l.p, f.r.p), B = fit(f.b, true, f.co, f.si, f.l.p, f.r.p);
-    const L = fit(f.l, false, f.co, f.si, f.t.p, f.b.p), R = fit(f.r, false, f.co, f.si, f.t.p, f.b.p);
-    // v = c0 + c1 u for rows, u = c0 + c1 v for cols
-    const meet = (row, col) => { const v = (row.c0 + row.c1 * col.c0) / (1 - row.c1 * col.c1), u = col.c0 + col.c1 * v; return { x:u * f.co - v * f.si, y:u * f.si + v * f.co }; };
-    const q = [meet(T, L), meet(T, R), meet(B, R), meet(B, L)];
-    const size = Math.max(f.b.p - f.t.p, f.r.p - f.l.p);
-    if (out.some(o => Math.max(...o.q.map((p, j) => qdist(p, q[j]))) < size * 0.06)) continue;
-    out.push({ q, score:f.score });
+  for (let c of picked) {
+    for (let round = 0; round < 2; round++) {
+      let best = c;
+      for (let dt = -2; dt <= 2; dt++) for (let dh = -2; dh <= 2; dh++) for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+        const h = c.h * (1 + dh * 0.015), t = { cx:c.cx + dx * c.h * 0.012, cy:c.cy + dy * c.h * 0.012, th:c.th + dt * Math.PI / 180, h, w:h * 63 / 88 };
+        const s = score(t); if (s > best.s) best = { ...t, s };
+      }
+      c = best;
+    }
+    const co = Math.cos(c.th), si = Math.sin(c.th), hw = c.w / 2, hh = c.h / 2;
+    // each side as a line: offset outward (o) and lean (l, as a share of its length) that best fit the edges
+    // (a card's frame lines inside it can fit as well as its edge: of the fits nearly as good as the best, the
+    // outermost is the card's edge)
+    const fitSide = (u0, v0, u1, v1, nu, nv, map) => {
+      let best = { s:-1, o:0, l:0 }; const all = [];
+      for (let o = -0.1 * c.h; o <= 0.1 * c.h; o += 1) for (let l = -0.04; l <= 0.04; l += 0.01) {
+        const len = Math.hypot(u1 - u0, v1 - v0);
+        const a = [u0 + nu * (o - l * len / 2), v0 + nv * (o - l * len / 2)], b = [u1 + nu * (o + l * len / 2), v1 + nv * (o + l * len / 2)];
+        const P0 = [c.cx + a[0] * co - a[1] * si, c.cy + a[0] * si + a[1] * co], P1 = [c.cx + b[0] * co - b[1] * si, c.cy + b[0] * si + b[1] * co];
+        const s = sideScore(P0[0], P0[1], P1[0], P1[1], map);
+        all.push({ s, o, l, P0, P1 });
+        if (s > best.s + 1e-9 || (Math.abs(s - best.s) < 1e-9 && Math.abs(o) < Math.abs(best.o))) best = { s, o, l, P0, P1 };
+      }
+      for (const f of all) if (f.s >= best.s * 0.85 && f.o > best.o + 1 && (!best.outer || f.o > best.outer.o)) best.outer = f;
+      return best.outer ? { ...best.outer, s:best.s } : best;
+    };
+    const mh = near[binOf(c.th)], mv = near[binOf(c.th + Math.PI / 2)];
+    const T = fitSide(-hw, -hh, hw, -hh, 0, -1, mh), B = fitSide(-hw, hh, hw, hh, 0, 1, mh);
+    const L = fitSide(-hw, -hh, -hw, hh, -1, 0, mv), Rt = fitSide(hw, -hh, hw, hh, 1, 0, mv);
+    const meet = (p, q) => {  // where line p (P0->P1) crosses line q
+      const [x1, y1] = p.P0, [x2, y2] = p.P1, [x3, y3] = q.P0, [x4, y4] = q.P1, d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+      if (Math.abs(d) < 1e-6) return { x:x1, y:y1 };
+      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d; return { x:x1 + t * (x2 - x1), y:y1 + t * (y2 - y1) };
+    };
+    const q = [meet(T, L), meet(T, Rt), meet(B, Rt), meet(B, L)].map(p => ({ x:p.x + x0, y:p.y + y0 }));
+    // Most cards have a black border: just inside a card's outline is darker than just outside it. Pieces inside
+    // a card (its art box, text box) don't show that, so it counts in a card's favor
+    const cq = q.map(p => ({ x:p.x - x0, y:p.y - y0 })), g = (x, y) => { x = Math.round(x); y = Math.round(y); return x >= 0 && y >= 0 && x < rw && y < rh ? grayPx[y * rw + x] : -1; };
+    let din = 0, dout = 0, nb = 0;
+    for (let side = 0; side < 4; side++) for (let t = 0.15; t <= 0.85; t += 0.1) {
+      const a = cq[side], b = cq[(side + 1) % 4], m = { x:a.x + (b.x - a.x) * t, y:a.y + (b.y - a.y) * t };
+      const cx3 = (cq[0].x + cq[2].x) / 2, cy3 = (cq[0].y + cq[2].y) / 2, len = Math.hypot(m.x - cx3, m.y - cy3) || 1, ux = (cx3 - m.x) / len, uy = (cy3 - m.y) / len;
+      const off = c.w * 0.025, i1 = g(m.x + ux * off, m.y + uy * off), o1 = g(m.x - ux * off, m.y - uy * off);
+      if (i1 >= 0 && o1 >= 0) { din += i1; dout += o1; nb++; }
+    }
+    const border = nb ? Math.max(0, Math.min(1, (dout - din) / nb / 40)) : 0;
+    out.push({ q, score:(T.s + B.s + L.s + Rt.s) / 4 * 0.7 + Math.min(T.s, B.s, L.s, Rt.s) * 0.3 + 0.2 * border });
   }
-  return out;
+  return out.sort((a, b) => b.score - a.score).slice(0, 4);
 }
 // Outlines around a point that could be a card or its art, as corners in frame pixels, smallest first
 async function findQuads(fr, P){
@@ -2729,51 +2809,15 @@ async function findQuads(fr, P){
   const cv = CV.cv, k = Math.min(1, 800 / Math.max(fr.w, fr.h)), W = Math.round(fr.w * k), H = Math.round(fr.h * k);
   const cvs = document.createElement("canvas"); cvs.width = W; cvs.height = H;
   const ctx = cvs.getContext("2d", { willReadFrequently:true }); ctx.drawImage(fr.src, 0, 0, W, H);
-  const mats = [], keep = m => (mats.push(m), m), found = [];
+  const mats = [], keep = m => (mats.push(m), m), out = [];
   try {
-    const src = keep(cv.matFromImageData(ctx.getImageData(0, 0, W, H))), gray = keep(new cv.Mat()), edges = keep(new cv.Mat()), thick = keep(new cv.Mat());
+    const src = keep(cv.matFromImageData(ctx.getImageData(0, 0, W, H))), gray = keep(new cv.Mat());
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
-    const kernel = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)));
-    for (const r of lineRects(cv, gray, { x:P.x * k, y:P.y * k })) {
-      const q = r.q.map(p => ({ x:p.x / k, y:p.y / k }));
-      found.push({ q:orderQuad(q), area:qdist(q[0], q[1]) * qdist(q[0], q[3]), lines:true, score:r.score });
-    }
-    const pt = new cv.Point(P.x * k, P.y * k), minA = (0.05 * Math.min(W, H)) ** 2, maxA = W * H * 0.8;
-    // Webcam contrast varies a lot, so trace edges at a few strengths
-    for (const [lo, hi] of [[10, 35], [20, 60], [40, 120]]) {
-      cv.Canny(gray, edges, lo, hi);
-      cv.dilate(edges, thick, kernel);  // close small gaps in the outline
-      const contours = keep(new cv.MatVector()), hier = keep(new cv.Mat());
-      cv.findContours(thick, contours, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-      for (let i = 0; i < contours.size(); i++) {
-        const c = contours.get(i);
-        try {
-          const a = cv.contourArea(c);
-          if (a < minA || a > maxA || cv.pointPolygonTest(c, pt, false) < 0) continue;
-          const r = cv.minAreaRect(c), ra = r.size.width * r.size.height;
-          if (!ra || a / ra < 0.82) continue;  // not rectangular
-          const sh = Math.min(r.size.width, r.size.height) / Math.max(r.size.width, r.size.height);
-          if (sh < 0.55 || sh > 0.9) continue;  // a card is 0.72 as wide as it is tall, its art 0.74; perspective stretches that a little
-          // The outline simplified to four corners when it simplifies cleanly (that keeps any perspective), else the fitted rectangle
-          let pts = null;
-          const ap = new cv.Mat(); cv.approxPolyDP(c, ap, 0.03 * cv.arcLength(c, true), true);
-          if (ap.rows === 4 && cv.isContourConvex(ap)) { pts = []; for (let j = 0; j < 4; j++) pts.push({ x:ap.data32S[j * 2], y:ap.data32S[j * 2 + 1] }); }
-          ap.delete();
-          if (!pts) pts = cv.RotatedRect.points(r).map(p => ({ x:p.x, y:p.y }));
-          found.push({ q:orderQuad(pts.map(p => ({ x:p.x / k, y:p.y / k }))), area:a / k / k });
-        } finally { c.delete(); }
-      }
-    }
+    for (const r of cardFits(cv, gray, { x:P.x * k, y:P.y * k }))
+      out.push({ q:orderQuad(r.q.map(p => ({ x:p.x / k, y:p.y / k }))), score:r.score });
   } catch (e) { console.warn("Card finder:", e); } finally { mats.forEach(m => m.delete()); }
-  // The same outline turns up at several edge strengths and on both sides of the traced line: keep one of each
-  found.sort((a, b) => a.area - b.area);
-  const out = [];
-  for (const f of found) {
-    const size = Math.sqrt(f.area);
-    if (!out.some(o => Math.max(...o.q.map((p, j) => qdist(p, f.q[j]))) < size * 0.08)) out.push(f);
-  }
-  return out.slice(0, 6);
+  return out;  // best fit first
 }
 // Straighten each outline into art-shaped pictures for the AI. Each outline is read as a whole card and as just
 // the art, each both ways up. Every reading remembers the card's corners in the frame, for drawing its outline.
@@ -2915,11 +2959,17 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
   },
   embed:canvases => aiEmbed(canvases),
   shrink:(canvas, w) => shrinkArt(canvas, w),
+  prepWidth,
   // Search a stand-in index instead of the published one: art pictures with names, fingerprinted here the way the
   // builder would with this prep (for measuring a new way of preparing art before rebuilding the real index)
+  // (each item: { name, canvas } to fingerprint here, or { name, v } with a fingerprint worked out before)
   async useIndex(list, prep){
     IDX.prep = prep; IDX.n = 1;  // (so prepWidth reads the new prep while fingerprinting)
-    const vecs = []; for (let i = 0; i < list.length; i += 16) vecs.push(...await aiEmbed(list.slice(i, i + 16).map(x => x.canvas)));
+    const vecs = [];
+    for (let i = 0; i < list.length; i += 16) {
+      const part = list.slice(i, i + 16);
+      vecs.push(...(part.every(x => x.v) ? part.map(x => Float32Array.from(x.v)) : await aiEmbed(part.map(x => x.canvas))));
+    }
     const D = vecs[0].length, V = new Int8Array(list.length * D), S = new Float32Array(list.length);
     vecs.forEach((v, i) => { let m = 0; for (const x of v) m = Math.max(m, Math.abs(x)); S[i] = 127 / (m || 1); for (let j = 0; j < D; j++) V[i * D + j] = Math.round(v[j] * S[i]); });
     Object.assign(IDX, { n:list.length, dims:D, model:AI.model, vecs:V, scales:S, ids:list.map(x => x.id || x.name), names:list.map(x => x.name) });
@@ -3289,7 +3339,7 @@ async function findCard(q){
 }
 function showCard(card, { share = false, from = null, fromHistory = false } = {}){
   const view = $("#cardView"); view.innerHTML = "";
-  cardCache.set(card.id, card); remember(card, fromHistory); learnLater(card.name);
+  cardCache.set(card.id, card); remember(card, fromHistory, { who:from ? `Shown by ${from}` : "" }); learnLater(card.name);
   if (!from) focusCardView();  // you asked for it, so bring the card into view; cards others show don't move your panel
   if (from) { bumpTab("card"); const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
   const faces = card.card_faces && !card.image_uris ? card.card_faces : [card];
@@ -3361,12 +3411,13 @@ const HIST_MAX = 60;
 const cardCache = new Map();
 let cardHist = [], histOn = "";
 try { cardHist = JSON.parse(store.get("kt-history", "[]")).filter(x => x && typeof x.id === "string" && typeof x.name === "string").slice(0, HIST_MAX); } catch { cardHist = []; }
-function remember(card, keepOrder){
-  histOn = card.id;
+// who: who played or showed it (blank for your own lookups); quiet: add it without making it the current card
+function remember(card, keepOrder, { who = "", quiet = false } = {}){
+  if (!quiet) histOn = card.id;
   if (!keepOrder || !cardHist.some(x => x.id === card.id)) {
-    const iu = card.image_uris || card.card_faces?.[0]?.image_uris;
-    const thumb = /^https:\/\/cards\.scryfall\.io\//.test(iu?.art_crop || "") ? iu.art_crop : "";
-    cardHist = [{ id:card.id, name:card.name, thumb }, ...cardHist.filter(x => x.id !== card.id && x.name !== card.name)].slice(0, HIST_MAX);
+    const iu = card.image_uris || card.card_faces?.[0]?.image_uris, ok = u => /^https:\/\/cards\.scryfall\.io\//.test(u || "");
+    const thumb = ok(iu?.art_crop) ? iu.art_crop : "", img = ok(iu?.normal) ? iu.normal : "";
+    cardHist = [{ id:card.id, name:card.name, thumb, img, who:String(who).slice(0, 24) }, ...cardHist.filter(x => x.id !== card.id && x.name !== card.name)].slice(0, HIST_MAX);
     store.set("kt-history", JSON.stringify(cardHist));
   }
   renderHistory();
@@ -3379,8 +3430,11 @@ function renderHistory(){
   cardHist.forEach(x => {
     const b = document.createElement("button"); b.type = "button"; b.title = x.name;
     if (x.id === histOn) { b.classList.add("on"); b.setAttribute("aria-current", "true"); }
-    if (x.thumb) { const im = document.createElement("img"); im.src = x.thumb; im.alt = ""; im.loading = "lazy"; b.appendChild(im); }
+    // the whole card (older entries only kept the art crop; Scryfall's full picture sits at the same path)
+    const src = x.img || (x.thumb || "").replace("/art_crop/", "/normal/");
+    const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; if (src) im.src = src; b.appendChild(im);
     const t = document.createElement("span"); t.textContent = x.name; b.appendChild(t);
+    if (x.who) { const w = document.createElement("span"); w.className = "who"; w.textContent = x.who; b.appendChild(w); }
     b.onclick = async () => {
       let c = cardCache.get(x.id);
       if (!c) { setStatus("Looking it up..."); c = await scry(`/cards/${x.id}`) || await scry("/cards/named?exact=" + encodeURIComponent(x.name)); }
@@ -3898,7 +3952,7 @@ async function prepareOnDevice(fromClick){
 }
 function startRec(){ startBrowserRec(); }
 function stopRec(){ stopBrowserRec(); }
-function onFinalSpeech(t){ addCaption(mySeat, t); broadcast({ type:"caption", text:t }); runVoice(t); }
+function onFinalSpeech(t){ addCaption(mySeat, t); broadcast({ type:"caption", text:t }); runVoice(t); spokenPlay(mySeat, me.lisp ? delisp(t) : t, !!me.lisp).catch(e => console.warn(e)); }
 $("#engineSel").onchange = async e => {
   stopRec(); engine = e.target.value; store.set("kt-engine", engine);
   if (!SR) { setCapHint("Captions need Chrome or Edge."); capOn = false; updateCapBtn(); return; }
@@ -4082,6 +4136,7 @@ async function runAsr(){
       const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
       if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
       addCaption(s, text, true);
+      spokenPlay(s, text, lispFor(s)).catch(e => console.warn(e));  // their own browser isn't captioning them, so this one does it
       if (remoteCap[s]) remoteCap[s].captioned++;
     }
   } catch (e) { console.warn("Speech model failed:", e); }
@@ -4094,6 +4149,8 @@ $("#capBtn").onclick = () => {
   updateCapBtn();
 };
 $("#voiceIn").onchange = e => store.set("kt-voice", e.target.checked ? "1" : "0");
+$("#playIn").checked = store.get("kt-play", "1") === "1";
+$("#playIn").onchange = e => store.set("kt-play", e.target.checked ? "1" : "0");
 $("#lispIn").onchange = e => { store.set("kt-lisp-me", e.target.checked ? "1" : "0"); if (me) { me.lisp = e.target.checked; pushState(); } };
 $("#oneWord").onchange = e => store.set("kt-oneword", e.target.checked ? "1" : "0");
 
@@ -4138,6 +4195,51 @@ async function lookUpSpoken(q){
   }
   if (!card) { toast(`Heard "${q}", but no card matched.`); return; }
   showCard(card, { share:true }); toast(`Heard: look up ${card.name}`);
+}
+/* "I play Sol Ring", "I'm casting Rhystic Study": the card pops up on that player's camera for everyone (lands
+   aren't shown). When it's not clear which card they said, their screen asks them to say it again. */
+const PLAY_RE = /(?:^|\b(?:and|then|so|now|ok|okay|alright)\s+)(?:i(?:'m| am)?\s+(?:going to |gonna )?|i(?:'ll| will)\s+|let me\s+|i\s+)?(?:play|playing|played|cast|casting)\s+(.+)$/;
+const NOT_A_CARD = /^(it|that|this|them|those|these|a land|land|lands|my land|something|nothing|anything|first|second|third|next|again|now|around|with|against|for|on|to|too|well|some|another|a lot|games?|magic|commander|a game|mtg|here|there|at|in|online|every|all|both|one)\b/;
+async function spokenPlay(seat, raw, lisp){
+  if (!$("#playIn").checked) return;
+  const t = raw.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim();
+  const m = PLAY_RE.exec(t); if (!m) return;
+  let tail = m[1].replace(/^(a|an|my|our)\s+/, "").trim();
+  if (!tail || NOT_A_CARD.test(tail)) return;
+  try { await loadIndex(); } catch {}
+  // The first card name in what follows, if it starts within the first couple of words
+  let name = null, i = 0;
+  for (const seg of linkify(tail, lisp)) { if (seg.card) { name = seg.card; break; } i += seg.t.split(/\s+/).length; if (i > 2) break; }
+  let card = name ? await fetchCard(null, name) : null;
+  if (!card) {  // Scryfall's own guess, if it's close to what was said
+    const q = tail.split(" ").slice(0, 6).join(" "), c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
+    if (c) { const named = norm(c.name.split(" // ")[0]), said = norm(q).split(" ").slice(0, named.split(" ").length + 1).join(" ");
+      if (similarity(lisp ? lispNorm(said) : said, lisp ? lispNorm(named) : named) >= 0.6) card = c; }
+  }
+  if (!card) { askRepeat(seat); return; }
+  if (/\bLand\b/.test(String(card.type_line || card.card_faces?.[0]?.type_line || "").split(" // ")[0])) return;  // lands aren't popped up
+  showPlayed(seat, card);
+  if (seat === mySeat) broadcast({ type:"played", id:card.id, name:card.name });
+}
+function askRepeat(seat){
+  if (seat !== mySeat) { send(conns[seat]?.conn || {}, { type:"repeatcard" }); return; }
+  toast("Please repeat what card you played.");
+  const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
+  el.querySelector(".repeatask")?.remove();
+  const a = document.createElement("div"); a.className = "repeatask"; a.setAttribute("role", "alert"); a.textContent = "Please repeat what card you played";
+  el.appendChild(a); setTimeout(() => a.remove(), 6000);
+}
+function showPlayed(seat, card){
+  const el = $(`#grid .tile[data-seat="${seat}"]`); if (!el) return;
+  el.querySelector(".played")?.remove();
+  const b = document.createElement("button"); b.type = "button"; b.className = "played"; b.title = `${card.name}: click to read it`;
+  const im = document.createElement("img"); im.src = cardImg(card); im.alt = card.name; b.appendChild(im);
+  const cap = document.createElement("span"); cap.textContent = card.name; b.appendChild(cap);
+  b.onclick = e => { e.stopPropagation(); showCard(card); };
+  el.appendChild(b);
+  setTimeout(() => { b.classList.add("out"); setTimeout(() => b.remove(), 450); }, 10000);
+  log(`${seat === mySeat ? "You" : nm(seat)} played `, card.name);
+  cardCache.set(card.id, card); remember(card, false, { who:`Played by ${seat === mySeat ? "you" : nm(seat)}`, quiet:true });
 }
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;

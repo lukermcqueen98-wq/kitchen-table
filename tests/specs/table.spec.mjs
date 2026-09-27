@@ -36,6 +36,15 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
   await a.locator(".modal-card button", { hasText:"Add counter" }).click();
   await expect(tile(b, 1).locator(".ctrs")).toContainText("Charge on Sol Ring");
 
+  // A commander shows its color identity and base power/toughness under its name, on everyone's screen
+  await tile(a, 1).locator(".cmdr.ask").click();
+  await a.locator('.modal-card input[placeholder="Start typing a card name"]').first().fill("Gamma Card");
+  await a.locator(".modal-card button.primary").click();
+  await expect(tile(b, 1).locator(".cmdr").first()).toHaveText("Gamma Card");
+  await expect(tile(b, 1).locator(".cmdrinfo img")).toHaveCount(2);
+  await expect(tile(b, 1).locator(".cmdrinfo img").first()).toHaveAttribute("alt", "Green");
+  await expect(tile(b, 1).locator(".cmdrinfo .pt")).toHaveText("3/4");
+
   // Drag Rick's camera onto Luke's: they swap places (CSS order), and the videos keep playing
   const grip = await tile(b, 2).locator(".grip").boundingBox(), target = await tile(b, 1).boundingBox();
   await b.mouse.move(grip.x + 5, grip.y + 5); await b.mouse.down();
