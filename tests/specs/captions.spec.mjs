@@ -9,7 +9,9 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
 
   // Rick has a lisp: "Thol Ring" links Sol Ring on Luke's screen, and "take thix" is 6 damage
   await say(b, "I cast Thol Ring and I take thix from Luke");
-  await expect(a.locator("#captions .cardlink", { hasText:"Thol Ring" })).toHaveAttribute("title", "Sol Ring");
+  await expect(a.locator(`#captions .cardlink[title='Heard "thol ring"']`)).toHaveText("Sol Ring");
+  // (a caption is just what he did: "I cast Sol Ring · I take 6")
+  await expect(a.locator("#captions li", { hasText:"I cast Sol Ring" })).toContainText("I take 6");
   expect(await lifeOf(b, 2)).toBe(34);
   // ...and saying he cast it pops Sol Ring up on Rick's camera on Luke's screen
   await expect(tile(a, 2).locator(".played")).toContainText("Sol Ring");
@@ -24,14 +26,14 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await a.waitForTimeout(800);
   await expect(tile(a, 1).locator(".played")).toHaveCount(0);
   await say(a, "I play blorptastic wizzlequark");
+  await expect(a.locator("#captions li", { hasText:"I play _" })).toHaveCount(1);
   await expect(tile(a, 1).locator(".repeatask")).toHaveText("Please repeat what card you played");
 
   // Misheard names of cards nobody has in their deck still link, and every Magic keyword (from Scryfall's lists) does too,
   // but not everyday words that happen to be keywords
   // (captions start at the action phrase and link only cards; Magic terms live in the Terms tab)
   await say(a, "ok so now I cast ristic study with offspring and trample");
-  await expect(a.locator(`#captions .cardlink.fuzzy[title='Heard "ristic study"']`)).toHaveText("Rhystic Study");
-  await expect(a.locator("#captions li", { hasText:"offspring" })).not.toContainText("ok so now");
+  await expect(a.locator("#captions li").last()).toHaveText("You:I cast Rhystic Study");
   await expect(a.locator("#captions .kwlink")).toHaveCount(0);
   await a.click("#tab-terms"); await a.fill("#termSearch", "offspring");
   await expect(a.locator("#termList summary")).toHaveText(["Offspring"]);
@@ -53,7 +55,9 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   // possessive without its 's ("commander sphere")
   await say(a, "I cast gwen um and a commander sphere");
   await expect(a.locator("#captions .cardlink", { hasText:"Gwenom, Remorseless" })).toHaveCount(1);
-  await expect(a.locator("#captions .cardlink", { hasText:/Commander.?s Sphere|commander sphere/ })).toHaveCount(1);
+  await expect(a.locator("#captions .cardlink", { hasText:"Commander's Sphere" })).toHaveCount(1);
+  await say(a, "I cast commander spear");
+  await expect(a.locator("#captions li", { hasText:"I cast Commander's Sphere" })).toHaveCount(1);
 
   // Rick's speech service fails (as in Brave): Luke's screen says why his captions aren't arriving
   await b.evaluate(() => { window.__speechError = "network"; });
