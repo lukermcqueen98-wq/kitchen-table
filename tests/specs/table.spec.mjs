@@ -28,6 +28,20 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
   await expect(tile(b, 1).locator(".ctr", { hasText:"Commander damage from Rick" })).toContainText("2");
   await expect(tile(b, 1).locator(".life output")).toHaveText("36");
   await expect.poll(() => b.$$eval("#dmgList li", l => l.map(x => x.textContent).filter(t => /commander/.test(t)))).toEqual([expect.stringContaining("Luke took 2 from Rick (commander)")]);
+  // Full screen on one player's camera: only theirs shows, filling the camera area; the button again goes back
+  const g0 = await b.locator("#grid").boundingBox();
+  await tile(b, 1).locator(".fsbtn").click();
+  await expect(tile(b, 2)).toBeHidden();
+  await expect(tile(b, 1)).toBeVisible();
+  expect((await tile(b, 1).boundingBox()).width).toBeGreaterThan(g0.width * 0.9);
+  await tile(b, 1).locator(".fsbtn").click();
+  await expect(tile(b, 2)).toBeVisible();
+  // ...Esc works too
+  await tile(b, 2).locator(".fsbtn").click();
+  await expect(tile(b, 1)).toBeHidden();
+  await b.keyboard.press("Escape");
+  await expect(tile(b, 1)).toBeVisible();
+
   // The Log tab counts what arrived while you were on another tab; opening it clears the count
   await expect(b.locator("#tab-log .badge")).toHaveText(/^[1-9]/);
   await b.click("#tab-log");
