@@ -28,6 +28,13 @@ button{cursor:pointer}
 /* Lobby and phone camera */
 .screen{min-height:100%;display:grid;place-items:center;padding:24px}
 .lobby-card{width:min(100%,480px)}
+#choose .lobby-card{width:min(100%,720px)}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.choices{grid-template-columns:1fr}}
+.choice{display:flex;flex-direction:column;gap:6px;text-align:left;padding:18px;border-radius:12px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+.choice:hover,.choice:focus-visible{border-color:var(--brass)}
+.choice b{font:700 24px var(--serif)}
+.choice span{color:var(--muted);font-size:14px}
 #lobby .lobby-card{width:min(100%,940px)}
 .lobby-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 36px;align-items:start}
 @media (max-width:860px){.lobby-cols{grid-template-columns:1fr}}
@@ -313,10 +320,21 @@ button.mpip{cursor:pointer}
 </head>
 <body>
 
+<section id="choose" class="screen hidden">
+  <div class="lobby-card">
+    <h1>Kitchen Table</h1>
+    <p class="lede">How do you want to play?</p>
+    <div class="choices">
+      <button class="choice" id="chooseWebcam"><b>Webcam table</b><span>Play with your real cards. Everyone points a camera at their playmat; click any card on screen to read it.</span></button>
+      <button class="choice" id="chooseDigital"><b>Digital table</b><span>No cards needed. Paste a decklist and play on a shared digital table, with voice chat.</span></button>
+    </div>
+  </div>
+</section>
 <section id="lobby" class="screen hidden">
   <div class="lobby-card">
     <h1>Kitchen Table</h1>
     <p class="lede">Play paper Magic over webcam. Point a camera at your playmat, share the table, and click any card on screen to read it.</p>
+    <p class="hint" style="margin:-14px 0 18px">No real cards handy? <a id="digitalLink" href="play.html" style="color:var(--brass)">Play on the digital table with a pasted decklist</a>.</p>
     <div class="lobby-cols">
       <div class="col">
       <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
@@ -568,7 +586,21 @@ async function boostBitrate(call){
 }
 
 if (PHONE) { runPhoneCam(); return; }
-$("#lobby").classList.remove("hidden");
+/* First visit: webcam table or digital table? The answer is remembered. An invite link (?room=) always opens the
+   webcam lobby, and ?webcam opens it from the digital table's link. */
+{
+  const choice = store.get("kt-play-choice", "");
+  const digital = () => { location.href = "play.html" + (params.get("room") ? "?room=" + encodeURIComponent(params.get("room")) : ""); };
+  $("#digitalLink").onclick = e => { e.preventDefault(); store.set("kt-play-choice", "digital"); digital(); };
+  if (params.get("room") || params.has("webcam") || choice === "webcam") $("#lobby").classList.remove("hidden");
+  else if (choice === "digital") { digital(); return; }
+  else {
+    $("#choose").classList.remove("hidden");
+    $("#chooseWebcam").onclick = () => { store.set("kt-play-choice", "webcam"); $("#choose").classList.add("hidden"); $("#lobby").classList.remove("hidden"); };
+    $("#chooseDigital").onclick = () => { store.set("kt-play-choice", "digital"); digital(); };
+    $("#chooseWebcam").focus();
+  }
+}
 
 /* =====================================================================
    Phone camera mode: this page was opened from the QR code on a phone

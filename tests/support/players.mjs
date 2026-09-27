@@ -11,6 +11,8 @@ const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrc
 const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : "Artifact", oracle_text:"{T}: Add {C}{C}.", mana_cost:"{2}{G/U}", scryfall_uri:"https://scryfall.com",
   color_identity:k === 2 ? ["G", "U"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
   image_uris:{ small:`https://cards.scryfall.io/small/${k % 3}.png`, normal:`https://cards.scryfall.io/normal/${k % 3}.png`, art_crop:`https://cards.scryfall.io/art_crop/${k % 3}.png` } });
+const FOREST = { object:"card", id:"00000009-0000-4000-8000-000000000009", name:"Forest", type_line:"Basic Land — Forest", oracle_text:"({T}: Add {G}.)", mana_cost:"",
+  produced_mana:["G"], image_uris:{ small:"https://cards.scryfall.io/small/0.png", normal:"https://cards.scryfall.io/normal/0.png" } };
 const json = (route, body, status = 200) => route.fulfill({ status, contentType:"application/json", headers:{ "access-control-allow-origin":"*" }, body:JSON.stringify(body) });
 
 // camera: "card" shows the Gamma Card on a playmat; otherwise Chromium's default test pattern. mic: "phrases" plays speech-length sounds.
@@ -23,7 +25,8 @@ export async function launchBrowser({ camera, mic } = {}){
 
 // noWebcam: the computer has a microphone but no camera (like a player whose phone is their camera)
 // rejectPhrases: the speech stand-in takes a phrase list (like newer Chrome) but fails with an unexpected error when given one
-export async function newPlayer(browser, { lisp = false, rejectPhrases = false, noWebcam = false } = {}){
+// choose: show the first-visit "webcam or digital table?" question (otherwise the webcam table is already picked)
+export async function newPlayer(browser, { lisp = false, rejectPhrases = false, noWebcam = false, choose = false } = {}){
   const ctx = await browser.newContext({ permissions:["camera", "microphone", "clipboard-read", "clipboard-write"], viewport:{ width:1400, height:900 } });
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:"" }));
   await ctx.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/, r => {
@@ -37,7 +40,13 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false, 
   await ctx.route(/api\.scryfall\.com/, r => {
     const u = decodeURIComponent(r.request().url()).toLowerCase(), byId = /\/cards\/(0{7}\d)/.exec(u);
     const k = NAMES.findIndex(n => u.includes(n.toLowerCase()));
-    if (/named\?(exact|fuzzy)=forest$/.test(u)) return json(r, { object:"card", id:"00000009-0000-4000-8000-000000000009", name:"Forest", type_line:"Basic Land — Forest", oracle_text:"({T}: Add {G}.)", mana_cost:"", image_uris:{ normal:"https://cards.scryfall.io/normal/0.png" } });
+    if (/named\?(exact|fuzzy)=forest$/.test(u) || u.includes(FOREST.id)) return json(r, FOREST);
+    // decklists: up to 75 names at a time
+    if (u.includes("/cards/collection")) {
+      const ids = JSON.parse(r.request().postData() || "{}").identifiers || [], data = [], not_found = [];
+      for (const id of ids) { const n = String(id.name || "").toLowerCase(), i = NAMES.findIndex(x => x.toLowerCase() === n); if (i >= 0) data.push(card(i)); else if (n === "forest") data.push(FOREST); else not_found.push(id); }
+      return json(r, { object:"list", data, not_found });
+    }
     if (u.includes("/catalog/keyword-abilities")) return json(r, { data:["Flying", "Offspring", "Fear"] });
     if (u.includes("/catalog/keyword-actions")) return json(r, { data:["Forage", "Cast"] });
     if (u.includes("/catalog/ability-words")) return json(r, { data:["Coven", "Eerie"] });
@@ -65,6 +74,7 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false, 
     window.RTCPeerConnection = class extends RPC { constructor(...x){ super(...x); window.__pcs.push(this); } };
     if (lisp) try { localStorage.setItem("kt-lisp-me", "1"); } catch {}
   }, [PEER_PORT, lisp, rejectPhrases]);
+  if (!choose) await ctx.addInitScript(() => { try { if (!localStorage.getItem("kt-play-choice")) localStorage.setItem("kt-play-choice", "webcam"); } catch {} });
   if (noWebcam) await ctx.addInitScript(() => {
     const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md), en = md.enumerateDevices.bind(md);
     md.getUserMedia = c => c?.video ? Promise.reject(new DOMException("No camera", "NotFoundError")) : gum(c);
