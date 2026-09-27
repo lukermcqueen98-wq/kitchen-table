@@ -277,7 +277,7 @@ button.mpip{cursor:pointer}
 #termList summary{cursor:pointer;font-weight:600}
 #termList p{margin:6px 0 4px;font-size:14px}
 #termList a{color:var(--brass);font-size:13px}
-#captions .gap{color:var(--muted)}
+#captions .unknown{color:var(--muted);font-weight:700;padding:0 2px;cursor:help}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--felt-deep);border:1px solid var(--brass);border-radius:10px;padding:10px 14px;z-index:60;display:flex;gap:12px;align-items:center;max-width:92vw}
 
 @media (max-width:900px){
@@ -3763,17 +3763,53 @@ function linkify(text, lisp){
    to read the card); after "I play" or "I cast", the words that follow get a closer look for a card name
    (Scryfall's spelling-tolerant search too), so a name the speech recognizer mangles still links. */
 const ACTION_PHRASE = /\bi(?:'m| am|'ll| will)?\s+(?:going to |gonna )?(?:take|taking|took|lose|losing|lost|gain|gaining|gained|heal|healing|healed|pay|paying|paid|play|playing|played|cast|casting)\b/;
-const TAIL_PHRASE = /\b(?:play|playing|played|cast|casting)\s+(?:a |an |my )?(.+)$/;
+/* What a player said they did, read from a line: each action phrase with the card(s) after "I play" / "I cast"
+   (null when it can't be made out) or the amount after "I take / lose / gain / heal / pay". */
+const ACTION_ALL = new RegExp(ACTION_PHRASE.source, "g");
+async function parseActions(text, lisp){
+  const low = text.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim(), out = [];
+  const ms = [...low.matchAll(ACTION_ALL)];
+  for (let i = 0; i < ms.length; i++) {
+    const m = ms[i], verb = m[0].split(/\s+/).pop(), phrase = m[0].replace(/^i\b/, "I");
+    const after = low.slice(m.index + m[0].length, i + 1 < ms.length ? ms[i + 1].index : undefined).trim().replace(/\s+(and|then|so)$/, "");
+    if (/^(play|cast)/.test(verb)) out.push({ phrase, cards:await cardsIn(after, lisp) });
+    else {
+      const words = (lisp ? delisp(after) : after).split(" ").slice(0, 4).join(" ").toLowerCase();
+      const n = words ? numIn(words) : null, unit = /\bdamage\b/.test(words) ? " damage" : /\blife\b/.test(words) ? " life" : "";
+      out.push({ phrase, amount:n != null && n <= 999 ? `${n}${unit}` : null, heard:after });
+    }
+  }
+  return out;
+}
+// The cards named in what followed "I play" / "I cast": one, or a few joined by "and" / "then"
+async function cardsIn(words, lisp){
+  let rest = words.replace(/^(a|an|my|our)\s+/, "").trim(); const out = [];
+  while (rest && out.length < 3) {
+    if (NOT_A_CARD.test(rest)) { if (!out.length) out.push({ card:null, heard:rest }); break; }
+    // a card named exactly at the start first (keeps names with "and" in them whole, like Fire and Ice)
+    const first = linkify(rest, lisp)[0];
+    let heard, card = null;
+    if (first?.card && !first.fuzzy) {
+      heard = first.t; card = await fetchCard(null, first.card);
+      rest = rest.split(" ").slice(first.n).join(" ");
+      const more = /^(and|then|plus)\s+/.exec(rest); rest = more ? rest.slice(more[0].length) : "";
+    } else {
+      const cut = rest.split(/\s+(?:and|then|plus)\s+/);
+      heard = cut[0]; rest = cut.slice(1).join(" and ");
+      card = await cardFromWords(heard, lisp);
+    }
+    if (card || !out.length) out.push({ card, heard });  // (a later part that isn't a card is just more talk)
+    rest = rest.replace(/^(a|an|my|our)\s+/, "").trim();
+  }
+  return out.length ? out : [{ card:null, heard:words }];
+}
 async function addCaption(seat, text, heardHere){
   if (seat !== mySeat && !heardHere) lastCapFrom[seat] = Date.now();
   try { await loadIndex(); } catch {}
-  const gameOnly = $("#gameOnly").checked, low = text.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ");
-  const phrase = ACTION_PHRASE.exec(low);
-  if (gameOnly && !phrase) return;  // not something a player did
-  // Only cards are linked in captions (Magic terms are in the Terms tab); a shown line starts at its phrase
-  let segs = linkify(text, lispFor(seat)).map(x => x.kw ? { t:x.t } : x);
-  if (gameOnly) segs = fromPhrase(segs, phrase.index);
-  const found = segs.some(x => x.card);
+  const gameOnly = $("#gameOnly").checked, lisp = lispFor(seat);
+  // Only what players do: the line is just the phrases and what they name, not the words around them
+  const acts = gameOnly ? await parseActions(text, lisp) : null;
+  if (gameOnly && !acts.length) return;
   const ul = $("#captions");
   const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
   const li = document.createElement("li");
@@ -3782,40 +3818,31 @@ async function addCaption(seat, text, heardHere){
   who.textContent = (seat === mySeat ? "You" : nm(seat)) + ":";
   li.appendChild(who);
   if (heardHere) li.title = "Captioned on this computer from their audio";
-  segs.forEach((seg, idx) => {
+  const cardButton = (name, title, open) => {
+    const b = document.createElement("button"); b.className = "cardlink"; b.textContent = name; b.title = title; b.onclick = open; return b;
+  };
+  const unknown = heard => { const u = document.createElement("span"); u.className = "unknown"; u.textContent = "_"; u.title = `Heard "${heard}"`; return u; };
+  if (gameOnly) acts.forEach((a, i) => {
+    if (i) li.append(" · ");
+    li.append(a.phrase + " ");
+    if (a.cards) a.cards.forEach((c, j) => {
+      if (j) li.append(" and ");
+      li.appendChild(c.card ? cardButton(c.card.name, `Heard "${c.heard}"`, () => showCard(c.card)) : unknown(c.heard));
+    });
+    else if (a.amount) li.append(a.amount); else li.appendChild(unknown(a.heard));
+  });
+  else linkify(text, lisp).forEach((seg, idx) => {  // everything said, with card names linked
     if (idx) li.append(" ");
-    if (seg.gap) { const g = document.createElement("span"); g.className = "gap"; g.textContent = "…"; li.appendChild(g); }
-    else if (seg.card) {
-      const b = document.createElement("button"); b.className = "cardlink" + (seg.fuzzy ? " fuzzy" : "");
-      b.textContent = seg.fuzzy ? seg.card : seg.t; b.title = seg.fuzzy ? `Heard "${seg.t}"` : seg.card;
-      b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(seg.card)) || await findCard(seg.card); if (c) showCard(c); else setStatus(`No card matched "${seg.card}".`); };
-      li.appendChild(b);
-    } else li.append(seg.t);
+    if (seg.card) li.appendChild(cardButton(seg.fuzzy ? seg.card : seg.t, seg.fuzzy ? `Heard "${seg.t}"` : seg.card, async () => {
+      setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(seg.card)) || await findCard(seg.card);
+      if (c) showCard(c); else setStatus(`No card matched "${seg.card}".`);
+    }));
+    else li.append(seg.t);
   });
   if (interimEl && interimEl.parentNode === ul) ul.insertBefore(li, interimEl); else ul.appendChild(li);
   if (seat !== mySeat) bumpTab("captions");
-  // A game phrase with no card after it: ask Scryfall what card the words after it could be
-  const tail = phrase && TAIL_PHRASE.exec(low.slice(phrase.index))?.[1];
-  if (tail && !found && !NOT_A_CARD.test(tail)) cardFromWords(tail, lispFor(seat)).then(card => {
-    if (!card) return;
-    const b = document.createElement("button"); b.className = "cardlink fuzzy"; b.textContent = card.name; b.title = `Heard "${tail}"`;
-    b.onclick = () => showCard(card);
-    li.append(" → "); li.appendChild(b);
-  });
   while (ul.children.length > 120) ul.firstChild.remove();
   if (nearBottom) ul.scrollTop = ul.scrollHeight;
-}
-// The part of a line from the action phrase on (at most about 20 words), dropping the chat before it
-function fromPhrase(segs, at){
-  let pos = 0, words = 0; const out = [];
-  for (const x of segs) {
-    const start = pos; pos += x.t.length + 1;
-    if (pos <= at) continue;
-    words += x.t.split(/\s+/).length;
-    if (words > 20 && !x.card) { out.push({ gap:true }); break; }
-    out.push(x);
-  }
-  return out.length ? out : segs;
 }
 /* The card some words name (what followed "I play" or "I cast"): the closest-sounding card when it's clearly
    closest; on a close call, Scryfall's own guess settles it if it's one of the two closest; with no good sound-alike,
@@ -4183,7 +4210,7 @@ async function lookUpSpoken(q){
 /* "I play Sol Ring", "I'm casting Rhystic Study": the card pops up on that player's camera for everyone (lands
    aren't shown). When it's not clear which card they said, their screen asks them to say it again. */
 const PLAY_RE = /(?:^|\b(?:and|then|so|now|ok|okay|alright)\s+)(?:i(?:'m| am)?\s+(?:going to |gonna )?|i(?:'ll| will)\s+|let me\s+|i\s+)?(?:play|playing|played|cast|casting)\s+(.+)$/;
-const NOT_A_CARD = /^(it|that|this|them|those|these|a land|land|lands|my land|something|nothing|anything|first|second|third|next|again|now|around|with|against|for|on|to|too|well|some|another|a lot|games?|magic|commander|a game|mtg|here|there|at|in|online|every|all|both|one)\b/;
+const NOT_A_CARD = /^(it|that|this|them|those|these|a land|land|lands|my land|something|nothing|anything|first|second|third|next|again|now|around|with|against|for|on|to|too|well|some|another|a lot|games?|magic|commander(?!\s+\w)|a game|mtg|here|there|at|in|online|every|all|both|one)\b/;
 /* The card that sounds closest to some words, out of every card name (for what follows "I play" or "I cast").
    Speech recognition often turns a card name into other words ("rhythmic study", "sold ring"); rather than only
    accepting names that sound exactly alike, this scores every name by how close its sounds are (edit distance over a
