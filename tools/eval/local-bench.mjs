@@ -111,7 +111,8 @@ await Promise.all(pages.map(async ({ page }) => {
                     found:Math.min(9, ...fits) < 0.12, bestFit:+Math.min(9, ...fits).toFixed(3), rank:fits.findIndex(f => f < 0.12) };
       if (!finderOnly) for (const k of methods) {
         const m = k === "perfect" ? await E.match(pic, 0, 0, { card:sc.quad }) : await E.match(pic, sc.click.x, sc.click.y, { finder:k === "finder" });
-        res[k] = m ? { name:m.name, score:+m.score.toFixed(3), sure:!!m.ok, ms:Math.round(m.ms) } : null;
+        res[k] = m ? { name:m.name, score:+m.score.toFixed(3), margin:+(m.margin ?? 0).toFixed(3), sure:!!m.ok, ms:Math.round(m.ms),
+                       top:(m.top || []).map(x => [x.name, +x.score.toFixed(3)]) } : null;
       }
       if (!res.found) {  // a picture of the miss: true outline green, found ones red, the click magenta
         const x = pic.getContext("2d"), poly = (q, c) => { x.strokeStyle = c; x.lineWidth = 2; x.beginPath(); q.forEach((p, j) => j ? x.lineTo(p.x, p.y) : x.moveTo(p.x, p.y)); x.closePath(); x.stroke(); };
