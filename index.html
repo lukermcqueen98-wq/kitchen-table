@@ -114,7 +114,6 @@ header.bar .btn.primary{padding:6px 16px}
 .tile .sel.fade{opacity:0;transition:opacity .4s}
 /* A card a player says they play, popped up on their camera */
 .playedrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:min(34%,230px);z-index:4;display:flex;gap:8px;animation:playIn .35s ease-out}
-.playedrow.multi{width:min(62%,460px)}
 .played{flex:1;min-width:0;cursor:pointer;border:0;padding:0;background:none}
 .played img{width:100%;display:block;border-radius:4.75%/3.5%;box-shadow:0 8px 30px rgba(0,0,0,.6),0 0 0 2px var(--brass)}
 .played span{display:block;margin-top:6px;text-align:center;font-size:13px;font-weight:600;background:rgba(0,0,0,.7);border-radius:6px;padding:3px 6px}
@@ -1115,7 +1114,7 @@ function onMessage(s, msg){
     case "table": applyTable(msg.table); break;
     case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500), false, actsFromWire(msg.acts)); break;
     case "played": {
-      const list = (Array.isArray(msg.cards) ? msg.cards : [msg]).slice(0, 3).filter(c => c && typeof c.name === "string");
+      const list = (Array.isArray(msg.cards) ? msg.cards : [msg]).slice(0, 5).filter(c => c && typeof c.name === "string");
       if ($("#playIn").checked && list.length)
         Promise.all(list.map(c => fetchCard(typeof c.id === "string" ? c.id.slice(0, 40) : null, c.name.slice(0, 141))))
           .then(cards => { cards = cards.filter(Boolean); if (cards.length) showPlayed(s, cards); });
@@ -3789,7 +3788,7 @@ async function parseActions(text, lisp){
 // The cards named in what followed "I play" / "I cast": one, or a few joined by "and" / "then"
 async function cardsIn(words, lisp){
   let rest = words.replace(/^(a|an|my|our)\s+/, "").trim(); const out = [];
-  while (rest && out.length < 3) {
+  while (rest && out.length < 5) {
     if (NOT_A_CARD.test(rest)) { if (!out.length) out.push({ card:null, heard:rest }); break; }
     // a card named exactly at the start first (keeps names with "and" in them whole, like Fire and Ice)
     const first = linkify(rest, lisp)[0];
@@ -3986,7 +3985,7 @@ function actsFromWire(list){
   const str = (v, n) => typeof v === "string" ? v.slice(0, n) : "";
   return list.slice(0, 6).filter(a => a && typeof a === "object" && typeof a.phrase === "string").map(a => ({
     phrase:str(a.phrase, 40), amount:typeof a.amount === "string" ? str(a.amount, 20) : null, heard:str(a.heard, 200),
-    ...(Array.isArray(a.cards) ? { cards:a.cards.slice(0, 3).map(c => ({ card:c?.name ? { id:str(c.id, 40), name:str(c.name, 141) } : null, heard:str(c?.heard, 200) })) } : {}) }));
+    ...(Array.isArray(a.cards) ? { cards:a.cards.slice(0, 5).map(c => ({ card:c?.name ? { id:str(c.id, 40), name:str(c.name, 141) } : null, heard:str(c?.heard, 200) })) } : {}) }));
 }
 // Cards a player said they played or cast pop up on their camera for everyone (not lands); one that couldn't be
 // made out asks them to say it again
@@ -4331,23 +4330,32 @@ function askRepeat(seat){
   const a = document.createElement("div"); a.className = "repeatask"; a.setAttribute("role", "alert"); a.textContent = "Please repeat what card you played";
   el.appendChild(a); setTimeout(() => a.remove(), 6000);
 }
-// Cards popped up on a player's camera (side by side when they played several at once), for 10 seconds
+/* Cards popped up on a player's camera, one at a time: when several are said at once (or more come in while one
+   is showing), they wait their turn, so everyone sees each of them. 6 seconds each while others wait, 10 for the last. */
+const playedQueue = {};  // seat -> { items, busy }
 function showPlayed(seat, cards){
   if (!Array.isArray(cards)) cards = [cards];
-  const el = $(`#grid .tile[data-seat="${seat}"]`); if (!el || !cards.length) return;
-  el.querySelector(".playedrow")?.remove();
-  const row = document.createElement("div"); row.className = "playedrow" + (cards.length > 1 ? " multi" : "");
+  const q = playedQueue[seat] ||= { items:[], busy:false };
   for (const card of cards) {
-    const b = document.createElement("button"); b.type = "button"; b.className = "played"; b.title = `${card.name}: click to read it`;
-    const im = document.createElement("img"); im.src = cardImg(card); im.alt = card.name; b.appendChild(im);
-    const cap = document.createElement("span"); cap.textContent = card.name; b.appendChild(cap);
-    b.onclick = e => { e.stopPropagation(); showCard(card); };
-    row.appendChild(b);
+    q.items.push(card);
     log(`${seat === mySeat ? "You" : nm(seat)} played `, card.name);
     cardCache.set(card.id, card); remember(card, false, { who:`Played by ${seat === mySeat ? "you" : nm(seat)}`, quiet:true });
   }
-  el.appendChild(row);
-  setTimeout(() => { row.classList.add("out"); setTimeout(() => row.remove(), 450); }, 10000);
+  if (!q.busy) nextPlayed(seat);
+}
+function nextPlayed(seat){
+  const q = playedQueue[seat], el = $(`#grid .tile[data-seat="${seat}"]`);
+  el?.querySelector(".playedrow")?.remove();
+  if (!q?.items.length || !el) { if (q) { q.busy = false; q.items = []; } return; }
+  q.busy = true;
+  const card = q.items.shift(), waiting = q.items.length;
+  const row = document.createElement("div"); row.className = "playedrow";
+  const b = document.createElement("button"); b.type = "button"; b.className = "played"; b.title = `${card.name}: click to read it`;
+  const im = document.createElement("img"); im.src = cardImg(card); im.alt = card.name; b.appendChild(im);
+  const cap = document.createElement("span"); cap.textContent = card.name + (waiting ? ` (+${waiting} more)` : ""); b.appendChild(cap);
+  b.onclick = e => { e.stopPropagation(); showCard(card); };
+  row.appendChild(b); el.appendChild(row);
+  setTimeout(() => { row.classList.add("out"); setTimeout(() => nextPlayed(seat), 400); }, waiting ? 6000 : 10000);
 }
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
