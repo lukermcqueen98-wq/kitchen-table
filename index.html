@@ -201,6 +201,9 @@ aside section+section{margin-top:22px}
 #cardView img{width:100%;border-radius:4.75% / 3.5%;display:block;margin-bottom:10px}
 #cardView .type{color:var(--muted);font-size:14px;margin:0 0 6px}
 #cardView .oracle{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
+.msym{width:1em;height:1em;vertical-align:-.14em;margin:0 1px}
+#cardView h2 .cost{margin-left:8px;white-space:nowrap}
+#cardView h2 .msym{width:.8em;height:.8em;vertical-align:-.05em}
 #cardView a{color:var(--brass)}
 #cardView .from{background:rgba(201,164,76,.15);border:1px solid var(--brass);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:14px}
 #cardView.flash{animation:cardFlash .9s ease-out}
@@ -3404,6 +3407,28 @@ async function findCard(q){
   }
   return null;
 }
+/* Card text with mana symbols as pictures, like on the card: "{2}{R}" becomes the 2 and red symbols, "{T}" the tap
+   symbol. The pictures come from Scryfall; a symbol keeps its text for copying and screen readers, and shows as text
+   if its picture can't load. */
+const SYMBOL_NAMES = { W:"white", U:"blue", B:"black", R:"red", G:"green", C:"colorless", S:"snow", X:"X", T:"tap", Q:"untap", E:"energy", P:"Phyrexian" };
+function symbolFile(sym){
+  const k = sym.toUpperCase().replace(/\//g, "");
+  return ({ "½":"HALF", "∞":"INFINITY" })[k] || k;
+}
+function withSymbols(el, text){
+  const parts = String(text || "").split(/(\{[^{}]{1,8}\})/);
+  for (const part of parts) {
+    if (!part) continue;
+    const m = /^\{([^{}]+)\}$/.exec(part);
+    if (!m) { el.append(part); continue; }
+    const im = document.createElement("img"); im.className = "msym"; im.alt = part;
+    im.title = m[1].split("/").map(x => SYMBOL_NAMES[x.toUpperCase()] || x).join(" or ");
+    im.src = `https://svgs.scryfall.io/card-symbols/${encodeURIComponent(symbolFile(m[1]))}.svg`;
+    im.onerror = () => im.replaceWith(part);
+    el.appendChild(im);
+  }
+  return el;
+}
 function showCard(card, { share = false, from = null, fromHistory = false } = {}){
   const view = $("#cardView"); view.innerHTML = "";
   cardCache.set(card.id, card); remember(card, fromHistory, { who:from ? `Shown by ${from}` : "" }); learnLater(card.name);
@@ -3415,9 +3440,10 @@ function showCard(card, { share = false, from = null, fromHistory = false } = {}
     if (src && (f === card || f.image_uris)) { const im = document.createElement("img"); im.src = src; im.alt = f.name; view.appendChild(im); }
   });
   (card.card_faces || [card]).forEach(f => {
-    const h = document.createElement("h2"); h.textContent = f.name + (f.mana_cost ? "  " + f.mana_cost : ""); view.appendChild(h);
+    const h = document.createElement("h2"); h.textContent = f.name; view.appendChild(h);
+    if (f.mana_cost) { const c = document.createElement("span"); c.className = "cost"; withSymbols(c, f.mana_cost); h.appendChild(c); }
     const t = document.createElement("p"); t.className = "type"; t.textContent = f.type_line || ""; view.appendChild(t);
-    const o = document.createElement("p"); o.className = "oracle"; o.textContent = f.oracle_text || ""; view.appendChild(o);
+    const o = document.createElement("p"); o.className = "oracle"; withSymbols(o, f.oracle_text); view.appendChild(o);
     if (f.power) { const pt = document.createElement("p"); pt.className = "type"; pt.textContent = `${f.power}/${f.toughness}`; view.appendChild(pt); }
     if (f.loyalty) { const lo = document.createElement("p"); lo.className = "type"; lo.textContent = `Loyalty ${f.loyalty}`; view.appendChild(lo); }
   });
@@ -3794,7 +3820,7 @@ $("#termSearch").addEventListener("input", renderTerms);
 function showKeyword(k){
   const view = $("#cardView"); view.innerHTML = ""; focusCardView();
   const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
-  const d = document.createElement("p"); d.className = "oracle"; d.textContent = k.def; view.appendChild(d);
+  const d = document.createElement("p"); d.className = "oracle"; withSymbols(d, k.def); view.appendChild(d);
   const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
   view.appendChild(a); setStatus("");
 }

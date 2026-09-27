@@ -42,6 +42,14 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
   await b.keyboard.press("Escape");
   await expect(tile(b, 1)).toBeVisible();
 
+  // The Card tab shows mana symbols as pictures (the text stays for copying), in the cost and the rules text
+  await b.fill("#searchIn", "Sol Ring"); await b.click("#searchBtn");
+  await expect(b.locator("#cardView h2").first()).toHaveText("Sol Ring");
+  await expect.poll(() => b.$$eval("#cardView h2 .msym", l => l.map(i => i.alt))).toEqual(["{2}", "{G/U}"]);
+  await expect.poll(() => b.$$eval("#cardView .oracle .msym", l => l.map(i => i.alt + (i.naturalWidth > 0)))).toEqual(["{T}true", "{C}true", "{C}true"]);
+  expect(await b.locator("#cardView h2 .msym").nth(1).getAttribute("src")).toMatch(/card-symbols\/GU\.svg$/);
+  await expect(b.locator("#cardView .oracle").first()).toHaveText(": Add .");
+
   // The Log tab counts what arrived while you were on another tab; opening it clears the count
   await expect(b.locator("#tab-log .badge")).toHaveText(/^[1-9]/);
   await b.click("#tab-log");
