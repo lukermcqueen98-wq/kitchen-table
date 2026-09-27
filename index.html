@@ -170,6 +170,10 @@ header.bar .btn.primary{padding:6px 16px}
 .dmgask .opts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 .dmgask .btn{padding:6px 10px;font-size:14px;display:flex;align-items:center;gap:6px}
 .dmgask label{display:flex;gap:6px;justify-content:center;align-items:center;font-size:13px;margin-top:10px;color:var(--muted)}
+.lifeask{position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:6;background:rgba(13,32,29,.97);border:1px solid var(--brass);border-radius:12px;padding:10px 12px;width:min(92%,380px);display:flex;flex-direction:column;gap:8px}
+.lifeask .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;text-align:center}
+.lifeask .row span{flex:1 1 100%;font-weight:600}
+.lifeask .btn{padding:6px 14px;font-size:14px}
 .dmgask .skip{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px}
 
 /* Side panel */
@@ -1348,7 +1352,7 @@ function applyNewGame(by, id){
   table.gameId = id || uid(); restored = true;  // a fresh game: nothing to bring back
   me.startLife = modeOf(table.mode).life;
   Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
-  lastLife = me.life; pending = null; shown.clear();
+  lastLife = me.life; pending = null; lifeAsks = []; shown.clear();
   Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"", turns:{} });
   turnStartAt = null; gameStartAt = null; damageLog = [];
   pushState(); render(); renderDmg();
@@ -1466,7 +1470,7 @@ function render(bumpMine){
     el.querySelector(".life").classList.toggle("low", p.life <= 5);
     renderCounters(el, s);
   });
-  renderAsk(); renderTablePanel(); renderCapPeers(); updateClocks();
+  renderAsk(); renderLifeAsk(); renderTablePanel(); renderCapPeers(); updateClocks();
   const dc = $("#dayChip");
   dc.classList.toggle("hidden", !table.dayNight); dc.classList.toggle("night", table.dayNight === "night");
   dc.textContent = table.dayNight === "night" ? "Night" : "Day";
@@ -1699,6 +1703,36 @@ function changeLife(delta, opts = {}){
     else if (delta > 0 && pending) { pending.amount -= delta; if (pending.amount <= 0) pending = null; }
   }
   pushState(); render(true);
+}
+/* Life changes heard by voice wait on the speaker's camera for Accept or Cancel, so a misheard number never
+   changes anyone's life total by itself */
+let lifeAsks = [], lifeAskId = 0;
+function askLife(text, to, apply){
+  lifeAsks.push({ id:++lifeAskId, text, to, apply });
+  if (lifeAsks.length > 3) lifeAsks.shift();
+  renderLifeAsk();
+}
+function answerLife(id, ok){
+  const a = lifeAsks.find(x => x.id === id); if (!a) return;
+  lifeAsks = lifeAsks.filter(x => x !== a);
+  if (ok) a.apply(); else toast(`Cancelled: ${a.text}`);
+  renderLifeAsk();
+}
+function renderLifeAsk(){
+  const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
+  let box = el.querySelector(".lifeask");
+  if (!lifeAsks.length) { box?.remove(); return; }
+  const sig = JSON.stringify([me.life, lifeAsks.map(a => a.id)]);
+  if (box && box.dataset.sig === sig) return;
+  if (!box) { box = document.createElement("div"); box.className = "lifeask"; box.addEventListener("pointerdown", e => e.stopPropagation()); el.appendChild(box); }
+  box.dataset.sig = sig; box.innerHTML = "";
+  for (const a of lifeAsks) {
+    const row = document.createElement("div"); row.className = "row";
+    const t = document.createElement("span"); t.textContent = `Heard: ${a.text} (life ${me.life} → ${a.to(me.life)})`; row.appendChild(t);
+    const yes = document.createElement("button"); yes.className = "btn primary"; yes.textContent = "Accept"; yes.onclick = () => answerLife(a.id, true);
+    const no = document.createElement("button"); no.className = "btn"; no.textContent = "Cancel"; no.onclick = () => answerLife(a.id, false);
+    row.append(yes, no); box.appendChild(row);
+  }
 }
 function renderAsk(){
   const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
@@ -4492,12 +4526,14 @@ function runVoice(raw){
   }
   if ((m = t.match(/\b(?:set my life to|my life is|i'?m at|i am at|i'?m now at|i am now at)\s+(.+)/))) {
     const n = numIn(m[1]); if (n == null || n > 999) return;
-    const prev = me.life; me.life = n; pushState(); render(true);
-    toast(`Heard: life set to ${n}`, () => { me.life = prev; pushState(); render(true); }); return;
+    askLife(`set life to ${n}`, () => n, () => {
+      const prev = me.life; me.life = n; pushState(); render(true);
+      toast(`Life set to ${n}`, () => { me.life = prev; pushState(); render(true); });
+    }); return;
   }
   if ((m = t.match(/\b(?:gain|gained|gaining)\s+(.+?)\s*life\b/))) {
     const n = numIn(m[1]); if (!n || n > 200) return;
-    changeLife(n, { noAsk:true }); toast(`Heard: gain ${n} life`, () => changeLife(-n, { noAsk:true })); return;
+    askLife(`gain ${n} life`, l => l + n, () => { changeLife(n, { noAsk:true }); toast(`Gained ${n} life`, () => changeLife(-n, { noAsk:true })); }); return;
   }
   if ((m = t.match(/\b(?:i|i'll|i will|i'm|im|i am)\s+(?:going to\s+)?(?:take|taking|took|lose|losing|lost)\s+(.+)/)) ||
       (m = t.match(/\b(?:take|taking|took|lose|losing)\s+(.+?\s+(?:damage|life)\b.*)/))) {
@@ -4505,13 +4541,18 @@ function runVoice(raw){
     const n = numIn(rest.split(/\bfrom\b/)[0]); if (!n || n > 200) return;
     const src = matchSource(rest), cmd = /\bcommander\b/.test(rest);
     if (src !== null) {
-      me.life -= n;
-      const e = recordDamage({ source:src, amount:n, cmd:cmd && src !== mySeat });
-      pushState(); render(true);
-      toast(`Heard: took ${n}${e.cmd ? " commander damage" : ""} from ${src === mySeat ? "yourself" : nm(src)}`, () => undoDamage(e.id));
+      const isCmd = cmd && src !== mySeat, who = src === mySeat ? "yourself" : nm(src);
+      askLife(`take ${n}${isCmd ? " commander damage" : ""} from ${who}`, l => l - n, () => {
+        me.life -= n;
+        const e = recordDamage({ source:src, amount:n, cmd:isCmd });
+        pushState(); render(true);
+        toast(`Took ${n}${e.cmd ? " commander damage" : ""} from ${who}`, () => undoDamage(e.id));
+      });
     } else {
-      changeLife(-n);
-      toast(`Heard: lost ${n} life. Pick who it was from on your screen.`, () => changeLife(n));
+      askLife(`lose ${n} life`, l => l - n, () => {
+        changeLife(-n);
+        toast(`Lost ${n} life. Pick who it was from on your screen.`, () => changeLife(n));
+      });
     }
   }
 }
