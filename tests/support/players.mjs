@@ -8,7 +8,8 @@ import { BASE, PEER_PORT } from "./global-setup.mjs";
 
 const MODULES = path.resolve(import.meta.dirname, "..", "node_modules");
 const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js", "opencv.js":"@techstark/opencv-js/dist/opencv.js" };
-const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:"Artifact", oracle_text:"Test card.", scryfall_uri:"https://scryfall.com",
+const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : "Artifact", oracle_text:"Test card.", scryfall_uri:"https://scryfall.com",
+  color_identity:k === 2 ? ["G", "U"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
   image_uris:{ small:`https://cards.scryfall.io/small/${k % 3}.png`, normal:`https://cards.scryfall.io/normal/${k % 3}.png`, art_crop:`https://cards.scryfall.io/art_crop/${k % 3}.png` } });
 const json = (route, body, status = 200) => route.fulfill({ status, contentType:"application/json", headers:{ "access-control-allow-origin":"*" }, body:JSON.stringify(body) });
 

@@ -126,6 +126,11 @@ header.bar .btn.primary{padding:6px 16px}
 .cmdrs:empty{display:none}
 .cmdr{pointer-events:auto;background:rgba(0,0,0,.65);border:0;border-radius:6px;padding:3px 9px;font-size:13px;color:var(--parchment);font-style:italic;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmdr.ask{font-style:normal;color:var(--brass);border:1px dashed var(--brass)}
+.cmdrwrap{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:100%}
+.cmdrinfo{display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.65);border-radius:6px;padding:2px 7px}
+.cmdrinfo:empty{display:none}
+.msym-img{width:16px;height:16px;display:block}
+.cmdrinfo .pt{margin-left:5px;font:700 14px var(--serif);font-variant-numeric:tabular-nums}
 #cmdrPop{position:fixed;width:240px;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.6);z-index:70;pointer-events:none}
 .cmdrform{text-align:left;margin-top:14px}
 .cmdrform .searchwrap{margin-bottom:4px}
@@ -185,7 +190,7 @@ aside section+section{margin-top:22px}
 #cardView .from{background:rgba(201,164,76,.15);border:1px solid var(--brass);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:14px}
 #cardView.flash{animation:cardFlash .9s ease-out}
 @keyframes cardFlash{from{box-shadow:0 0 0 3px var(--brass);border-radius:6px}to{box-shadow:0 0 0 3px transparent}}
-#histBox{margin:0 0 10px;font-size:13px}
+#histBox{margin:16px 0 0;font-size:13px}
 #matchStats{margin:0 0 8px;color:var(--muted)}
 .rechead{cursor:pointer;display:flex;align-items:baseline;gap:8px}
 .rechead h2{display:inline;margin:0}
@@ -194,11 +199,15 @@ aside section+section{margin-top:22px}
 #matchStats .btn{padding:4px 10px}
 #histBox summary{cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:8px}
 #histBox summary .spacer{flex:1}
-#histList{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;max-height:132px;overflow:auto}
-#histList button{display:flex;align-items:center;gap:6px;max-width:100%;padding:3px 8px 3px 3px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);font-size:13px}
-#histList button.on{border-color:var(--brass);color:var(--brass)}
-#histList img{width:30px;height:22px;object-fit:cover;border-radius:3px;flex:none}
+/* Card history: a picture of every card looked up or played, newest first (like SpellTable's) */
+#histList{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px}
+#histList button{display:flex;flex-direction:column;gap:4px;padding:0;border:0;background:none;text-align:left;font-size:12px;color:var(--muted);min-width:0}
+#histList img{width:100%;aspect-ratio:488/680;object-fit:cover;border-radius:4.75%/3.5%;display:block;background:rgba(0,0,0,.3);border:2px solid transparent}
+#histList button:hover img,#histList button:focus-visible img{border-color:var(--muted)}
+#histList button.on img{border-color:var(--brass)}
+#histList button.on{color:var(--brass)}
 #histList span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#histList .who{font-size:11px;opacity:.8}
 #alts{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:13px;color:var(--muted);margin:0 0 8px}
 #alts button{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 3px;border-radius:6px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);font-size:13px}
 #alts img{width:30px;height:22px;object-fit:cover;border-radius:3px}
@@ -410,12 +419,12 @@ button.mpip{cursor:pointer}
           <p class="hint" id="msText"></p>
           <div class="row"><button class="btn small" id="msExport" type="button">Export log</button><button class="linkbtn small" id="msClear" type="button">Clear</button></div>
         </details>
-        <details id="histBox" class="hidden" open>
-          <summary><span>Recent cards (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
-          <div id="histList"></div>
-        </details>
         <div id="alts" class="hidden"></div>
         <div id="cardView"><p class="hint">Click a card's art on any camera to identify it by picture. For a tight spot, drag a box around the card or its art.</p></div>
+        <details id="histBox" class="hidden" open>
+          <summary><span>Card history (<span id="histCount">0</span>)</span><span class="spacer"></span><button class="linkbtn small" id="histClear" type="button">Clear</button></summary>
+          <div id="histList"></div>
+        </details>
       </section>
       </div>
     <div class="pane hidden" role="tabpanel" data-pane="log" aria-labelledby="tab-log">
@@ -751,7 +760,14 @@ $("#deckImport").onclick = async () => {
   } finally { $("#deckImport").disabled = false; }
 };
 
-async function startCamera(deviceId, micId){
+// The camera being started, so "Sit down" can wait for it instead of saying there's no camera
+let cameraStarting = null;
+function startCamera(deviceId, micId){
+  const run = startCameraNow(deviceId, micId);
+  cameraStarting = run.finally(() => { if (cameraStarting === run) cameraStarting = null; });
+  return run;
+}
+async function startCameraNow(deviceId, micId){
   if (localStream) localStream.getTracks().forEach(t => t.stop());
   const video = { width:{ ideal:1920 }, height:{ ideal:1080 }, ...(deviceId ? { deviceId:{ exact:deviceId } } : {}) };
   const audio = { echoCancellation:true, noiseSuppression:true, ...(micId ? { deviceId:{ exact:micId } } : {}) };
@@ -759,7 +775,7 @@ async function startCamera(deviceId, micId){
     localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
     $("#noCam").classList.add("hidden");
   } catch (e) {
-    if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCamera();
+    if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCameraNow();
     if (e.name === "NotAllowedError") throw e;
     localStream = await navigator.mediaDevices.getUserMedia({ audio });
     $("#noCam").classList.remove("hidden");
@@ -800,6 +816,11 @@ function randomCode(){ const a = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; 
 
 $("#joinBtn").onclick = async () => {
   const err = $("#lobbyErr"); err.textContent = "";
+  if (!localStream && cameraStarting) {  // still starting (a slow camera, or the permission prompt is open): wait for it
+    $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Starting your camera...";
+    await cameraStarting.catch(() => {});
+    $("#joinBtn").disabled = false; $("#joinBtn").textContent = "Sit down";
+  }
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
   store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-deck", $("#deckIn").value);
@@ -1896,8 +1917,22 @@ function cleanCmdrs(list){
   return list.slice(0, 2).map(c => ({
     name:String(c?.name || "").slice(0, 141),
     id:/^[0-9a-f-]{36}$/.test(c?.id || "") ? c.id : "",
-    img:/^https:\/\/cards\.scryfall\.io\//.test(c?.img || "") ? String(c.img).slice(0, 300) : ""
+    img:/^https:\/\/cards\.scryfall\.io\//.test(c?.img || "") ? String(c.img).slice(0, 300) : "",
+    // color identity (as W U B R G) and base power/toughness or starting loyalty, shown under the name
+    ...(Array.isArray(c?.colors) ? { colors:c.colors.filter(x => "WUBRG".includes(x) && x.length === 1).slice(0, 5) } : {}),
+    ...(typeof c?.stats === "string" && /^[0-9*+\-X?½∞.]{1,4}(\/[0-9*+\-X?½∞.]{1,4})?$/.test(c.stats) ? { stats:c.stats } : {})
   })).filter(c => c.name);
+}
+// What's shown under a commander's name, from its Scryfall card: color identity and power/toughness (or loyalty)
+function cmdrFacts(card){
+  const f = card.card_faces?.[0] || {}, pw = card.power ?? f.power, tg = card.toughness ?? f.toughness, loy = card.loyalty ?? f.loyalty;
+  return { colors:(card.color_identity || []).filter(x => "WUBRG".includes(x)), stats:pw != null && tg != null ? `${pw}/${tg}` : loy != null ? String(loy) : "" };
+}
+const cmdrFactCache = new Map();  // commanders set before this was added: looked up once
+async function cmdrFactsFor(c){
+  const k = c.id || c.name;
+  if (!cmdrFactCache.has(k)) cmdrFactCache.set(k, (async () => { const card = await fetchCard(c.id, c.name); return card ? cmdrFacts(card) : null; })());
+  return cmdrFactCache.get(k);
 }
 function renderCmdrs(el, s){
   const box = el.querySelector(".cmdrs"), p = players[s], mine = s === mySeat;
@@ -1905,6 +1940,7 @@ function renderCmdrs(el, s){
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig; box.innerHTML = "";
   (p.cmdrs || []).forEach(c => {
+    const wrap = document.createElement("div"); wrap.className = "cmdrwrap";
     const b = document.createElement("button"); b.className = "cmdr"; b.textContent = c.name;
     b.setAttribute("aria-label", `Commander: ${c.name}. Click to open the card.`);
     const show = () => showCmdrPop(b, c), hide = () => $("#cmdrPop").classList.add("hidden");
@@ -1917,7 +1953,21 @@ function renderCmdrs(el, s){
       const card = (c.id && await scry(`/cards/${c.id}`)) || await scry("/cards/named?exact=" + encodeURIComponent(c.name));
       if (card) showCard(card); else setStatus(`Couldn't load ${c.name}.`);
     };
-    box.appendChild(b);
+    wrap.appendChild(b);
+    // Under the name: its color identity as mana symbols, and base power/toughness (or starting loyalty)
+    const info = document.createElement("div"); info.className = "cmdrinfo";
+    const fill = f => {
+      if (!f) return;
+      info.innerHTML = "";
+      for (const col of f.colors.length ? f.colors : ["C"]) {
+        const im = document.createElement("img"); im.className = "msym-img"; im.src = `https://svgs.scryfall.io/card-symbols/${col}.svg`;
+        im.alt = { W:"White", U:"Blue", B:"Black", R:"Red", G:"Green", C:"Colorless" }[col]; im.title = im.alt; info.appendChild(im);
+      }
+      if (f.stats) { const st = document.createElement("span"); st.className = "pt"; st.textContent = f.stats; st.title = f.stats.includes("/") ? "Base power/toughness" : "Starting loyalty"; info.appendChild(st); }
+    };
+    if (c.colors) fill({ colors:c.colors, stats:c.stats || "" }); else cmdrFactsFor(c).then(fill);
+    wrap.appendChild(info);
+    box.appendChild(wrap);
   });
   if (mine) {
     const b = document.createElement("button"); b.className = "cmdr ask";
@@ -2034,7 +2084,7 @@ function askCommander(opts = {}){
     save.disabled = false;
     if (!ca) { err.textContent = `No card matched "${a.value.trim()}". Pick one from the suggestions.`; return; }
     if (b.value.trim() && !cb) { err.textContent = `No card matched "${b.value.trim()}".`; return; }
-    me.cmdrs = cleanCmdrs([ca, cb].filter(Boolean).map(c => ({ name:c.name, id:c.id, img:cardImg(c) })));
+    me.cmdrs = cleanCmdrs([ca, cb].filter(Boolean).map(c => ({ name:c.name, id:c.id, img:cardImg(c), ...cmdrFacts(c) })));
     store.set("kt-cmdrs", JSON.stringify(me.cmdrs)); setTimeout(artSync, 300);
     pushState(); render();
     if (me.cmdrs.length === 1) log("You are playing ", me.cmdrs[0].name); else log(`You are playing ${me.cmdrs.map(c => c.name).join(" and ")}.`);
@@ -2827,16 +2877,20 @@ function cardFits(cv, gray, P){
     }
     const co = Math.cos(c.th), si = Math.sin(c.th), hw = c.w / 2, hh = c.h / 2;
     // each side as a line: offset outward (o) and lean (l, as a share of its length) that best fit the edges
+    // (a card's frame lines inside it can fit as well as its edge: of the fits nearly as good as the best, the
+    // outermost is the card's edge)
     const fitSide = (u0, v0, u1, v1, nu, nv, map) => {
-      let best = { s:-1, o:0, l:0 };
-      for (let o = -0.06 * c.h; o <= 0.06 * c.h; o += 1) for (let l = -0.04; l <= 0.04; l += 0.01) {
+      let best = { s:-1, o:0, l:0 }; const all = [];
+      for (let o = -0.1 * c.h; o <= 0.1 * c.h; o += 1) for (let l = -0.04; l <= 0.04; l += 0.01) {
         const len = Math.hypot(u1 - u0, v1 - v0);
         const a = [u0 + nu * (o - l * len / 2), v0 + nv * (o - l * len / 2)], b = [u1 + nu * (o + l * len / 2), v1 + nv * (o + l * len / 2)];
         const P0 = [c.cx + a[0] * co - a[1] * si, c.cy + a[0] * si + a[1] * co], P1 = [c.cx + b[0] * co - b[1] * si, c.cy + b[0] * si + b[1] * co];
         const s = sideScore(P0[0], P0[1], P1[0], P1[1], map);
+        all.push({ s, o, l, P0, P1 });
         if (s > best.s + 1e-9 || (Math.abs(s - best.s) < 1e-9 && Math.abs(o) < Math.abs(best.o))) best = { s, o, l, P0, P1 };
       }
-      return best;
+      for (const f of all) if (f.s >= best.s * 0.85 && f.o > best.o + 1 && (!best.outer || f.o > best.outer.o)) best.outer = f;
+      return best.outer ? { ...best.outer, s:best.s } : best;
     };
     const mh = near[binOf(c.th)], mv = near[binOf(c.th + Math.PI / 2)];
     const T = fitSide(-hw, -hh, hw, -hh, 0, -1, mh), B = fitSide(-hw, hh, hw, hh, 0, 1, mh);
@@ -3398,7 +3452,7 @@ async function findCard(q){
 }
 function showCard(card, { share = false, from = null, fromHistory = false } = {}){
   const view = $("#cardView"); view.innerHTML = "";
-  cardCache.set(card.id, card); remember(card, fromHistory); learnLater(card.name);
+  cardCache.set(card.id, card); remember(card, fromHistory, { who:from ? `Shown by ${from}` : "" }); learnLater(card.name);
   if (!from) focusCardView();  // you asked for it, so bring the card into view; cards others show don't move your panel
   if (from) { bumpTab("card"); const f = document.createElement("p"); f.className = "from"; f.textContent = `${from} is showing everyone this card.`; view.appendChild(f); }
   const faces = card.card_faces && !card.image_uris ? card.card_faces : [card];
@@ -3470,12 +3524,13 @@ const HIST_MAX = 60;
 const cardCache = new Map();
 let cardHist = [], histOn = "";
 try { cardHist = JSON.parse(store.get("kt-history", "[]")).filter(x => x && typeof x.id === "string" && typeof x.name === "string").slice(0, HIST_MAX); } catch { cardHist = []; }
-function remember(card, keepOrder){
-  histOn = card.id;
+// who: who played or showed it (blank for your own lookups); quiet: add it without making it the current card
+function remember(card, keepOrder, { who = "", quiet = false } = {}){
+  if (!quiet) histOn = card.id;
   if (!keepOrder || !cardHist.some(x => x.id === card.id)) {
-    const iu = card.image_uris || card.card_faces?.[0]?.image_uris;
-    const thumb = /^https:\/\/cards\.scryfall\.io\//.test(iu?.art_crop || "") ? iu.art_crop : "";
-    cardHist = [{ id:card.id, name:card.name, thumb }, ...cardHist.filter(x => x.id !== card.id && x.name !== card.name)].slice(0, HIST_MAX);
+    const iu = card.image_uris || card.card_faces?.[0]?.image_uris, ok = u => /^https:\/\/cards\.scryfall\.io\//.test(u || "");
+    const thumb = ok(iu?.art_crop) ? iu.art_crop : "", img = ok(iu?.normal) ? iu.normal : "";
+    cardHist = [{ id:card.id, name:card.name, thumb, img, who:String(who).slice(0, 24) }, ...cardHist.filter(x => x.id !== card.id && x.name !== card.name)].slice(0, HIST_MAX);
     store.set("kt-history", JSON.stringify(cardHist));
   }
   renderHistory();
@@ -3488,8 +3543,11 @@ function renderHistory(){
   cardHist.forEach(x => {
     const b = document.createElement("button"); b.type = "button"; b.title = x.name;
     if (x.id === histOn) { b.classList.add("on"); b.setAttribute("aria-current", "true"); }
-    if (x.thumb) { const im = document.createElement("img"); im.src = x.thumb; im.alt = ""; im.loading = "lazy"; b.appendChild(im); }
+    // the whole card (older entries only kept the art crop; Scryfall's full picture sits at the same path)
+    const src = x.img || (x.thumb || "").replace("/art_crop/", "/normal/");
+    const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; if (src) im.src = src; b.appendChild(im);
     const t = document.createElement("span"); t.textContent = x.name; b.appendChild(t);
+    if (x.who) { const w = document.createElement("span"); w.className = "who"; w.textContent = x.who; b.appendChild(w); }
     b.onclick = async () => {
       let c = cardCache.get(x.id);
       if (!c) { setStatus("Looking it up..."); c = await scry(`/cards/${x.id}`) || await scry("/cards/named?exact=" + encodeURIComponent(x.name)); }
@@ -4294,6 +4352,7 @@ function showPlayed(seat, card){
   el.appendChild(b);
   setTimeout(() => { b.classList.add("out"); setTimeout(() => b.remove(), 450); }, 10000);
   log(`${seat === mySeat ? "You" : nm(seat)} played `, card.name);
+  cardCache.set(card.id, card); remember(card, false, { who:`Played by ${seat === mySeat ? "you" : nm(seat)}`, quiet:true });
 }
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
