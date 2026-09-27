@@ -15,6 +15,19 @@ test("life log, counters, dragging cameras, turn numbers, and game records", asy
   await tile(a, 1).locator('.life button[data-d="1"]').click();
   await expect.poll(() => logLines(b), { timeout:8000 }).toContainEqual(expect.stringContaining("Luke lost 2 life (40 → 38)"));
   await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("You lost 2 life (40 → 38)"));
+  // Commander damage: a small - and + under your life for each other player (not on anyone else's camera)
+  await expect(tile(b, 1).locator(".cmdctl")).toHaveCount(0);
+  const cmd = tile(a, 1).locator(".cmdctl .row", { hasText:"Rick" });
+  await expect(cmd).toHaveCount(1);
+  const plus = cmd.getByRole("button", { name:"Add 1 commander damage from Rick" });
+  for (let i = 0; i < 3; i++) await plus.click();
+  await cmd.getByRole("button", { name:"Remove 1 commander damage from Rick" }).click();
+  await expect(cmd.locator("b")).toHaveText("2");
+  await expect(tile(a, 1).locator(".life output")).toHaveText("36");
+  // Rick sees Luke's commander damage and life, and the clicks are one entry in the damage history
+  await expect(tile(b, 1).locator(".ctr", { hasText:"Commander damage from Rick" })).toContainText("2");
+  await expect(tile(b, 1).locator(".life output")).toHaveText("36");
+  await expect.poll(() => b.$$eval("#dmgList li", l => l.map(x => x.textContent).filter(t => /commander/.test(t)))).toEqual([expect.stringContaining("Luke took 2 from Rick (commander)")]);
   // The Log tab counts what arrived while you were on another tab; opening it clears the count
   await expect(b.locator("#tab-log .badge")).toHaveText(/^[1-9]/);
   await b.click("#tab-log");
