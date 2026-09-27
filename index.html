@@ -307,6 +307,7 @@ button.mpip{cursor:pointer}
       <label class="field"><span>Camera</span><select id="camSel"></select></label>
       <label class="field"><span>Microphone</span><select id="micSel"></select></label>
       <label class="check"><input type="checkbox" id="rotIn"> My camera is upside down</label>
+      <label class="check"><input type="checkbox" id="phoneIn"> Use my phone as the camera (shows a code to scan after you sit down)</label>
       <details class="adv">
         <summary>Connection settings (TURN relay)</summary>
         <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
@@ -561,7 +562,7 @@ function runPhoneCam(){
   const seat = +seatStr;
   if (!room || !(seat >= 1 && seat <= MAX) || !key) { $("#phLabel").textContent = "This camera link is incomplete. Scan the code on your computer again."; $("#phStart").disabled = true; return; }
   $("#phLabel").textContent = `Camera for seat ${seat} at table ${room}.`;
-  let facing = "environment", stream = null, cpeer = null, timer = null, wake = null;
+  let facing = "environment", stream = null, cpeer = null, timer = null, wake = null, ctl = null;
   const out = {};
   const status = t => { $("#phStatus").textContent = t; };
 
@@ -579,7 +580,18 @@ function runPhoneCam(){
   async function keepAwake(){ try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && cpeer) keepAwake(); });
 
+  // A data link to the computer this phone is the camera for: it passes on a player's "I'm not getting your video"
+  function control(){
+    if (ctl && (ctl.open || Date.now() - ctl.at < 10000)) return;
+    try { ctl?.close(); } catch {}
+    ctl = cpeer.connect(`${PREFIX}-${room}-${seat}`, { reliable:true, metadata:{ cam:true, key } }); ctl.at = Date.now();
+    ctl.on("data", msg => {
+      const v = +msg?.seat;
+      if (msg?.type === "redial" && v >= 1 && v <= MAX) { const o = out[v]; delete out[v]; try { o?.call.close(); } catch {} dial(); }
+    });
+  }
   function dial(){
+    control();
     let live = 0, mine = false;
     for (let s = 1; s <= MAX; s++) {
       const o = out[s], st = o?.call.peerConnection?.connectionState;
@@ -628,6 +640,7 @@ function runPhoneCam(){
    ===================================================================== */
 let localStream = null, peer = null, mySeat = 0, roomCode = "", me = null;
 const calls = {}, conns = {}, camCalls = {}, players = {};
+let phoneCtl = null;  // data link to your phone camera, when it's on
 const table = { turnSeat:0, monarch:0, initiative:0, dayNight:"", clockMode:"off", mode:"cmdr", turns:{}, gameId:"" };  // gameId: new for every game  // turns: seat -> turns taken this game
 let turnStartAt = null, gameStartAt = null, tableKnown = false, joinedAt = 0;
 let damageLog = [], pending = null, camHidden = false;
@@ -637,6 +650,7 @@ const nm = s => (s === mySeat ? me?.name : players[s]?.name) || lastNames[s] || 
 
 /* ---------- Lobby ---------- */
 $("#nameIn").value = store.get("kt-name", "");
+$("#phoneIn").checked = store.get("kt-phone", "") === "1";
 for (const sel of [$("#modeSel"), $("#tblMode")]) for (const [k, m] of Object.entries(MODES)) {
   const o = document.createElement("option"); o.value = k; o.textContent = sel.id === "modeSel" ? m.label : `${m.short}, ${m.life} life`; sel.appendChild(o);
 }
@@ -666,7 +680,7 @@ async function startCameraNow(deviceId, micId){
     if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCameraNow();
     if (e.name === "NotAllowedError") throw e;
     localStream = await navigator.mediaDevices.getUserMedia({ audio });
-    $("#noCam").classList.remove("hidden");
+    $("#noCam").classList.remove("hidden"); $("#phoneIn").checked = true;  // no webcam: the phone is the camera
   }
   $("#lobbyPreview").srcObject = localStream;
 }
@@ -711,7 +725,7 @@ $("#joinBtn").onclick = async () => {
   }
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
-  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value);
+  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-phone", $("#phoneIn").checked ? "1" : "");
   store.set("kt-turn-url", $("#turnUrl").value.trim()); store.set("kt-turn-user", $("#turnUser").value.trim()); store.set("kt-turn-cred", $("#turnCred").value);
   roomCode = $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || randomCode();
   $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Finding a seat...";
@@ -759,7 +773,13 @@ function wirePeer(){
     setupCall(s, call, false);
   });
   peer.on("connection", conn => {
-    const s = seatOf(conn.peer); if (!s || conn.peer.endsWith("-cam")) { conn.close(); return; }
+    const s = seatOf(conn.peer);
+    if (conn.peer.endsWith("-cam")) {  // your phone camera's control link (so viewers can ask it to reconnect to them)
+      if (s === mySeat && me && conn.metadata?.key === me.camKey) { phoneCtl = conn; conn.on("close", () => { if (phoneCtl === conn) phoneCtl = null; }); }
+      else conn.close();
+      return;
+    }
+    if (!s) { conn.close(); return; }
     const ex = conns[s];
     if (ex && ex.outgoing && mySeat < s && !newSession(s, conn.metadata)) { conn.close(); return; }
     if (ex) ex.conn.close();
@@ -877,13 +897,16 @@ function handleCamCall(call){
   call.on("stream", st => {
     const p = players[s]; if (!p) return;
     p.camStream = st;
-    if (s === mySeat) { applyWebcam(); log("Your phone camera is connected."); updatePhoneUi(); }
+    if (s === mySeat) {
+      applyWebcam(); log("Your phone camera is connected."); updatePhoneUi(); pushState();
+      if (modalKind === "phone") setTimeout(() => { if (modalKind === "phone") closePhoneDialog(); }, 1200);  // done: carry on
+    }
     render();
   });
   const drop = () => {
     if (camCalls[s] !== call) return;
     delete camCalls[s];
-    if (players[s]) { players[s].camStream = null; if (s === mySeat) { applyWebcam(); updatePhoneUi(); } render(); }
+    if (players[s]) { players[s].camStream = null; if (s === mySeat) { applyWebcam(); updatePhoneUi(); pushState(); } render(); }
   };
   call.on("close", drop); call.on("error", drop);
 }
@@ -893,7 +916,7 @@ function applyWebcam(){ const t = localStream?.getVideoTracks()[0]; if (t) t.ena
 function send(conn, msg){ try { if (conn.open) conn.send(msg); } catch {} }
 function broadcast(msg){ Object.values(conns).forEach(c => send(c.conn, msg)); }
 function publicState(){
-  return { name:me.name, life:me.life, startLife:me.startLife, cap:capState(), capErr:capErr, lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
+  return { name:me.name, life:me.life, startLife:me.startLife, phoneCam:!!me.camStream, cap:capState(), capErr:capErr, lisp:!!me.lisp, poison:me.poison, exp:me.exp, energy:me.energy, blessing:me.blessing,
            emblems:me.emblems, custom:me.custom, cmd:me.cmd, rot:me.rot, camKey:me.camKey, manaOn:me.manaOn, mana:me.manaOn ? me.mana : null, cmdrs:me.cmdrs };
 }
 let lastLife = null;
@@ -1083,6 +1106,7 @@ function onMessage(s, msg){
       p.mana = { W:0, U:0, B:0, R:0, G:0, C:0 };
       if (st.mana && typeof st.mana === "object") for (const c of MANA) p.mana[c] = int(st.mana[c], 0, 999);
       p.camKey = typeof st.camKey === "string" ? st.camKey.slice(0, 40) : "";
+      p.phoneCam = !!st.phoneCam;
       if (oldKey && oldKey !== p.camKey && camCalls[s]) { try { camCalls[s].close(); } catch {} }
       if (msg.type === "hello") {
         if (typeof msg.sid === "string") p.sid = msg.sid.slice(0, 40);
@@ -1121,6 +1145,7 @@ function onMessage(s, msg){
       break;
     }
     case "repeatcard": askRepeat(mySeat); break;
+    case "camlost": if (phoneCtl) send(phoneCtl, { type:"redial", seat:s }); break;  // a player isn't getting your phone's video
     case "card": if (typeof msg.name === "string") log(`${p.name || "Someone"} looked at `, msg.name.slice(0, 141)); break;
     case "show":
       if (typeof msg.id === "string" && /^[0-9a-f-]{36}$/.test(msg.id)) {
@@ -1175,7 +1200,8 @@ function enterTable(){
   $("#oneWord").checked = store.get("kt-oneword", "1") === "1";
   try { tileOrder = JSON.parse(store.get("kt-order:" + roomCode, "[]")).map(Number).filter(n => n >= 1 && n <= MAX); } catch { tileOrder = []; }
   wirePeer(); render(); renderDmg();
-  setTimeout(() => askCommander(), 500);
+  // (with the phone as the camera, its code comes first; the commander question follows)
+  setTimeout(() => { if ($("#phoneIn").checked && !LOCAL) openPhoneDialog({ then:() => askCommander() }); else askCommander(); }, 500);
   setTimeout(artSync, 1500);
   setTimeout(loadCardIndex, 2500);
   // Start downloading the AI card matcher (and the index, which it loads first) now, so the first click is quick
@@ -1338,8 +1364,53 @@ function turnText(s){
   const left = +table.clockMode - el;
   return left >= 0 ? [`${base}, ${fmt(left)} left`, false] : [`${base}, ${fmt(-left)} over`, true];
 }
+/* A player's phone camera is on but its video isn't reaching this screen (a dropped or stale link): ask their
+   computer to have the phone reconnect to us */
+function checkPhoneCams(){
+  const now = Date.now();
+  for (const [k, p] of Object.entries(players)) {
+    const s = +k; if (s === mySeat) continue;
+    if (!p.phoneCam || p.camStream) { p.camLostSince = 0; continue; }
+    p.camLostSince ||= now;
+    if (now - p.camLostSince > 5000 && now - (p.camAskAt || 0) > 12000) { p.camAskAt = now; send(conns[s]?.conn || {}, { type:"camlost" }); }
+  }
+}
+/* Keep every camera playing: phones pause videos when the screen sleeps or you switch apps, and a video can freeze
+   when the connection hiccups. A paused one is started again; one whose picture hasn't moved for 6 seconds while its
+   camera is live is reattached. */
+function keepVideosPlaying(){
+  const now = Date.now();
+  document.querySelectorAll("#grid .tile video").forEach(v => {
+    const st = v.srcObject, track = st?.getVideoTracks?.()[0];
+    if (!st || !track || track.readyState !== "live" || !track.enabled) { v._still = 0; return; }
+    if (v.paused) { v.play?.().catch(() => {}); return; }
+    if (v.currentTime !== v._t) { v._t = v.currentTime; v._still = now; return; }
+    if (!v._still) v._still = now;
+    else if (now - v._still > 6000) { v._still = now; v.srcObject = null; v.srcObject = st; v.play?.().catch(() => {}); }
+  });
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepVideosPlaying(); });
+/* Every player we're connected to should also have a live video link. If only the video link dropped (a network
+   hiccup), nothing else would bring it back and their camera would stay blank here, so the player in the lower seat
+   calls again (only one side, so the two don't cross). */
+const videoRedialAt = {};
+function ensureVideoLinks(){
+  if (!peer || peer.destroyed || !localStream) return;
+  const now = Date.now();
+  for (const [k, c] of Object.entries(conns)) {
+    const s = +k; if (!c.conn.open || mySeat > s) continue;
+    const pc = calls[s]?.call.peerConnection, st = pc?.connectionState;
+    const bad = !calls[s] || st === "failed" || st === "closed" || (st === "disconnected" && now - (calls[s].badSince ||= now) > 8000);
+    if (st === "connected" && calls[s]) calls[s].badSince = 0;
+    if (!bad || now - (videoRedialAt[s] || 0) < 10000) continue;
+    videoRedialAt[s] = now;
+    try { calls[s]?.call.close(); } catch {}
+    delete calls[s];
+    setupCall(s, peer.call(`${PREFIX}-${roomCode}-${s}`, localStream, { metadata:{ sid:SID } }), true);
+  }
+}
 function updateClocks(){
-  updateNetWarn(); syncRemoteCaps();
+  updateNetWarn(); syncRemoteCaps(); checkPhoneCams(); keepVideosPlaying(); ensureVideoLinks();
   $("#gameClock").textContent = gameStartAt ? `Game ${fmt(gameSeconds())}` : "";
   $("#startBtn").classList.toggle("hidden", !!gameStartAt);
   document.querySelectorAll("#grid .tile").forEach(el => {
@@ -1374,8 +1445,12 @@ function render(bumpMine){
     if (vs && v.srcObject !== vs) { v.srcObject = vs; v.play?.().catch(() => {}); }
     const au = el.querySelector("audio");
     if (au && p.stream && au.srcObject !== p.stream) { au.srcObject = p.stream; au.play?.().catch(() => {}); }
-    const hasVideo = !!(p.camStream || (vs && vs.getVideoTracks().length));
-    el.querySelector(".nocam").classList.toggle("hidden", hasVideo);
+    // (a phone camera that's on but not reaching this screen: say so instead of showing a black box)
+    const phoneWait = s !== mySeat && p.phoneCam && !p.camStream;
+    const hasVideo = !phoneWait && !!(p.camStream || (vs && vs.getVideoTracks().length));
+    const nc = el.querySelector(".nocam"); nc.classList.toggle("hidden", hasVideo);
+    const ncText = phoneWait ? "Reconnecting their phone camera..." : s === mySeat ? "No camera. Use your phone: More > Use my phone as the camera." : "No camera yet.";
+    if (nc.textContent !== ncText) nc.textContent = ncText;
     v.classList.toggle("rot", !!p.rot);
     el.classList.toggle("active", table.turnSeat === s);
     const pos = tileSeats(seats).indexOf(s);
@@ -1405,7 +1480,7 @@ function buildTile(s){
   el.innerHTML = `
     <video autoplay playsinline muted></video>
     ${mine ? "" : "<audio autoplay></audio>"}
-    <div class="nocam hidden">${mine ? "No camera. Use Phone camera in the top bar." : "No camera yet."}</div>
+    <div class="nocam hidden"></div>
     <div class="hit" title="Click a card name to identify it"></div>
     <div class="plate"><div class="prow"><button class="grip" title="Drag to move this camera. Arrow keys work too." aria-label="Move this camera">⠿</button><span class="nm"><span class="pip" style="background:${SEAT_HEX[s - 1]}"></span><span class="pname"></span></span><span class="badges"></span><span class="turnflag"></span></div><div class="cmdrs"></div></div>
     <div class="life">${mine ? '<button aria-label="Lose 1 life" data-d="-1">&minus;</button>' : ""}<output></output>${mine ? '<button aria-label="Gain 1 life" data-d="1">+</button>' : ""}</div>
@@ -1763,7 +1838,11 @@ $("#dnSel").onchange = e => changeTable({ dayNight:e.target.value });
 $("#clockSel").onchange = e => { if (!turnStartAt && table.turnSeat) turnStartAt = Date.now(); changeTable({ clockMode:e.target.value }); };
 
 /* ---------- Phone camera setup from the table ---------- */
-$("#phoneBtn").onclick = () => {
+$("#phoneBtn").onclick = () => openPhoneDialog();
+let phoneThen = null;  // what to do once the phone dialog closes (the commander question, right after sitting down)
+function closePhoneDialog(){ const t = phoneThen; phoneThen = null; closeModal(); t?.(); }
+function openPhoneDialog({ then = null } = {}){
+  phoneThen = then;
   const card = document.createElement("div"); card.className = "modal-card";
   const h = document.createElement("h2"); h.textContent = "Use your phone as your camera"; card.appendChild(h);
   const p = document.createElement("p");
@@ -1783,14 +1862,14 @@ $("#phoneBtn").onclick = () => {
     stop.onclick = () => {
       me.camKey = uid(); pushState();  // new key: the old phone link stops working for everyone
       try { camCalls[mySeat]?.close(); } catch {}
-      closeModal(); log("Phone camera disconnected. The old QR code no longer works.");
+      closePhoneDialog(); log("Phone camera disconnected. The old QR code no longer works.");
     };
     card.appendChild(stop);
   }
-  const close = document.createElement("button"); close.className = "btn primary"; close.style.marginLeft = "8px"; close.textContent = "Close"; close.onclick = closeModal;
+  const close = document.createElement("button"); close.className = "btn primary"; close.style.marginLeft = "8px"; close.textContent = "Close"; close.onclick = closePhoneDialog;
   card.appendChild(close);
-  openModal(card); updatePhoneUi();
-};
+  openModal(card, "phone"); updatePhoneUi();
+}
 function updatePhoneUi(){
   const on = !!me.camStream;
   $("#phoneBtn").textContent = on ? "Phone camera is on (tap to see its link)" : "Use my phone as the camera";
@@ -1998,7 +2077,7 @@ function closeModal(){
   else if (cmdrAsking) setTimeout(() => { if (!modalKind) askCommander({ resume:true }); }, 150);  // bring the question back after a dice roll
 }
 $("#modal").addEventListener("pointerdown", e => { if (e.target.id === "modal") closeModal(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modal").classList.contains("hidden")) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modal").classList.contains("hidden")) { if (modalKind === "phone") closePhoneDialog(); else closeModal(); } });
 
 function dieSvg(kind, fill, ink){
   const shapes = {
