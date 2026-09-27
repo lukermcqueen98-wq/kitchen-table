@@ -466,7 +466,7 @@ button.mpip{cursor:pointer}
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
         <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I pay 2 life", "I play...", "I cast...") and cards they name</label>
         <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
-        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I pass my turn", "roll a d20", "what does Sol Ring do")</label>
+        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice card lookups (say "what does Sol Ring do", "show me Rhystic Study")</label>
       </section>
       </div>
     <div class="pane hidden" role="tabpanel" data-pane="terms" aria-labelledby="tab-terms">
@@ -4467,7 +4467,7 @@ $("#playIn").onchange = e => store.set("kt-play", e.target.checked ? "1" : "0");
 $("#lispIn").onchange = e => { store.set("kt-lisp-me", e.target.checked ? "1" : "0"); if (me) { me.lisp = e.target.checked; pushState(); } };
 $("#oneWord").onchange = e => store.set("kt-oneword", e.target.checked ? "1" : "0");
 
-/* Voice commands: only your own speech, only finished sentences, always undoable */
+/* Numbers in speech ("I take three"), for the amounts shown in captions */
 const NUMW = { zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13,
   fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fifty:50 };
 const NUM_SOUNDALIKE = { to:2, too:2, for:4, fore:4, free:3, tree:3, won:1, ate:8, tin:10, sex:6 };
@@ -4611,60 +4611,17 @@ function nextPlayed(seat){
   row.appendChild(b); el.appendChild(row);
   setTimeout(() => { row.classList.add("out"); setTimeout(() => nextPlayed(seat), 400); }, waiting ? 6000 : 10000);
 }
-/* "I pass my turn", "pass the turn", "I pass", "I'm passing", "end my turn", "that's my turn", "I'm done": the turn
-   player's turn passes. Not passing priority or passing on something, and not "if I pass" or "at end of turn". */
-function saysPassTurn(t){
-  if (/\bpriority\b|\b(if|when|before|after|until|once|should|could|can|might|would|do|don't|did|didn't) (i|we) (pass|end)\b|\bdon'?t pass\b|\bpass(ing)? (on|it|that|this|me|you|him|her|them|the (ball|card|salt|dice|die))\b/.test(t)) return false;
-  return /\b(pass(ing|ed)? (the |my )?turn|end(ing)? (the |my )?turn|end turn|go(ing)? to (the )?next turn|(that'?s|that is) (it for )?my turn|(i'?m|i am) (done|finished) with my turn|done with my turn)\b/.test(t)
-    || /(^|\b(ok|okay|alright|all right|so|and|um|uh|yeah|then) )(i pass|i'll pass|i will pass|i'm passing|i am passing|passing|pass|i'?m done|i am done|i'?m finished|i am finished)( now| then| it)?$/.test(t);
-}
+/* Voice commands: only card lookups ("what does Rhystic Study do", "show me Sol Ring", "look up Smothering Tithe").
+   Nothing else on the table (life, turns, dice, counters, mana) changes by voice; card names said also pop up (see
+   announceCards). */
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
   if (me.lisp) raw = delisp(raw);
-  const t = raw.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim()
-    .replace(/\b(maga|manna|mona|mono)\b/g, "mana").replace(/\b(read|reed)(?= mana\b)/g, "red").replace(/\bblew(?= mana\b)/g, "blue");
-  let m;
-  // Card lookup: "what does Rhystic Study do", "show me Sol Ring", "look up Smothering Tithe", "read Cyclonic Rift"
-  if ((m = t.match(/^(?:hey |ok |okay |so |um |uh )?(?:what does|what do|what's|whats|what is|show me|look up|lookup|pull up|read me|read|find|check)\s+(?:the card\s+|card\s+)?(.+?)(?:\s+(?:do|does|say|says|card|again))*$/))) {
-    const q = m[1].trim();
-    if (q.length >= 3 && !/^(my|your|his|her|their|our|it|that|this|life|mana|poison|everyone|the (turn|time|score|clock|board|game))\b/.test(q)) { lookUpSpoken(q); return; }
-  }
-  if (/\broll (off|for first|to see who goes first|for who goes first)\b/.test(t)) { startRollOff(); toast("Heard: roll for first player"); return; }
-  if (/\bflip (a )?coin\b/.test(t)) { rollDice("coin"); toast("Heard: flip a coin"); return; }
-  if ((m = t.match(/\broll (?:a |an |the )?d ?(4|6|8|10|12|20|four|six|eight|ten|twelve|twenty)\b/))) {
-    const n = /\d/.test(m[1]) ? +m[1] : NUMW[m[1]]; rollDice("d" + n); toast(`Heard: roll a d${n}`); return;
-  }
-  if (saysPassTurn(t)) {
-    if (table.turnSeat === mySeat || !table.turnSeat) {
-      const prev = { turnSeat:table.turnSeat, turns:{ ...table.turns } }, prevStart = turnStartAt;
-      passTurn(); toast(`Heard: pass turn to ${nm(table.turnSeat)}`, () => { turnStartAt = prevStart; changeTable(prev); });
-    }
-    return;
-  }
-  if (/\bmonarch\b/.test(t) && /\b(i|i'm|im|me)\b/.test(t) && /\b(become|became|am|i'm|im|take|took|get|got)\b/.test(t) && !/\b(not|lose|lost)\b/.test(t)) {
-    const prev = table.monarch; changeTable({ monarch:mySeat }); toast("Heard: you are the monarch", () => changeTable({ monarch:prev })); return;
-  }
-  if (/\binitiative\b/.test(t) && /\b(i|i'm|im|me)\b/.test(t) && /\b(take|took|have|get|got)\b/.test(t) && !/\b(not|lose|lost)\b/.test(t)) {
-    const prev = table.initiative; changeTable({ initiative:mySeat }); toast("Heard: you have the initiative", () => changeTable({ initiative:prev })); return;
-  }
-  if ((m = t.match(/\b(?:it'?s|it is|it becomes|becomes|now) (day|night)\b/))) {
-    const prev = table.dayNight; changeTable({ dayNight:m[1] }); toast(`Heard: it's ${m[1]}`, () => changeTable({ dayNight:prev })); return;
-  }
-  if (me.manaOn && (m = t.match(/\b(add|adding|added|float|floating|spend|spending|spent|use|using|used|remove|pay|paying)\s+(.+?)\s*(white|blue|black|red|green|colorless)(\s+mana)?\b/))) {
-    const n = numIn(m[2]) ?? (/^(a|an|one)$/.test(m[2].trim()) ? 1 : null); if (!n || n > 99) return;
-    const c = { white:"W", blue:"U", black:"B", red:"R", green:"G", colorless:"C" }[m[3]];
-    const d = /^(add|adding|added|float|floating)$/.test(m[1]) ? n : -n;
-    const prev = me.mana[c]; bumpMana(c, d);
-    toast(`Heard: ${d > 0 ? "add" : "remove"} ${n} ${m[3]} mana`, () => { me.mana[c] = prev; pushState(); render(); }); return;
-  }
-  if (me.manaOn && /\bempty (my )?(mana )?pool\b/.test(t)) {
-    const prev = { ...me.mana }; emptyMana(); toast("Heard: empty mana pool", () => { me.mana = prev; pushState(); render(); }); return;
-  }
-  if (/\bpoison\b/.test(t) && /\b(take|took|get|got|gain|gained|give me|add)\b/.test(t)) {
-    const n = numIn(t) ?? 1; if (n > 20) return;
-    me.poison += n; pushState(); render();
-    toast(`Heard: ${n} poison`, () => { me.poison = Math.max(0, me.poison - n); pushState(); render(); }); return;
-  }
+  const t = raw.toLowerCase().replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
+  const m = t.match(/^(?:hey |ok |okay |so |um |uh )?(?:what does|what do|what's|whats|what is|show me|look up|lookup|pull up|read me|read|find|check)\s+(?:the card\s+|card\s+)?(.+?)(?:\s+(?:do|does|say|says|card|again))*$/);
+  if (!m) return;
+  const q = m[1].trim();
+  if (q.length >= 3 && !/^(my|your|his|her|their|our|it|that|this|life|mana|poison|everyone|the (turn|time|score|clock|board|game))\b/.test(q)) lookUpSpoken(q);
 }
 
 /* =====================================================================
