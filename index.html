@@ -1167,7 +1167,7 @@ function onMessage(s, msg){
     }
     case "hellopls": if (conns[s]) sendHello(conns[s].conn); break;
     case "table": applyTable(msg.table); break;
-    case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500), false, actsFromWire(msg.acts)); break;
+    case "caption": if (typeof msg.text === "string") { noteQuestion(s, msg.text.slice(0, 500)); addCaption(s, msg.text.slice(0, 500), false, actsFromWire(msg.acts)); } break;
     case "played": {
       const list = (Array.isArray(msg.cards) ? msg.cards : [msg]).slice(0, 5).filter(c => c && typeof c.name === "string");
       if ($("#playIn").checked && list.length)
@@ -3972,7 +3972,14 @@ const ACTION_PHRASE = /(?:\bi(?:'m| am|'ll| will)?|\blet me)\s+(?:going to |gonn
 /* What a player said they did, read from a line: each action phrase with the card(s) after "I play" / "I cast"
    (null when it can't be made out) or the amount after "I take / lose / gain / heal / pay". */
 const ACTION_ALL = new RegExp(ACTION_PHRASE.source, "g");
-async function parseActions(text, lisp, seat = mySeat){
+/* "What card is that?": when a player asks, the next short thing someone else says in the next 15 seconds is read
+   as the card's name ("it's Rhystic Study", "oh, Smothering Tithe"), as closely as after "I play". */
+const WHAT_CARD = /\b(what|which) (card|one) (is|was) (that|this|it)\b|\bwhat('?s| is| was) (that|this) (card|one|thing)\b|\bwhat('?s| is| was) (that|this)\s*$|\bwhat('?d| did) you (just )?(play|cast)\b|\bwhat are you (playing|casting)\b|\bwhat('?s| is) (it|that) called\b|\bwhat card\b|\bname of (that|the) card\b/;
+let askedCard = null;  // { seat, at } for the last "what card is that?"
+function noteQuestion(seat, text){ if (WHAT_CARD.test(String(text).toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim())) askedCard = { seat, at:Date.now() }; }
+function answeringCard(seat){ return !!askedCard && askedCard.seat !== seat && Date.now() - askedCard.at < 15000; }
+const ANSWER_LEAD = /^(?:(?:oh|um|uh|so|yeah|yes|well|okay|ok|that|it|this)\s+)*(?:(?:it'?s|that'?s|this is|it is|that is|it was|that was|this|that)\s+)?(?:(?:called|a|an|my|just|the card|the)\s+)*/;
+async function parseActions(text, lisp, seat = mySeat, { answer = false } = {}){
   const low = text.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim(), out = [];
   const ms = [...low.matchAll(ACTION_ALL)];
   for (let i = 0; i < ms.length; i++) {
@@ -3983,6 +3990,14 @@ async function parseActions(text, lisp, seat = mySeat){
       const words = (lisp ? delisp(after) : after).split(" ").slice(0, 4).join(" ").toLowerCase();
       const n = words ? numIn(words) : null, unit = /\bdamage\b/.test(words) ? " damage" : /\blife\b/.test(words) ? " life" : "";
       out.push({ phrase, amount:n != null && n <= 999 ? `${n}${unit}` : null, heard:after });
+    }
+  }
+  // The answer to "what card is that?": a short reply is taken as the card's name
+  if (answer && !ms.length && !WHAT_CARD.test(low)) {
+    const said = low.replace(ANSWER_LEAD, "").trim();
+    if (said && said.split(" ").length <= 8 && !NOT_A_CARD.test(said)) {
+      const cards = (await cardsIn(said, lisp, seat)).filter(c => c.card);
+      if (cards.length) { out.push({ phrase:"", cards, mention:true, answer:true }); askedCard = null; }
     }
   }
   // Cards named anywhere else in the line ("that Rhystic Study is brutal", "Counterspell!"), without "I play"
@@ -4333,7 +4348,8 @@ function stopRec(){ stopBrowserRec(); }
    caption, so everyone's caption and the card popping up on your camera show the same cards */
 async function onFinalSpeech(t){
   runVoice(t);
-  const acts = await parseActions(t, !!me.lisp, mySeat).catch(e => { console.warn(e); return []; });
+  const answer = answeringCard(mySeat); noteQuestion(mySeat, t);
+  const acts = await parseActions(t, !!me.lisp, mySeat, { answer }).catch(e => { console.warn(e); return []; });
   const wire = actsForWire(acts);
   addCaption(mySeat, t, false, acts); broadcast({ type:"caption", text:t, acts:wire });
   announceCards(mySeat, acts);
@@ -4355,7 +4371,7 @@ function announceCards(seat, acts){
   if (!$("#playIn").checked) return;
   const cast = acts.filter(a => a.cards && a.phrase), now = Date.now(), seen = recentPops[seat] ||= {};
   // (a card only talked about pops up once a minute; "I play" / "I cast" always does)
-  const cards = acts.filter(a => a.cards).flatMap(a => a.cards.filter(c => c.card && (a.phrase || now - (seen[c.card.name] || 0) > 60000)).map(c => c.card))
+  const cards = acts.filter(a => a.cards).flatMap(a => a.cards.filter(c => c.card && (a.phrase || a.answer || now - (seen[c.card.name] || 0) > 60000)).map(c => c.card))
     .filter(c => !/\bLand\b/.test(String(c.type_line || c.card_faces?.[0]?.type_line || "").split(" // ")[0]));
   for (const c of cards) seen[c.name] = now;
   if (cards.length) { showPlayed(seat, cards); if (seat === mySeat) broadcast({ type:"played", cards:cards.map(c => ({ id:c.id, name:c.name })) }); }
@@ -4544,7 +4560,8 @@ async function runAsr(){
       const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
       if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
       // (their own browser isn't captioning them, so this one works out what they did, and pops their cards up here)
-      const acts = await parseActions(text, lispFor(s), s).catch(() => []);
+      const answer = answeringCard(s); noteQuestion(s, text);
+      const acts = await parseActions(text, lispFor(s), s, { answer }).catch(() => []);
       addCaption(s, text, true, acts); announceCards(s, acts);
       if (remoteCap[s]) remoteCap[s].captioned++;
     }
