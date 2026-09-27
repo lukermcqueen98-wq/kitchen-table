@@ -156,6 +156,14 @@ header.bar .btn.primary{padding:6px 16px}
 .life output.bump{transform:scale(1.15)}
 .life button,.ctr button{border:0;background:rgba(255,255,255,.1);border-radius:6px;width:30px;height:30px;font-size:18px;line-height:1}
 .life.low output{color:var(--danger)}
+.cmdctl{position:absolute;right:10px;top:62px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;z-index:2}
+.cmdctl .row{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.65);border-radius:8px;padding:2px 5px;font-size:12px}
+.cmdctl .row.lethal b{color:var(--danger)}
+.cmdctl .sw{width:9px;height:9px;border-radius:50%}
+.cmdctl .who{max-width:9ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdctl::before{content:"Commander damage";font-size:11px;color:var(--muted);background:rgba(0,0,0,.65);border-radius:6px;padding:1px 6px}
+.cmdctl b{min-width:2ch;text-align:center;font-variant-numeric:tabular-nums}
+.cmdctl button{border:0;background:rgba(255,255,255,.1);border-radius:5px;width:22px;height:22px;font-size:15px;line-height:1;padding:0}
 .ctrs{position:absolute;right:10px;bottom:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;pointer-events:none;z-index:2}
 .ctr{pointer-events:auto;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.7);border-radius:8px;padding:3px 7px;font-size:13px;max-width:100%}
 .ctr b{font:700 18px var(--serif);min-width:1.5ch;text-align:center}
@@ -170,10 +178,6 @@ header.bar .btn.primary{padding:6px 16px}
 .dmgask .opts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 .dmgask .btn{padding:6px 10px;font-size:14px;display:flex;align-items:center;gap:6px}
 .dmgask label{display:flex;gap:6px;justify-content:center;align-items:center;font-size:13px;margin-top:10px;color:var(--muted)}
-.lifeask{position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:6;background:rgba(13,32,29,.97);border:1px solid var(--brass);border-radius:12px;padding:10px 12px;width:min(92%,380px);display:flex;flex-direction:column;gap:8px}
-.lifeask .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;text-align:center}
-.lifeask .row span{flex:1 1 100%;font-weight:600}
-.lifeask .btn{padding:6px 14px;font-size:14px}
 .dmgask .skip{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px}
 
 /* Side panel */
@@ -453,7 +457,7 @@ button.mpip{cursor:pointer}
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
         <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I pay 2 life", "I play...", "I cast...") and cards they name</label>
         <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
-        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "I pass my turn", "what does Sol Ring do")</label>
+        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I pass my turn", "roll a d20", "what does Sol Ring do")</label>
       </section>
       </div>
     <div class="pane hidden" role="tabpanel" data-pane="terms" aria-labelledby="tab-terms">
@@ -1173,7 +1177,10 @@ function onMessage(s, msg){
       break;
     case "dmg": {
       const e = cleanEntry(msg.entry);
-      if (e && e.target === s && !damageLog.some(x => x.id === e.id)) { damageLog.push(e); renderDmg(); }
+      if (!e || e.target !== s) break;
+      const i = damageLog.findIndex(x => x.id === e.id);
+      if (i < 0) damageLog.push(e); else damageLog[i] = e;
+      renderDmg();
       break;
     }
     case "dmgundo": {
@@ -1366,7 +1373,7 @@ function applyNewGame(by, id){
   table.gameId = id || uid(); restored = true;  // a fresh game: nothing to bring back
   me.startLife = modeOf(table.mode).life;
   Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
-  lastLife = me.life; pending = null; lifeAsks = []; shown.clear();
+  lastLife = me.life; pending = null; shown.clear();
   Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"", turns:{} });
   turnStartAt = null; gameStartAt = null; damageLog = [];
   pushState(); render(); renderDmg();
@@ -1484,7 +1491,7 @@ function render(bumpMine){
     el.querySelector(".life").classList.toggle("low", p.life <= 5);
     renderCounters(el, s);
   });
-  renderAsk(); renderLifeAsk(); renderTablePanel(); renderCapPeers(); updateClocks();
+  renderAsk(); renderCmdCtl(); renderTablePanel(); renderCapPeers(); updateClocks();
   const dc = $("#dayChip");
   dc.classList.toggle("hidden", !table.dayNight); dc.classList.toggle("night", table.dayNight === "night");
   dc.textContent = table.dayNight === "night" ? "Night" : "Day";
@@ -1588,7 +1595,7 @@ function renderCounters(el, s){
     minus:() => bumpCustom(c.id, -1), plus:() => bumpCustom(c.id, 1),
     remove:() => { me.custom = me.custom.filter(x => x.id !== c.id); pushState(); render(); }
   } : {}));
-  Object.entries(p.cmd || {}).forEach(([src, v]) => { if (v > 0) chip(`Commander damage from ${nm(+src)}`, v, { sw:SEAT_HEX[src - 1], lethal:v >= 21 }); });
+  if (!mine) Object.entries(p.cmd || {}).forEach(([src, v]) => { if (v > 0) chip(`Commander damage from ${nm(+src)}`, v, { sw:SEAT_HEX[src - 1], lethal:v >= 21 }); });
   (p.emblems || []).forEach((t, i) => {
     const c = document.createElement("div"); c.className = "ctr emblem"; c.title = t;
     const l = document.createElement("span"); l.textContent = "Emblem: " + t; c.appendChild(l);
@@ -1718,35 +1725,47 @@ function changeLife(delta, opts = {}){
   }
   pushState(); render(true);
 }
-/* Life changes heard by voice wait on the speaker's camera for Accept or Cancel, so a misheard number never
-   changes anyone's life total by itself */
-let lifeAsks = [], lifeAskId = 0;
-function askLife(text, to, apply){
-  lifeAsks.push({ id:++lifeAskId, text, to, apply });
-  if (lifeAsks.length > 3) lifeAsks.shift();
-  renderLifeAsk();
-}
-function answerLife(id, ok){
-  const a = lifeAsks.find(x => x.id === id); if (!a) return;
-  lifeAsks = lifeAsks.filter(x => x !== a);
-  if (ok) a.apply(); else toast(`Cancelled: ${a.text}`);
-  renderLifeAsk();
-}
-function renderLifeAsk(){
+/* Commander damage: a small - and + under your life for each other player. + is 1 commander damage from them (and
+   1 life lost); - takes one back. Clicks in a row go in the damage history as one entry. Not in 60-card games. */
+function renderCmdCtl(){
   const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
-  let box = el.querySelector(".lifeask");
-  if (!lifeAsks.length) { box?.remove(); return; }
-  const sig = JSON.stringify([me.life, lifeAsks.map(a => a.id)]);
+  const others = table.mode === "sixty" ? [] : presentSeats().filter(s => s !== mySeat);
+  let box = el.querySelector(".cmdctl");
+  if (!others.length) { box?.remove(); return; }
+  const sig = JSON.stringify([others.map(s => [s, nm(s), me.cmd[s] || 0])]);
   if (box && box.dataset.sig === sig) return;
-  if (!box) { box = document.createElement("div"); box.className = "lifeask"; box.addEventListener("pointerdown", e => e.stopPropagation()); el.appendChild(box); }
+  if (!box) { box = document.createElement("div"); box.className = "cmdctl"; box.addEventListener("pointerdown", e => e.stopPropagation()); el.appendChild(box); }
   box.dataset.sig = sig; box.innerHTML = "";
-  for (const a of lifeAsks) {
-    const row = document.createElement("div"); row.className = "row";
-    const t = document.createElement("span"); t.textContent = `Heard: ${a.text} (life ${me.life} → ${a.to(me.life)})`; row.appendChild(t);
-    const yes = document.createElement("button"); yes.className = "btn primary"; yes.textContent = "Accept"; yes.onclick = () => answerLife(a.id, true);
-    const no = document.createElement("button"); no.className = "btn"; no.textContent = "Cancel"; no.onclick = () => answerLife(a.id, false);
-    row.append(yes, no); box.appendChild(row);
+  for (const s of others) {
+    const v = me.cmd[s] || 0, row = document.createElement("div"); row.className = "row" + (v >= 21 ? " lethal" : "");
+    row.title = `Commander damage from ${nm(s)}`;
+    const btn = (txt, label, d) => { const b = document.createElement("button"); b.innerHTML = txt; b.setAttribute("aria-label", label); b.onclick = e => { e.stopPropagation(); bumpCmd(s, d); }; return b; };
+    const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = SEAT_HEX[s - 1];
+    const val = document.createElement("b"); val.textContent = v;
+    const who = document.createElement("span"); who.className = "who"; who.textContent = nm(s);
+    row.append(sw, who, btn("&minus;", `Remove 1 commander damage from ${nm(s)}`, -1), val, btn("+", `Add 1 commander damage from ${nm(s)}`, 1));
+    box.appendChild(row);
   }
+}
+function bumpCmd(src, d){
+  const mineFrom = x => x.target === mySeat && x.source === src && x.cmd && !x.undone;
+  const last = [...damageLog].reverse().find(mineFrom);
+  if (d > 0) {
+    me.life -= 1;
+    if (last && Date.now() - last.at < 4000 && last === damageLog[damageLog.length - 1]) {
+      last.amount += 1; last.at = Date.now(); me.cmd[src] = (me.cmd[src] || 0) + 1;
+      broadcast({ type:"dmg", entry:last }); renderDmg();
+    } else recordDamage({ source:src, amount:1, cmd:true });
+  } else {
+    if (!(me.cmd[src] > 0)) return;
+    me.life += 1; me.cmd[src] -= 1;
+    if (last) {
+      if (last.amount > 1) { last.amount -= 1; broadcast({ type:"dmg", entry:last }); }
+      else { last.undone = true; broadcast({ type:"dmgundo", id:last.id }); }
+      renderDmg();
+    }
+  }
+  pushState(); render(true);
 }
 function renderAsk(){
   const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
@@ -3761,8 +3780,6 @@ function phon(w){
   const first = "aeiou".includes(w[0]) ? "a" : w[0];
   return (first + w.slice(1).replace(/[aeiouyhw]/g, "")).replace(/(.)\1+/g, "$1");
 }
-// Looser version for player names: treats sound pairs like g/k and b/p as the same
-function phonLoose(w){ return phon(w).replace(/[0x]/g, "s").replace(/g/g, "k").replace(/b/g, "p").replace(/d/g, "t").replace(/v/g, "f").replace(/j/g, "k").replace(/(.)\1+/g, "$1"); }
 // (a trailing s doesn't count: "commander sphere" sounds like "Commander's Sphere", "treasure" like "Treasures")
 function codeOf(words){ return words.filter(w => !STOP.has(w)).map(w => phon(w.length > 3 ? w.replace(/s$/, "") : w)).filter(Boolean).join(" "); }
 let poolCache = { sig:null, list:[] };
@@ -4407,18 +4424,6 @@ function numIn(str){
   if (!w) return null;
   return w[3] ? NUMW[w[3]] : NUMW[w[1]] + (w[2] ? NUMW[w[2]] : 0);
 }
-function matchSource(rest){
-  const m = rest.match(/\bfrom (.+)/); if (!m) return null;
-  const w = norm(m[1].replace(/\b(commander|damage|his|her|their|the)\b/g, " "));
-  if (/^(myself|me)\b/.test(w)) return mySeat;
-  for (const s of presentSeats()) {
-    if (s === mySeat) continue;
-    const n = norm(nm(s)); if (!n) continue;
-    if (w.startsWith(n) || w.split(" ")[0] === n.split(" ")[0]) return s;
-    if (phonLoose(w.split(" ")[0]) && phonLoose(w.split(" ")[0]) === phonLoose(n.split(" ")[0])) return s;  // "rig" for Rick
-  }
-  return null;
-}
 // For a lisp: swap heard words back to the command words they sound like ("thix" to "six", "path" to "pass")
 const VOICE_WORDS = ["six", "sixteen", "sixty", "seven", "seventeen", "seventy", "pass", "passing", "yes", "poison", "first", "coin", "since",
   "set", "sacrifice", "colorless", "spend", "spending", "use", "using", "cast", "damage", "less", "lose", "loss", "lost", "is", "this", "its", "it's", "so"];
@@ -4604,37 +4609,6 @@ function runVoice(raw){
     const n = numIn(t) ?? 1; if (n > 20) return;
     me.poison += n; pushState(); render();
     toast(`Heard: ${n} poison`, () => { me.poison = Math.max(0, me.poison - n); pushState(); render(); }); return;
-  }
-  if ((m = t.match(/\b(?:set my life to|my life is|i'?m at|i am at|i'?m now at|i am now at)\s+(.+)/))) {
-    const n = numIn(m[1]); if (n == null || n > 999) return;
-    askLife(`set life to ${n}`, () => n, () => {
-      const prev = me.life; me.life = n; pushState(); render(true);
-      toast(`Life set to ${n}`, () => { me.life = prev; pushState(); render(true); });
-    }); return;
-  }
-  if ((m = t.match(/\b(?:gain|gained|gaining)\s+(.+?)\s*life\b/))) {
-    const n = numIn(m[1]); if (!n || n > 200) return;
-    askLife(`gain ${n} life`, l => l + n, () => { changeLife(n, { noAsk:true }); toast(`Gained ${n} life`, () => changeLife(-n, { noAsk:true })); }); return;
-  }
-  if ((m = t.match(/\b(?:i|i'll|i will|i'm|im|i am)\s+(?:going to\s+)?(?:take|taking|took|lose|losing|lost)\s+(.+)/)) ||
-      (m = t.match(/\b(?:take|taking|took|lose|losing)\s+(.+?\s+(?:damage|life)\b.*)/))) {
-    const rest = m[1];
-    const n = numIn(rest.split(/\bfrom\b/)[0]); if (!n || n > 200) return;
-    const src = matchSource(rest), cmd = /\bcommander\b/.test(rest);
-    if (src !== null) {
-      const isCmd = cmd && src !== mySeat, who = src === mySeat ? "yourself" : nm(src);
-      askLife(`take ${n}${isCmd ? " commander damage" : ""} from ${who}`, l => l - n, () => {
-        me.life -= n;
-        const e = recordDamage({ source:src, amount:n, cmd:isCmd });
-        pushState(); render(true);
-        toast(`Took ${n}${e.cmd ? " commander damage" : ""} from ${who}`, () => undoDamage(e.id));
-      });
-    } else {
-      askLife(`lose ${n} life`, l => l - n, () => {
-        changeLife(-n);
-        toast(`Lost ${n} life. Pick who it was from on your screen.`, () => changeLife(n));
-      });
-    }
   }
 }
 

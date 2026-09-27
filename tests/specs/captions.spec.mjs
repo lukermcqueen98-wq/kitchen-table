@@ -12,14 +12,9 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator(`#captions .cardlink[title='Heard "thol ring"']`)).toHaveText("Sol Ring");
   // (a caption is just what he did: "I cast Sol Ring · I take 6")
   await expect(a.locator("#captions li", { hasText:"I cast Sol Ring" })).toContainText("I take 6");
-  // A life change heard by voice waits for Rick to accept it, on his own screen only
-  const ask = tile(b, 2).locator(".lifeask");
-  await expect(ask).toContainText("take 6 from Luke (life 40 → 34)");
-  await expect(tile(a, 2).locator(".lifeask")).toHaveCount(0);
+  // Life totals don't change by voice: only the buttons change them
+  await b.waitForTimeout(800);
   expect(await lifeOf(b, 2)).toBe(40);
-  await ask.getByRole("button", { name:"Accept" }).click();
-  await expect(ask).toHaveCount(0);
-  expect(await lifeOf(b, 2)).toBe(34);
   // ...and saying he cast it pops Sol Ring up on Rick's camera on Luke's screen
   await expect(tile(a, 2).locator(".played")).toContainText("Sol Ring");
   await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("Rick played Sol Ring"));
@@ -66,13 +61,11 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "that Sol Ring though");
   await expect(a.locator("#captions li").last()).toHaveText("You:Sol Ring");
   await expect.poll(() => logLines(a).then(l => l.filter(x => x.includes("You played Sol Ring")).length)).toBe(1);
+  const lifeBefore = await lifeOf(a, 1);
   await say(a, "I gain 2 life");
   await expect(a.locator("#captions li", { hasText:"I gain 2 life" })).toHaveCount(1);
-  // ...and Cancel leaves the life total alone
-  const before = await lifeOf(a, 1);
-  await tile(a, 1).locator(".lifeask").getByRole("button", { name:"Cancel" }).click();
-  await expect(tile(a, 1).locator(".lifeask")).toHaveCount(0);
-  expect(await lifeOf(a, 1)).toBe(before);
+  await a.waitForTimeout(800);
+  expect(await lifeOf(a, 1)).toBe(lifeBefore);
   await a.click("#tab-captions"); await a.uncheck("#gameOnly");
   await say(a, "we should order pizza after this");
   await expect(a.locator("#captions li", { hasText:"pizza" })).toHaveCount(1);
