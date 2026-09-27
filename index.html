@@ -2915,11 +2915,17 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
   },
   embed:canvases => aiEmbed(canvases),
   shrink:(canvas, w) => shrinkArt(canvas, w),
+  prepWidth,
   // Search a stand-in index instead of the published one: art pictures with names, fingerprinted here the way the
   // builder would with this prep (for measuring a new way of preparing art before rebuilding the real index)
+  // (each item: { name, canvas } to fingerprint here, or { name, v } with a fingerprint worked out before)
   async useIndex(list, prep){
     IDX.prep = prep; IDX.n = 1;  // (so prepWidth reads the new prep while fingerprinting)
-    const vecs = []; for (let i = 0; i < list.length; i += 16) vecs.push(...await aiEmbed(list.slice(i, i + 16).map(x => x.canvas)));
+    const vecs = [];
+    for (let i = 0; i < list.length; i += 16) {
+      const part = list.slice(i, i + 16);
+      vecs.push(...(part.every(x => x.v) ? part.map(x => Float32Array.from(x.v)) : await aiEmbed(part.map(x => x.canvas))));
+    }
     const D = vecs[0].length, V = new Int8Array(list.length * D), S = new Float32Array(list.length);
     vecs.forEach((v, i) => { let m = 0; for (const x of v) m = Math.max(m, Math.abs(x)); S[i] = 127 / (m || 1); for (let j = 0; j < D; j++) V[i * D + j] = Math.round(v[j] * S[i]); });
     Object.assign(IDX, { n:list.length, dims:D, model:AI.model, vecs:V, scales:S, ids:list.map(x => x.id || x.name), names:list.map(x => x.name) });
