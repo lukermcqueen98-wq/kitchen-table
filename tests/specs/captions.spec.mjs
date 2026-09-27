@@ -15,6 +15,10 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(tile(a, 2).locator(".played")).toContainText("Sol Ring");
   await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("Rick played Sol Ring"));
 
+  // A name the recognizer turned into other words: the closest-sounding card
+  await say(a, "I cast rhythmic study");
+  await expect(tile(a, 1).locator(".played")).toContainText("Rhystic Study");
+
   // Lands aren't popped up, and a card name that can't be made out gets "Please repeat"
   await say(a, "I play a Forest");
   await a.waitForTimeout(800);
@@ -26,8 +30,8 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   // but not everyday words that happen to be keywords
   // (captions start at the action phrase and link only cards; Magic terms live in the Terms tab)
   await say(a, "ok so now I cast ristic study with offspring and trample");
-  await expect(a.locator("#captions .cardlink.fuzzy", { hasText:"Rhystic Study" })).toHaveAttribute("title", 'Heard "ristic study"');
-  await expect(a.locator("#captions li", { hasText:"Rhystic Study" })).not.toContainText("ok so now");
+  await expect(a.locator(`#captions .cardlink.fuzzy[title='Heard "ristic study"']`)).toHaveText("Rhystic Study");
+  await expect(a.locator("#captions li", { hasText:"offspring" })).not.toContainText("ok so now");
   await expect(a.locator("#captions .kwlink")).toHaveCount(0);
   await a.click("#tab-terms"); await a.fill("#termSearch", "offspring");
   await expect(a.locator("#termList summary")).toHaveText(["Offspring"]);
