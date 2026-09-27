@@ -102,9 +102,11 @@ await Promise.all(pages.map(async ({ page }) => {
       const off = (a, z, size) => Math.min(...[0, 1, 2, 3].map(s => Math.max(...a.map((p, j) => Math.hypot(p.x - z[(j + s) % 4].x, p.y - z[(j + s) % 4].y))))) / size;
       const artOf = q => { const tall = Math.hypot(q[0].x - q[3].x, q[0].y - q[3].y) > Math.hypot(q[0].x - q[1].x, q[0].y - q[1].y), c = tall ? q : [q[1], q[2], q[3], q[0]];
         return [at(c, 0.085, 0.113), at(c, 0.915, 0.113), at(c, 0.915, 0.555), at(c, 0.085, 0.555)]; };
+    // (either way up: the matcher tries both)
+    const artsOf = q => [artOf(q), artOf([q[2], q[3], q[0], q[1]])];
       const artH = Math.hypot(sc.art[0].x - sc.art[3].x, sc.art[0].y - sc.art[3].y);
       const qs = await E.findQuads(pic, sc.click.x, sc.click.y);
-      const fits = qs.map(q => Math.min(off(artOf(q.q), sc.art, artH), off(q.q, sc.art, artH)));
+      const fits = qs.map(q => Math.min(...artsOf(q.q).map(a => off(a, sc.art, artH)), off(q.q, sc.art, artH)));
       const res = { i, h:Math.round(Math.hypot(sc.quad[0].x - sc.quad[3].x, sc.quad[0].y - sc.quad[3].y)), blur:+sc.blur.toFixed(1), quads:qs.length,
                     found:Math.min(9, ...fits) < 0.12, bestFit:+Math.min(9, ...fits).toFixed(3), rank:fits.findIndex(f => f < 0.12) };
       if (!finderOnly) for (const k of methods) {

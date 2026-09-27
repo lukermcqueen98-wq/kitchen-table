@@ -33,6 +33,7 @@ export async function newPlayer(browser, { lisp = false } = {}){
   await ctx.route(/api\.scryfall\.com/, r => {
     const u = decodeURIComponent(r.request().url()).toLowerCase(), byId = /\/cards\/(0{7}\d)/.exec(u);
     const k = NAMES.findIndex(n => u.includes(n.toLowerCase()));
+    if (/named\?(exact|fuzzy)=forest$/.test(u)) return json(r, { object:"card", id:"00000009-0000-4000-8000-000000000009", name:"Forest", type_line:"Basic Land — Forest", oracle_text:"({T}: Add {G}.)", image_uris:{ normal:"https://cards.scryfall.io/normal/0.png" } });
     if (u.includes("/catalog/keyword-abilities")) return json(r, { data:["Flying", "Offspring", "Fear"] });
     if (u.includes("/catalog/keyword-actions")) return json(r, { data:["Forage", "Cast"] });
     if (u.includes("/catalog/ability-words")) return json(r, { data:["Coven", "Eerie"] });

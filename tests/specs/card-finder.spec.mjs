@@ -18,6 +18,8 @@ test("the card finder outlines the clicked card on made-up webcam pictures", asy
     // The art box an outline gives the AI when read as a whole card (taller than wide, either way up)
     const artOf = q => { const tall = Math.hypot(q[0].x - q[3].x, q[0].y - q[3].y) > Math.hypot(q[0].x - q[1].x, q[0].y - q[1].y), c = tall ? q : [q[1], q[2], q[3], q[0]];
       return [at(c, 0.085, 0.113), at(c, 0.915, 0.113), at(c, 0.915, 0.555), at(c, 0.085, 0.555)]; };
+    // (either way up: the matcher tries both)
+    const artsOf = q => [artOf(q), artOf([q[2], q[3], q[0], q[1]])];
     const others = [1, 2, 3, 4, 5, 6].map(k => window.ktScene.fakeCard(100 + k));
     const res = [];
     for (let i = 0; i < n; i++) {
@@ -26,7 +28,7 @@ test("the card finder outlines the clicked card on made-up webcam pictures", asy
       const artH = Math.hypot(sc.art[0].x - sc.art[3].x, sc.art[0].y - sc.art[3].y), t0 = performance.now();
       const qs = await window.ktEval.findQuads(pic, sc.click.x, sc.click.y);
       // the best art box any outline gives, read as a card or as the art itself
-      const best = Math.min(9, ...qs.flatMap(q => [off(artOf(q.q), sc.art, artH), off(q.q, sc.art, artH)]));
+      const best = Math.min(9, ...qs.flatMap(q => [...artsOf(q.q).map(a => off(a, sc.art, artH)), off(q.q, sc.art, artH)]));
       res.push({ i, n:qs.length, best:+best.toFixed(3), ms:Math.round(performance.now() - t0) });
     }
     return res;
