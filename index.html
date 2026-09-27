@@ -113,10 +113,12 @@ header.bar .btn.primary{padding:6px 16px}
 @keyframes selMiss{to{opacity:0;transform:scale(1.3)}}
 .tile .sel.fade{opacity:0;transition:opacity .4s}
 /* A card a player says they play, popped up on their camera */
-.played{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:min(34%,230px);z-index:4;cursor:pointer;border:0;padding:0;background:none;animation:playIn .35s ease-out}
+.playedrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:min(34%,230px);z-index:4;display:flex;gap:8px;animation:playIn .35s ease-out}
+.playedrow.multi{width:min(62%,460px)}
+.played{flex:1;min-width:0;cursor:pointer;border:0;padding:0;background:none}
 .played img{width:100%;display:block;border-radius:4.75%/3.5%;box-shadow:0 8px 30px rgba(0,0,0,.6),0 0 0 2px var(--brass)}
 .played span{display:block;margin-top:6px;text-align:center;font-size:13px;font-weight:600;background:rgba(0,0,0,.7);border-radius:6px;padding:3px 6px}
-.played.out{opacity:0;transform:translateY(-50%) scale(.9);transition:opacity .4s,transform .4s}
+.playedrow.out{opacity:0;transform:translateY(-50%) scale(.9);transition:opacity .4s,transform .4s}
 @keyframes playIn{from{opacity:0;transform:translateY(-50%) scale(.6)}to{opacity:1;transform:translateY(-50%) scale(1)}}
 .repeatask{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:rgba(13,32,29,.96);border:1px solid var(--brass);border-radius:10px;padding:8px 14px;font-weight:600;white-space:nowrap}
 .nocam{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;pointer-events:none;text-align:center;padding:20px}
@@ -289,7 +291,7 @@ button.mpip{cursor:pointer}
   header.bar .grp.game{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){
-  .life output{transition:none}.tile.enter{animation:none}.played{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
+  .life output{transition:none}.tile.enter{animation:none}.playedrow{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
 }
 </style>
 </head>
@@ -1111,11 +1113,14 @@ function onMessage(s, msg){
     }
     case "hellopls": if (conns[s]) sendHello(conns[s].conn); break;
     case "table": applyTable(msg.table); break;
-    case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500)); break;
-    case "played":
-      if ($("#playIn").checked && typeof msg.name === "string")
-        fetchCard(typeof msg.id === "string" ? msg.id.slice(0, 40) : null, msg.name.slice(0, 141)).then(c => { if (c) showPlayed(s, c); });
+    case "caption": if (typeof msg.text === "string") addCaption(s, msg.text.slice(0, 500), false, actsFromWire(msg.acts)); break;
+    case "played": {
+      const list = (Array.isArray(msg.cards) ? msg.cards : [msg]).slice(0, 3).filter(c => c && typeof c.name === "string");
+      if ($("#playIn").checked && list.length)
+        Promise.all(list.map(c => fetchCard(typeof c.id === "string" ? c.id.slice(0, 40) : null, c.name.slice(0, 141))))
+          .then(cards => { cards = cards.filter(Boolean); if (cards.length) showPlayed(s, cards); });
       break;
+    }
     case "repeatcard": askRepeat(mySeat); break;
     case "card": if (typeof msg.name === "string") log(`${p.name || "Someone"} looked at `, msg.name.slice(0, 141)); break;
     case "show":
@@ -3762,7 +3767,7 @@ function linkify(text, lisp){
    "I play Sol Ring", "I cast Counterspell". A shown line starts at that phrase. Card names in it are underlined (click
    to read the card); after "I play" or "I cast", the words that follow get a closer look for a card name
    (Scryfall's spelling-tolerant search too), so a name the speech recognizer mangles still links. */
-const ACTION_PHRASE = /\bi(?:'m| am|'ll| will)?\s+(?:going to |gonna )?(?:take|taking|took|lose|losing|lost|gain|gaining|gained|heal|healing|healed|pay|paying|paid|play|playing|played|cast|casting)\b/;
+const ACTION_PHRASE = /(?:\bi(?:'m| am|'ll| will)?|\blet me)\s+(?:going to |gonna )?(?:take|taking|took|lose|losing|lost|gain|gaining|gained|heal|healing|healed|pay|paying|paid|play|playing|played|cast|casting)\b/;
 /* What a player said they did, read from a line: each action phrase with the card(s) after "I play" / "I cast"
    (null when it can't be made out) or the amount after "I take / lose / gain / heal / pay". */
 const ACTION_ALL = new RegExp(ACTION_PHRASE.source, "g");
@@ -3803,12 +3808,13 @@ async function cardsIn(words, lisp){
   }
   return out.length ? out : [{ card:null, heard:words }];
 }
-async function addCaption(seat, text, heardHere){
+// acts: what the speaker's own browser worked out they did (so every screen shows the same cards); worked out here if missing
+async function addCaption(seat, text, heardHere, given = null){
   if (seat !== mySeat && !heardHere) lastCapFrom[seat] = Date.now();
   try { await loadIndex(); } catch {}
   const gameOnly = $("#gameOnly").checked, lisp = lispFor(seat);
   // Only what players do: the line is just the phrases and what they name, not the words around them
-  const acts = gameOnly ? await parseActions(text, lisp) : null;
+  const acts = gameOnly ? (given || await parseActions(text, lisp)) : null;
   if (gameOnly && !acts.length) return;
   const ul = $("#captions");
   const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
@@ -3827,7 +3833,9 @@ async function addCaption(seat, text, heardHere){
     li.append(a.phrase + " ");
     if (a.cards) a.cards.forEach((c, j) => {
       if (j) li.append(" and ");
-      li.appendChild(c.card ? cardButton(c.card.name, `Heard "${c.heard}"`, () => showCard(c.card)) : unknown(c.heard));
+      li.appendChild(c.card ? cardButton(c.card.name, `Heard "${c.heard}"`, async () => {
+        const full = c.card.type_line ? c.card : await fetchCard(c.card.id || null, c.card.name); if (full) showCard(full);
+      }) : unknown(c.heard));
     });
     else if (a.amount) li.append(a.amount); else li.appendChild(unknown(a.heard));
   });
@@ -3852,8 +3860,8 @@ async function cardFromWords(words, lisp){
   const nc = nearestCard(words, lisp);
   if (nc && nc.score >= 0.72 && nc.margin >= 0.04) return fetchCard(null, nc.name);
   const q = norm(words).split(" ").slice(0, 6).join(" "), c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
-  if (nc && nc.score >= 0.72) return c && [nc.name, nc.second].includes(c.name) ? c : null;
   if (!c) return null;
+  if (nc && nc.score >= 0.72 && [nc.name, nc.second].includes(c.name)) return c;  // settles a close call
   const named = norm(c.name.split(" // ")[0]), said = q.split(" ").slice(0, named.split(" ").length + 1).join(" ");
   return similarity(lisp ? lispNorm(said) : said, lisp ? lispNorm(named) : named) >= 0.6 ? c : null;
 }
@@ -3961,7 +3969,35 @@ async function prepareOnDevice(fromClick){
 }
 function startRec(){ startBrowserRec(); }
 function stopRec(){ stopBrowserRec(); }
-function onFinalSpeech(t){ addCaption(mySeat, t); broadcast({ type:"caption", text:t }); runVoice(t); spokenPlay(mySeat, me.lisp ? delisp(t) : t, !!me.lisp).catch(e => console.warn(e)); }
+/* Your speech: voice commands right away; then what you did is worked out once (cards, amounts) and sent with the
+   caption, so everyone's caption and the card popping up on your camera show the same cards */
+async function onFinalSpeech(t){
+  runVoice(t);
+  const acts = await parseActions(t, !!me.lisp).catch(e => { console.warn(e); return []; });
+  const wire = actsForWire(acts);
+  addCaption(mySeat, t, false, acts); broadcast({ type:"caption", text:t, acts:wire });
+  announceCards(mySeat, acts);
+}
+// Actions as sent to other players: card ids and names instead of whole cards
+const actsForWire = acts => acts.map(a => ({ phrase:a.phrase, amount:a.amount ?? null, heard:a.heard ?? "",
+  ...(a.cards ? { cards:a.cards.map(c => ({ id:c.card?.id || "", name:c.card?.name || "", heard:c.heard || "" })) } : {}) }));
+function actsFromWire(list){
+  if (!Array.isArray(list)) return null;
+  const str = (v, n) => typeof v === "string" ? v.slice(0, n) : "";
+  return list.slice(0, 6).filter(a => a && typeof a === "object" && typeof a.phrase === "string").map(a => ({
+    phrase:str(a.phrase, 40), amount:typeof a.amount === "string" ? str(a.amount, 20) : null, heard:str(a.heard, 200),
+    ...(Array.isArray(a.cards) ? { cards:a.cards.slice(0, 3).map(c => ({ card:c?.name ? { id:str(c.id, 40), name:str(c.name, 141) } : null, heard:str(c?.heard, 200) })) } : {}) }));
+}
+// Cards a player said they played or cast pop up on their camera for everyone (not lands); one that couldn't be
+// made out asks them to say it again
+function announceCards(seat, acts){
+  if (!$("#playIn").checked) return;
+  const cast = acts.filter(a => a.cards);
+  const cards = cast.flatMap(a => a.cards.map(c => c.card)).filter(Boolean)
+    .filter(c => !/\bLand\b/.test(String(c.type_line || c.card_faces?.[0]?.type_line || "").split(" // ")[0]));
+  if (cards.length) { showPlayed(seat, cards); if (seat === mySeat) broadcast({ type:"played", cards:cards.map(c => ({ id:c.id, name:c.name })) }); }
+  if (cast.some(a => a.cards.every(c => !c.card))) askRepeat(seat);
+}
 $("#engineSel").onchange = async e => {
   stopRec(); engine = e.target.value; store.set("kt-engine", engine);
   if (!SR) { setCapHint("Captions need Chrome or Edge."); capOn = false; updateCapBtn(); return; }
@@ -4144,8 +4180,9 @@ async function runAsr(){
       // Whisper writes sound labels like [BLANK_AUDIO] or (music) for non-speech; drop those
       const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
       if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
-      addCaption(s, text, true);
-      spokenPlay(s, text, lispFor(s)).catch(e => console.warn(e));  // their own browser isn't captioning them, so this one does it
+      // (their own browser isn't captioning them, so this one works out what they did, and pops their cards up here)
+      const acts = await parseActions(text, lispFor(s)).catch(() => []);
+      addCaption(s, text, true, acts); announceCards(s, acts);
       if (remoteCap[s]) remoteCap[s].captioned++;
     }
   } catch (e) { console.warn("Speech model failed:", e); }
@@ -4209,7 +4246,6 @@ async function lookUpSpoken(q){
 }
 /* "I play Sol Ring", "I'm casting Rhystic Study": the card pops up on that player's camera for everyone (lands
    aren't shown). When it's not clear which card they said, their screen asks them to say it again. */
-const PLAY_RE = /(?:^|\b(?:and|then|so|now|ok|okay|alright)\s+)(?:i(?:'m| am)?\s+(?:going to |gonna )?|i(?:'ll| will)\s+|let me\s+|i\s+)?(?:play|playing|played|cast|casting)\s+(.+)$/;
 const NOT_A_CARD = /^(it|that|this|them|those|these|a land|land|lands|my land|something|nothing|anything|first|second|third|next|again|now|around|with|against|for|on|to|too|well|some|another|a lot|games?|magic|commander(?!\s+\w)|a game|mtg|here|there|at|in|online|every|all|both|one)\b/;
 /* The card that sounds closest to some words, out of every card name (for what follows "I play" or "I cast").
    Speech recognition often turns a card name into other words ("rhythmic study", "sold ring"); rather than only
@@ -4287,22 +4323,6 @@ function nearestCard(words, lisp){
   if (!ranked.length) return null;
   return { name:ranked[0][0], score:ranked[0][1], margin:ranked[0][1] - (ranked[1]?.[1] ?? 0), second:ranked[1]?.[0] || "" };
 }
-async function spokenPlay(seat, raw, lisp){
-  if (!$("#playIn").checked) return;
-  const t = raw.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim();
-  const m = PLAY_RE.exec(t); if (!m) return;
-  let tail = m[1].replace(/^(a|an|my|our)\s+/, "").trim();
-  if (!tail || NOT_A_CARD.test(tail)) return;
-  try { await loadIndex(); } catch {}
-  // The first card name in what follows, if it starts within the first couple of words
-  let name = null, i = 0;
-  for (const seg of linkify(tail, lisp)) { if (seg.card && !seg.fuzzy) { name = seg.card; break; } i += seg.t.split(/\s+/).length; if (i > 2) break; }
-  let card = name ? await fetchCard(null, name) : await cardFromWords(tail, lisp);
-  if (!card) { askRepeat(seat); return; }
-  if (/\bLand\b/.test(String(card.type_line || card.card_faces?.[0]?.type_line || "").split(" // ")[0])) return;  // lands aren't popped up
-  showPlayed(seat, card);
-  if (seat === mySeat) broadcast({ type:"played", id:card.id, name:card.name });
-}
 function askRepeat(seat){
   if (seat !== mySeat) { send(conns[seat]?.conn || {}, { type:"repeatcard" }); return; }
   toast("Please repeat what card you played.");
@@ -4311,17 +4331,23 @@ function askRepeat(seat){
   const a = document.createElement("div"); a.className = "repeatask"; a.setAttribute("role", "alert"); a.textContent = "Please repeat what card you played";
   el.appendChild(a); setTimeout(() => a.remove(), 6000);
 }
-function showPlayed(seat, card){
-  const el = $(`#grid .tile[data-seat="${seat}"]`); if (!el) return;
-  el.querySelector(".played")?.remove();
-  const b = document.createElement("button"); b.type = "button"; b.className = "played"; b.title = `${card.name}: click to read it`;
-  const im = document.createElement("img"); im.src = cardImg(card); im.alt = card.name; b.appendChild(im);
-  const cap = document.createElement("span"); cap.textContent = card.name; b.appendChild(cap);
-  b.onclick = e => { e.stopPropagation(); showCard(card); };
-  el.appendChild(b);
-  setTimeout(() => { b.classList.add("out"); setTimeout(() => b.remove(), 450); }, 10000);
-  log(`${seat === mySeat ? "You" : nm(seat)} played `, card.name);
-  cardCache.set(card.id, card); remember(card, false, { who:`Played by ${seat === mySeat ? "you" : nm(seat)}`, quiet:true });
+// Cards popped up on a player's camera (side by side when they played several at once), for 10 seconds
+function showPlayed(seat, cards){
+  if (!Array.isArray(cards)) cards = [cards];
+  const el = $(`#grid .tile[data-seat="${seat}"]`); if (!el || !cards.length) return;
+  el.querySelector(".playedrow")?.remove();
+  const row = document.createElement("div"); row.className = "playedrow" + (cards.length > 1 ? " multi" : "");
+  for (const card of cards) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "played"; b.title = `${card.name}: click to read it`;
+    const im = document.createElement("img"); im.src = cardImg(card); im.alt = card.name; b.appendChild(im);
+    const cap = document.createElement("span"); cap.textContent = card.name; b.appendChild(cap);
+    b.onclick = e => { e.stopPropagation(); showCard(card); };
+    row.appendChild(b);
+    log(`${seat === mySeat ? "You" : nm(seat)} played `, card.name);
+    cardCache.set(card.id, card); remember(card, false, { who:`Played by ${seat === mySeat ? "you" : nm(seat)}`, quiet:true });
+  }
+  el.appendChild(row);
+  setTimeout(() => { row.classList.add("out"); setTimeout(() => row.remove(), 450); }, 10000);
 }
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
