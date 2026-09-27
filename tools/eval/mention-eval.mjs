@@ -1,10 +1,11 @@
 /* How well cards named in table talk (without "I play") are picked out: sentences that name a card, and everyday talk
    that happens to contain a card name ("rest in peace", "order pizza"), against the benchmark's card names plus
    staples and card names that are everyday words or phrases.
-   Usage: node tools/eval/mention-eval.mjs <bench-data dir> [heldout]   (see tools/eval/fetch-data.mjs) */
+   Usage: node tools/eval/mention-eval.mjs <bench-data dir> [heldout|all]   (all: tools/eval/mention-phrases.mjs)   (see tools/eval/fetch-data.mjs) */
+import { PHRASES, PHRASE_CARDS } from "./mention-phrases.mjs";
 import http from "node:http"; import fs from "node:fs"; import path from "node:path"; import { createRequire } from "node:module";
 const ROOT = path.resolve(import.meta.dirname, "..", ".."), DATA = process.argv[2] || "bench-data";
-const list = JSON.parse(fs.readFileSync(path.join(DATA, "list.json"), "utf8"));
+const list = process.env.FULL_NAMES ? { tests:[], extra:[] } : JSON.parse(fs.readFileSync(path.join(DATA, "list.json"), "utf8"));
 const STAPLES = ["Sol Ring", "Rhystic Study", "Smothering Tithe", "Dark Ritual", "Counterspell", "Swords to Plowshares", "Atraxa, Praetors' Voice",
   "Cyclonic Rift", "Demonic Tutor", "Arcane Signet", "Mana Crypt", "Doubling Season", "Necropotence", "Craterhoof Behemoth", "Kodama's Reach",
   "Brainstorm", "Ponder", "Blood Moon", "Esper Sentinel", "Teferi's Protection", "Sheoldred, the Apocalypse", "Gwenom, Remorseless", "Skullclamp",
@@ -17,8 +18,14 @@ const STAPLES = ["Sol Ring", "Rhystic Study", "Smothering Tithe", "Dark Ritual",
   "Turn // Burn", "Catch // Release", "Commit // Memory", "Reason // Believe", "Driven // Despair", "Struggle // Survive", "Heaven // Earth", "Onward // Victory",
   "Good Fortune", "Lucky Clover", "Game Plan", "Fresh Start", "Hard Evidence", "Big Score", "Final Fortune", "Last Stand", "Ancient Grudge", "Fog", "Opt", "Shock",
   "Duress", "Cultivate", "Harmonize", "Upheaval", "Armageddon", "Timetwister", "Doomsday", "Thoughtseize", "Preordain", "Wrath of God", "Living Death",
-  "Sneak Attack", "Natural Order", "Past in Flames", "Mana Drain", "Birthing Pod", "Tooth and Nail", "Mind Twist", "Night's Whisper", "Dark Confidant", "Deal Damage", "Target Minotaur", "Combat Medic", "Life Goes On"];
-const NAMES = [...new Set([...list.tests, ...list.extra].map(x => x.name).concat(STAPLES))].sort();
+  "Sneak Attack", "Natural Order", "Past in Flames", "Mana Drain", "Birthing Pod", "Tooth and Nail", "Mind Twist", "Night's Whisper", "Dark Confidant", "Deal Damage", "Target Minotaur", "Combat Medic", "Life Goes On",
+  // short names several cards share, and a one-word card that's an everyday word
+  "Atraxa, Grand Unifier", "Sheoldred", "Sheoldred, Whispering One", "Krenko, Tin Street Kingpin", "Incoming!", "Study", "Korvold, Gleeful Glutton"];
+// FULL_NAMES: a saved copy of Scryfall's full list of card names (api.scryfall.com/catalog/card-names), to test
+// against every card in Magic instead of the benchmark's few thousand
+const FULL = process.env.FULL_NAMES ? JSON.parse(fs.readFileSync(process.env.FULL_NAMES, "utf8")).data : null;
+const NAMES = FULL || [...new Set([...list.tests, ...list.extra].map(x => x.name).concat(STAPLES, PHRASE_CARDS))].sort();
+console.log(`${NAMES.length} card names${FULL ? " (all of Magic)" : ""}`);
 const { chromium } = createRequire(path.join(ROOT, "tests") + "/")("@playwright/test");
 // [what was said, cards that should pop up]
 const cases = [
@@ -133,7 +140,7 @@ const heldOut = [
   ["i won't take that chance", []],
   ["in the end he won", []],
 ];
-const RUN = process.argv[3] === "heldout" ? heldOut : cases;
+const RUN = { heldout:heldOut, all:PHRASES }[process.argv[3]] || cases;
 const server = http.createServer((req, res) => { const u = decodeURIComponent(new URL(req.url, "http://x").pathname); const f = path.join(ROOT, u);
   if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); } res.writeHead(200, { "Content-Type":f.endsWith(".html") ? "text/html" : "application/javascript" }); fs.createReadStream(f).pipe(res); });
 await new Promise(r => server.listen(8799, "127.0.0.1", r));

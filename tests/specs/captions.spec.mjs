@@ -103,6 +103,18 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "what is my life");
   await expect(a.locator("#cardView h2").first()).toHaveText("Rhystic Study");
 
+  // "What card is that?": a mangled name alone doesn't pop up in table talk, but as the answer to that question it does
+  const pops = () => logLines(a).then(l => l.filter(x => x.includes("You played Rhystic Study")).length);
+  const before = await pops();
+  await say(a, "it's ristic study");
+  await a.waitForTimeout(800);
+  expect(await pops()).toBe(before);
+  await say(b, "what card is that");
+  await a.waitForTimeout(500);
+  await say(a, "oh it's ristic study");
+  await expect.poll(pops).toBe(before + 1);
+  for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Rhystic Study", { timeout:20000 });
+
   // Nothing but card lookups works by voice: saying "I pass my turn" doesn't pass the turn
   await say(a, "okay I pass my turn");
   await a.waitForTimeout(800);
