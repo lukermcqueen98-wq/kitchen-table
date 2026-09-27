@@ -21,8 +21,9 @@ export async function launchBrowser({ camera, mic } = {}){
   return chromium.launch({ args });
 }
 
+// noWebcam: the computer has a microphone but no camera (like a player whose phone is their camera)
 // rejectPhrases: the speech stand-in takes a phrase list (like newer Chrome) but fails with an unexpected error when given one
-export async function newPlayer(browser, { lisp = false, rejectPhrases = false } = {}){
+export async function newPlayer(browser, { lisp = false, rejectPhrases = false, noWebcam = false } = {}){
   const ctx = await browser.newContext({ permissions:["camera", "microphone", "clipboard-read", "clipboard-write"], viewport:{ width:1400, height:900 } });
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:"" }));
   await ctx.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/, r => {
@@ -63,6 +64,11 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false }
     window.RTCPeerConnection = class extends RPC { constructor(...x){ super(...x); window.__pcs.push(this); } };
     if (lisp) try { localStorage.setItem("kt-lisp-me", "1"); } catch {}
   }, [PEER_PORT, lisp, rejectPhrases]);
+  if (noWebcam) await ctx.addInitScript(() => {
+    const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md), en = md.enumerateDevices.bind(md);
+    md.getUserMedia = c => c?.video ? Promise.reject(new DOMException("No camera", "NotFoundError")) : gum(c);
+    md.enumerateDevices = async () => (await en()).filter(d => d.kind !== "videoinput");
+  });
   const page = await ctx.newPage();
   page.errors = [];
   page.on("pageerror", e => page.errors.push(e.message));

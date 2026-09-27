@@ -775,6 +775,10 @@ function seatOf(id){ const m = /-(\d)(-cam)?$/.exec(id); return m ? +m[1] : 0; }
    that player came back (refresh, new device) while we still held their old, dead connection: replace it rather than
    letting the tie-break below (for two players dialing each other at once) turn the new one away. */
 const SID = uid();
+/* Every call asks for the other player's audio and video, even from a computer with no webcam (a player whose phone
+   is their camera): an offer carries only what the caller sends, so without this, whoever dials from a computer with
+   no camera never gets anyone's picture back */
+const CALL_OPTS = () => ({ metadata:{ sid:SID }, constraints:{ offerToReceiveAudio:true, offerToReceiveVideo:true } });
 const newSession = (s, meta) => !!(players[s]?.sid && meta?.sid && players[s].sid !== meta.sid);
 function wirePeer(){
   peer.on("call", call => {
@@ -813,7 +817,7 @@ function wirePeer(){
     if (s === mySeat) continue;
     const id = `${PREFIX}-${roomCode}-${s}`;
     setupConn(s, peer.connect(id, { reliable:true, metadata:{ sid:SID } }), true);
-    setupCall(s, peer.call(id, localStream, { metadata:{ sid:SID } }), true);
+    setupCall(s, peer.call(id, localStream, CALL_OPTS()), true);
   }
 }
 function setupCall(s, call, outgoing){
@@ -1420,7 +1424,7 @@ function ensureVideoLinks(){
     videoRedialAt[s] = now;
     try { calls[s]?.call.close(); } catch {}
     delete calls[s];
-    setupCall(s, peer.call(`${PREFIX}-${roomCode}-${s}`, localStream, { metadata:{ sid:SID } }), true);
+    setupCall(s, peer.call(`${PREFIX}-${roomCode}-${s}`, localStream, CALL_OPTS()), true);
   }
 }
 function updateClocks(){
