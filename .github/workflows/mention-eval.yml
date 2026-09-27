@@ -31,7 +31,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: tests
       - name: Get every card name from Scryfall
-        run: curl -fsSL -H "User-Agent: KitchenTable-benchmark/1.0" -H "Accept: application/json" https://api.scryfall.com/catalog/card-names -o "$RUNNER_TEMP/names.json"
+        run: |
+          curl -fsSL -H "User-Agent: KitchenTable-benchmark/1.0" -H "Accept: application/json" https://api.scryfall.com/catalog/card-names -o "$RUNNER_TEMP/names.json"
       - name: Run the phrase sets against all of Magic
         env:
           FULL_NAMES: ${{ runner.temp }}/names.json
