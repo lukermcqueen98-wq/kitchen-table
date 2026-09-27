@@ -3030,6 +3030,8 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
   prepWidth,
   nearestCard:(words, lisp = false) => loadIndex().then(() => nearestCard(words, lisp)),
   linkCard:(words, lisp = false) => loadIndex().then(() => linkify(words, lisp).find(x => x.card) || null),
+  // Cards named in table talk (no "I play"), as the popups would show them
+  mentions:(text, lisp = false) => loadIndex().then(() => mentionsIn(text.toLowerCase(), lisp).map(m => m.name)),
   // Search a stand-in index instead of the published one: art pictures with names, fingerprinted here the way the
   // builder would with this prep (for measuring a new way of preparing art before rebuilding the real index)
   // (each item: { name, canvas } to fingerprint here, or { name, v } with a fingerprint worked out before)
@@ -3917,6 +3919,7 @@ function fuzzyAll(keys, i, lisp){
   if (one) for (let n = Math.min(3, keys.length - i); n >= 2; n--) {
     const win = keys.slice(i, i + n).join(" ").split(" ").filter(Boolean);
     if (win.length < 2 || win.some(w => STOP.has(w))) continue;
+    if (win[0].length >= 5 && cardIndex?.has(win[0]) && !NOT_ALONE.has(win[0])) break;  // "necropotence is": the exact name, not a sound-alike
     const joined = win.join(""), hit = one.get(phon(joined));
     if (hit?.name && similarity(joined, hit.k) >= 0.55) return { name:hit.name, n };
   }
@@ -3996,45 +3999,128 @@ async function parseActions(text, lisp, seat = mySeat){
   }
   return out;
 }
-/* Card names in table talk, with no "I play" in front, so only names that are hard to mistake for everyday words:
-   a card at the table (commanders), a card name of two or more words that aren't all everyday words ("Sol Ring",
-   "Rhystic Study", not "Second Chance"), a close sound-alike of one ("ristic study"), a legend's short name
-   ("Atraxa"), or a long one-word name ("Counterspell", "Doomsday"). Short one-word names like Opt, Shock or Order
-   need "I play" / "I cast". */
-const EVERYDAY = new Set(("about above after again against ahead alive all almost alone along already also always another answer any " +
-  "anyone anything anyway around away back bad before begin behind being believe below best better between big bit black blood blue " +
-  "body book both bound break bring brother build burn business call came can care carry case catch cause chance change check " +
-  "child choice city claim clear close cold come comes coming control cool could count course cover crazy cut dark day dead deal " +
-  "death decide deep did different dinner does done door down draw dream drink drive during each early earth easy eat end enough " +
-  "enter even evening ever every everybody everyone everything exactly face fact fair fall family far fast father feel feeling few " +
-  "fight final find fine fire first five food force forever forget forward four free friend friends from front full fun funny game " +
-  "games get give glad good got great green ground group grow guess guy guys half hand hands happen happy hard have head hear heart " +
-  "heaven hello help here hide high hit hold home hope hour house how however idea important inside instead into just keep kid kids " +
-  "kill kind know land last late later laugh lead learn least leave left less let life light like line listen little live long look " +
-  "lose lost lot loud love low luck lucky made make man many may maybe mean meet might mind minute miss moment money more morning most " +
-  "mother move much music must name need never new next nice night nobody none normal nothing now number off office okay old once one " +
-  "only open order other others out outside over own part party pass past pay people perfect person pick piece place plan play please " +
-  "point possible power pretty probably problem pull pure push put question quick quiet quite rather reach read ready real really " +
-  "reason red remember rest return right road rock room round rule run safe said same save saw say second see seek seem send serve " +
-  "set shall short should show side simple since sit six sleep slow small some somebody someone something sometimes soon sorry sound " +
-  "speak special stand start stay still stop story strange strong stuff such sure take talk tell than thank thanks that then there " +
-  "these thing things think this those though thought three through throw time today together tomorrow tonight too top total touch " +
-  "town trade trouble true trust try turn two under understand until upon use used very wait walk want war warm watch water way week " +
-  "welcome well went were what whatever when where which while white who whole why wild will win wind wish with within without wonder " +
-  "word words work world worry would wrong year yes yet you young your yourself").split(" "));
+/* Card names in table talk, with no "I play" in front. Each name found gets a score and pops up at 2 or more:
+   - what kind of name it is: two or more words that aren't all everyday words ("Sol Ring", "Rhystic Study") 2; a
+     legend's short name ("Atraxa") or a long one-word name ("Counterspell") 2; a shorter one-word name ("Ponder") 1;
+     a name made only of everyday words ("Rest in Peace", "Balance", "Order") 0.5; a close sound-alike ("ristic
+     study") 1 to 1.5
+   - who's at the table: a commander someone set +2; a card looked at, shown or played recently +1
+   - how it's said: a Magic verb just before it ("cast", "tutor for", "counter it with") +1.5 (+1 a few words back);
+     "my", "your"... before it +1; "that", "the", "with" before it +0.5; after it a trigger, "resolves", "is busted",
+     or what it does ("shuts off", "exiles", "doubles")... +1; other Magic words in the sentence ("mana", "graveyard", "exile") +0.5, or +1 for two or more
+   So "that Rhystic Study is brutal" pops up and "rest in peace grandpa" doesn't, but "exile it with Rest in Peace"
+   does. */
+const EVERYDAY = new Set(("or and but if so no not nor is it at by up out off as be am are was of to in on for the a an into onto from with " +
+  "a able about above accept across act action add afraid after again against age ago agree ahead air alarm alive all allow almost " +
+  "alone along already also always among amount analysis angry animal another answer any anyone anything anyway apart apple area arm " +
+  "army around art ask attack attention aunt away baby back bad bag ball bank bar base basket bath battle bear beat beautiful because " +
+  "become bed beer before begin behind being believe bell below belt bench best better between big bill bird birth birthday bit bite " +
+  "bitter black blame blank blind block blood blue board boat body bomb bone book boom boss both bottle bottom bound bowl box boy " +
+  "brain branch brave bread break breath breathe bridge bright bring broken brother brown brush budget bug build burn bus business " +
+  "busy butter button buy cake call calm came camera camp can cancel candy cap captain car card care career carry case cash castle " +
+  "cat catch cause cell center chain chair champion chance change chaos charge chase cheap check cheese chicken chief child choice " +
+  "choose church circle city claim class clean clear clever climb clock close cloud club coach coast coat code coffee coin cold " +
+  "collect college color come comes comfort coming comment common company complete computer concern condition consider contact " +
+  "contain continue control cook cookie cool copy corner cost costs couch could count counter country couple courage course court " +
+  "cousin cover crash crazy cream credit crew crime cross crowd crown cry cultivate cup cure current cut dance danger dark date " +
+  "daughter day dead deal dear death debt decide decision deep defend degree deliver demand deny depend desk despair destroy detail " +
+  "develop development devil did die diet different dig dinner dirt dirty discover dish distance divide doctor does dog doll done " +
+  "door double doubt down dragon drama draw drawer dream dress drink drive drop drug drum dry during dust duty each ear early earn " +
+  "earth east easy eat edge egg eight either election else empty end energy engine enjoy enough enter error escape even evening event " +
+  "ever every everybody everyone everything evidence evil exact exactly exam example excuse exercise exit expect experience explain " +
+  "explore express extra eye face fact fail failure fair faith fall false fame family famous fan fancy far farm fashion fast fat " +
+  "father fault favor fear feather fee feed feel feeling fence fever few fiction field fifth fifty fight file fill film final find " +
+  "fine finger finish fire firm first fish fit five fix flag flame flash flat flesh flight float floor flower fly focus fog fold " +
+  "follow food fool foot football force forest forever forget fork form fortune forty forward four fourth fox frame free fresh fridge " +
+  "friend friends from front fruit fuel full fun funny gain game games gap garage garden gas gate gather gear get gift girl give glad " +
+  "glass glory goal god gold golf gone good got grab grace grade grain grand grass grave gray great green ground group grow guard " +
+  "guess guest guide gun guy guys hair half hall hand handle hands hang happen happy hard hat hate have head heal health hear heart " +
+  "heat heaven heavy height hell hello help here hero hide high hill hire history hit hobby hold hole holiday home honest honey honor " +
+  "hook hope horse hospital host hot hotel hour house how however huge human hunger hungry hunt hurricane hurry hurt husband ice idea " +
+  "ill image imagine impact important include income increase indeed index injury insect inside insist instead insult into iron " +
+  "island issue item jacket job join joke journey judge juice jump junk just justice keep key kick kid kids kill kind king kiss " +
+  "kitchen knee knife knock know label labor lady lake lamp land language laptop large last late later laugh law lawn lay lazy lead " +
+  "leader leaf lean learn least leave left leg lend less lesson let letter level library lie life lift light like limit line link " +
+  "lion lip list listen little live load loan local lock long look lose loss lost lot loud love low luck lucky lunch machine mad made " +
+  "magic mail main major make man manage many map mark market marry master match matter may maybe meal mean measure meat media " +
+  "medicine meet member memory mess message metal middle might mile milk million mind minute mirror miss mission mistake mix model " +
+  "mom moment money moon more morning most mother motor mountain mouse mouth move movie much mud murder muscle music must nail name " +
+  "narrow nation natural nature near neck need needle nerve nest net never new news next nice night nine nobody noise none normal " +
+  "north nose note nothing notice now number nurse object ocean off offer office officer oil okay old once one onion only open " +
+  "opportunity option options orange order ordinary organ origin other others out outcome outside oven over own owner pack page pain " +
+  "paint pair palace pan panic paper parent park part partner party pass past path patience pattern pay peace peak pen pencil penny " +
+  "people pepper perfect period permit person phone photo physical piano pick pie piece pig pile pilot pin pink pipe pizza place plan " +
+  "plane plant plastic plate play player please plenty plot pocket poem poet point poison pole police pool poor pop port position " +
+  "possible post pot potato pound pour power practice pray prepare present press pressure pretty price pride priest prince print " +
+  "prison private prize probably problem process produce profit program promise proof proper protect proud prove public pull punch " +
+  "punishment pupil pure purple purpose purse push put queen question quick quiet quite race radio rain raise range rank rare rate " +
+  "rather raw ray reach read reader ready real reality really reason receive record recover red reduce release relief religion remain " +
+  "remember remove rent repair repeat reply report request rescue research respect respond response rest result return reward rice " +
+  "rich ride right ring rise risk river road rock role roll roof room root rope rose rough round royal rub ruin rule run rush sad " +
+  "safe safety said sail salad salary sale salt same sample sand sauce save saw say scale scene school science score scream screen " +
+  "sea search season seat second secret see seed seek seem seize sell send sense serious serve service set settle seven shadow shake " +
+  "shall shape share sharp sheep sheet shell shelter shift shine ship shirt shoe shoot shop short shot should shoulder shout show " +
+  "shower shut sick side sight sign signal silence silent silly silver simple since sing sir sister sit six size skill skin skirt sky " +
+  "slave sleep slide slip slow small smart smell smile smoke snake sneak snow soap social sock soft soil soldier solid solve some " +
+  "somebody someone something sometimes son song soon sorry soul sound south space spare speak special speed spend spin spirit spot " +
+  "spread spring square staff stage stairs stamp stand star start state station stay steal steel step stick still stock stomach stone " +
+  "stop storm story straight strange stream street stress stretch strike string strong struggle student study stuff style subject " +
+  "succeed success such sugar suit summer sun supply support sure surface surprise survive suspect swallow swamp swear sweet swim " +
+  "switch sword symbol system table tail take tale talk target task taste tax tea teach team tear teeth tell temple ten tend tent " +
+  "term test text than thank thanks that then theory there these thick thief thin thing things think this those though thought thread " +
+  "threat three throat throne through throw thunder ticket tie tiger tight till time tip tire title today toe together toilet " +
+  "tomorrow tone tongue tonight too tool tooth top topic tornado total touch tough tour towel tower town toy track trade traffic " +
+  "train trap travel treat tree trial trick trip trouble truck true trust truth try tube tune turn tv twin two type ugly uncle under " +
+  "understand union unit until upheaval upon upper upset urge use used valley value van vehicle very victory view village visit voice " +
+  "vote wage wait wake walk wall wallet wander want war warm warn warning wash waste watch water wave way weak wealth weapon wear " +
+  "weather wedding week weight welcome well went were west wet what whatever wheel when where which while whisper white who whole why " +
+  "wife wild will win wind window wine wing winter wire wise wish with within without witness wonder wood wool word words work worker " +
+  "world worry worth would wound wrap write wrong yard year yell yellow yes yet you young your yourself zone").split(" "));
+const CUE_VERB = new Set(("cast casts casting casted play plays playing played tutor tutors tutored tutoring fetch fetched fetching grab grabbed " +
+  "search searched counter counters countered countering exile exiles exiled exiling destroy destroys destroyed bounce bounced sac sacs sacked " +
+  "sacrifice sacrificed sacrificing copy copied copying flash flashed flashing equip equipped activate activated activating untap untapped " +
+  "tap tapped tapping resolve resolved recur recurred reanimate reanimated steal stole stolen blink blinked flicker flickered mill milled " +
+  "discard discarded kill killed killing hold holding holds cracked crack foretell foretold cascade cascaded proliferate topdeck topdecked " +
+  "ramp ramped drop dropped dropping remove removed wipe wiped").split(" "));
+const CUE_OWNER = new Set("my your his her their our its".split(" "));
+const CUE_WEAK = new Set("that this the a an with into for another".split(" "));
+const CUE_AFTER = /^(shuts|stops|locks|hoses|wrecks|blanks|counters|exiles|destroys|draws|makes|doubles|copies|triggers?|triggered|triggering|resolves?|resolved|resolving|overload(ed|ing)?|activat\w*|etbs?|enters|entered|dies|died|attacks|blocks|untaps|taxes|flips|transforms|is (so |really |pretty |super |kinda |kind of |just |actually )?(good|bad|busted|broken|nuts|insane|annoying|brutal|strong|great|op|cracked|unfair|banned|legal|expensive|cheap|out|online|on the (battlefield|stack|board)|in (play|my hand|hand)))\b/;
+const MTG_WORDS = new Set(("mana tap taps tapped untap stack graveyard yard exile exiled library hand battlefield board creature creatures spell spells " +
+  "instant sorcery artifact enchantment planeswalker token tokens counters trigger triggers commander cast flashback tutor combo deck draw " +
+  "attack attacking block blocking damage lands sacrifice sac discard mill scry upkeep response resolve resolves cmc ramp wipe removal target " +
+  "opponent opponents priority storm etb dies flash counter cascade proliferate reanimate legendary").split(" "));
 function mentionsIn(text, lisp){
   if (!cardIndex || !text.trim()) return [];
-  const pool = deckPool(), out = [];
-  for (const seg of linkify(text, lisp)) {
-    if (!seg.card) continue;
-    const k = norm(seg.t), name = seg.card, nk = norm(name.split(" // ")[0]);
-    const words = k.split(" ").filter(w => !STOP.has(w)), atTable = pool.has(nk) || [...pool.values()].some(v => v.name === name);
-    let ok;
-    if (atTable) ok = true;
-    else if (seg.fuzzy) ok = words.length >= 2 && similarity(lisp ? lispNorm(k) : k, lisp ? lispNorm(nk) : nk) >= 0.7;
-    else if (words.length >= 2) ok = !words.every(w => EVERYDAY.has(w));
-    else ok = !EVERYDAY.has(k) && (k.length >= 8 || (name.includes(",") && norm(name.split(",")[0]) === k && k.length >= 5));
-    if (ok) out.push({ name, heard:seg.t });
+  const pool = deckPool(), atTable = new Set([...pool.values()].map(v => v.name)), seen = new Set(cardHist.slice(0, 30).map(c => c.name));
+  const segs = linkify(text, lisp), words = segs.flatMap(g => g.t.split(/\s+/)).map(norm), out = [];
+  let at = 0;
+  for (const seg of segs) {
+    const n = seg.t.split(/\s+/).length, start = at; at += n;
+    let name = seg.card, heard = seg.t, fuzzy = !!seg.fuzzy, len = n;
+    if (!name && seg.kw) name = cardIndex.get(norm(seg.t));  // a card that's also a game term: "Counterspell"
+    if (!name) continue;
+    let k = norm(heard);
+    // a sound-alike that swallowed a legend's short name and the words after it ("atraxa is so"): just the name
+    const short = name.includes(",") ? norm(name.split(",")[0]) : "";
+    if (fuzzy && short && (k === short || k.startsWith(short + " "))) { len = short.split(" ").length; heard = seg.t.split(/\s+/).slice(0, len).join(" "); k = short; fuzzy = false; }
+    const nk = norm(name.split(" // ")[0]), sig = k.split(" ").filter(w => !STOP.has(w)), plain = sig.every(w => EVERYDAY.has(w));
+    let score;
+    if (fuzzy) { const sim = similarity(lisp ? lispNorm(k) : k, lisp ? lispNorm(nk) : nk); score = sig.length < 2 || plain || sim < 0.7 ? 0 : sim >= 0.8 ? 1.5 : 1; }
+    else if (plain) score = 0.5;
+    else if (sig.length >= 2) score = 2;
+    else if (k === short && k.length >= 5) score = 2;
+    else score = k.length >= 8 ? 2 : k.length >= 5 ? 1 : 0.5;
+    if (atTable.has(name)) score += 2;
+    if (seen.has(name)) score += 1;
+    const before = words.slice(Math.max(0, start - 3), start), prev = before[before.length - 1];
+    if (CUE_VERB.has(prev)) score += 1.5;
+    else if (before.some(w => CUE_VERB.has(w))) score += 1;
+    else if (CUE_OWNER.has(prev)) score += 1;
+    else if (CUE_WEAK.has(prev)) score += 0.5;
+    if (CUE_AFTER.test(words.slice(start + len, start + len + 6).join(" "))) score += 1;
+    const vocab = words.filter((w, i) => (i < start || i >= start + len) && MTG_WORDS.has(w)).length;
+    score += vocab >= 2 ? 1 : vocab ? 0.5 : 0;
+    if (score >= 2) out.push({ name, heard, score });
   }
   return out;
 }
