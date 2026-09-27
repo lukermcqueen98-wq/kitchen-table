@@ -127,6 +127,12 @@ aside#panel{grid-row:2 / span 2;grid-column:2;border-left:1px solid var(--felt-e
 .card .tok{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.75);font-size:9px;padding:0 3px;border-radius:4px}
 .card .tax{position:absolute;right:2px;bottom:2px;background:var(--brass);color:#1b1608;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
 .card .lbl{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:9px;background:rgba(0,0,0,.7);padding:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.card.theirs{box-shadow:0 0 0 2px var(--own),0 1px 3px rgba(0,0,0,.6)}
+#arrows{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:40}
+#arrows path{fill:none;stroke-width:4;stroke-linecap:round;opacity:.9}
+#arrows path.link{stroke-width:2;stroke-dasharray:6 5;opacity:.8}
+body.targeting,body.targeting .card{cursor:crosshair !important}
+body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--brass)}
 .ghost{position:fixed;pointer-events:none;z-index:90;opacity:.9;transform:rotate(-3deg)}
 
 /* Menus, modals, toast */
@@ -227,6 +233,7 @@ aside#panel{grid-row:2 / span 2;grid-column:2;border-left:1px solid var(--felt-e
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
 <div id="toast" class="hidden" role="status"></div>
 <div id="audios" class="hidden"></div>
+<svg id="arrows" aria-hidden="true"><defs></defs></svg>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
@@ -436,7 +443,7 @@ let deckIds = [], cmdrIds = [];
 
 function blankMe(name){
   return { name, life:FORMATS[table.fmt].life, poison:0, energy:0, exp:0, cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 },
-           zones:{ lib:[], hand:[], bf:[], gy:[], ex:[], cz:[] }, lands:0, turns:0, gameId:"", revealHand:false };
+           zones:{ lib:[], hand:[], bf:[], gy:[], ex:[], cz:[] }, lands:0, turns:0, gameId:"", revealHand:false, arrows:[] };
 }
 const newCard = (id, extra = {}) => ({ iid:uid(), id, x:0, y:0, tapped:false, fd:false, face:0, ctr:{}, ...extra });
 const cardOf = c => cards.get(c.id);
@@ -444,16 +451,18 @@ const nameOf = c => c.fd ? "a face-down card" : (cardOf(c)?.card_faces?.[c.face]
 function findCard(iid){ for (const [z, list] of Object.entries(me.zones)) { const i = list.findIndex(c => c.iid === iid); if (i >= 0) return { z, i, c:list[i] }; } return null; }
 
 // What other players see of you: everything on the table, and only counts of your hand and library
+// (own: the owner's seat, for a card you control but another player owns; att: the card it's attached to)
 function pubCard(c){
-  if (c.fd) return { iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr };
+  if (c.fd) return { iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "" };
   const k = cardOf(c);
-  return { iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0 };
+  return { iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
+           own:c.owner || 0, att:c.att || "" };
 }
 function pub(){
   const z = me.zones;
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(pubCard) : null,
-           bf:z.bf.map(pubCard), gy:z.gy.map(pubCard), ex:z.ex.map(pubCard), cz:z.cz.map(pubCard), gameId:me.gameId };
+           bf:z.bf.map(pubCard), gy:z.gy.map(pubCard), ex:z.ex.map(pubCard), cz:z.cz.map(pubCard), gameId:me.gameId, arrows:me.arrows || [] };
 }
 let pushTimer = null;
 function changed(){ render(); clearTimeout(pushTimer); pushTimer = setTimeout(pushState, 60); save(); }
@@ -512,7 +521,7 @@ async function sitDown(resume){
   try { history.replaceState(null, "", `?room=${roomCode}`); } catch {}
   try { localStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, ...($("#micSel").value ? { deviceId:{ exact:$("#micSel").value } } : {}) }, video:false }); }
   catch { localStream = null; }
-  if (resume) { table = { ...resume.table, tv:0 }; me = resume.me; }
+  if (resume) { table = { ...resume.table, tv:0 }; me = resume.me; me.arrows ||= []; }
   else { table.fmt = $("#fmtSel").value; me = blankMe(name); if (FORMATS[table.fmt].cmdr) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })); }
   players[mySeat] = { ...pub(), seat:mySeat };
   $("#lobby").classList.add("hidden"); $("#table").classList.remove("hidden");
@@ -588,13 +597,15 @@ function cleanPub(st){
   const cl = list => (Array.isArray(list) ? list : []).slice(0, 400).map(c => c && typeof c === "object" ? {
     iid:String(c.iid || "").slice(0, 20), id:typeof c.id === "string" ? c.id.slice(0, 40) : "", name:String(c.name || "").slice(0, 150),
     img:typeof c.img === "string" && /^https:\/\/cards\.scryfall\.io\//.test(c.img) ? c.img : "", x:+c.x || 0, y:+c.y || 0, tapped:!!c.tapped,
-    fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
+    fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), own:clamp(+c.own || 0, 0, MAX), att:String(c.att || "").slice(0, 20), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
   } : null).filter(Boolean);
   const num = (v, a, b) => clamp(Math.round(+v || 0), a, b);
   return { name:String(st.name || "Player").slice(0, 24), life:num(st.life, -999, 9999), poison:num(st.poison, 0, 99), energy:num(st.energy, 0, 999), exp:num(st.exp, 0, 999),
            cmd:st.cmd && typeof st.cmd === "object" ? Object.fromEntries(Object.entries(st.cmd).slice(0, 12).map(([k, v]) => [String(k).slice(0, 40), num(v, 0, 999)])) : {},
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), gameId:String(st.gameId || "").slice(0, 30) };
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), gameId:String(st.gameId || "").slice(0, 30),
+           arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
+             from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
 function onMessage(s, msg){
   if (!msg || typeof msg !== "object") return;
@@ -609,6 +620,9 @@ function onMessage(s, msg){
     }
     case "table": takeTable(msg.table); break;
     case "log": if (typeof msg.text === "string") log(msg.text.slice(0, 300), s); break;
+    case "act": takeAct(s, msg); break;
+    case "give": takeCard(s, msg.card); break;
+    case "return": takeBack(s, msg.card, msg.zone, !!msg.bottom); break;
     case "reveal": if (Array.isArray(msg.cards)) showReveal(players[s]?.name || "A player", cleanPub({ bf:msg.cards }).bf, String(msg.what || "").slice(0, 60)); break;
   }
 }
@@ -631,6 +645,7 @@ function changeTable(patch){
   afterTable(before);
 }
 function afterTable(before){
+  if (before.turnNum !== table.turnNum && me?.arrows?.length) { me.arrows = []; changed(); }
   if (!table.started && before.fmt !== table.fmt && me) { me.life = FORMATS[table.fmt].life; if (!FORMATS[table.fmt].cmdr) { me.zones.cz = []; } else if (!me.zones.cz.length) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })); changed(); }
   if (table.started && table.gameId && me.gameId !== table.gameId) dealNewGame();
   else if (table.turnSeat === mySeat && (before.turnSeat !== mySeat || before.turnNum !== table.turnNum) && table.turnNum > 0) startMyTurn();
@@ -660,7 +675,7 @@ function startMyTurn(){
   changed();
 }
 function dealNewGame(){
-  me.gameId = table.gameId; me.life = FORMATS[table.fmt].life; me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
+  me.gameId = table.gameId; me.arrows = []; me.life = FORMATS[table.fmt].life; me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
   const isC = FORMATS[table.fmt].cmdr;
@@ -701,7 +716,16 @@ function freeSpot(c){
 function move(iid, to, opt = {}){
   const f = findCard(iid); if (!f) return;
   const { z:from, c } = f;
+  // A card you control but another player owns goes to its owner's hand, graveyard, exile or library
+  if (c.owner && c.owner !== mySeat && to !== "bf" && !c.tok) {
+    if (!conns[c.owner]?.open) { toast(`${nm(c.owner)} isn't connected, so their card can't go back to them yet.`); return; }
+    me.zones[from].splice(f.i, 1); detachFrom(c);
+    send(conns[c.owner], { type:"return", card:wireCard(c), zone:to, bottom:!!opt.bottom });
+    if (!opt.quiet) say(`put ${nm(c.owner)}'s ${nameOf(c)} into ${to === "lib" ? `their library (${opt.bottom ? "bottom" : "top"})` : `their ${ZONE_NAME[to]}`}.`);
+    changed(); return;
+  }
   me.zones[from].splice(f.i, 1);
+  if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); }
   if (to !== "bf") { c.tapped = false; c.ctr = {}; if (to !== "lib") c.fd = false; }
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
@@ -725,6 +749,58 @@ function move(iid, to, opt = {}){
     if (!opt.quiet) say(verb + ".");
   }
   changed();
+}
+// Cards attached to one that leaves the battlefield stay where it was
+function detachFrom(host){
+  for (const a of me.zones.bf.filter(x => x.att === host.iid)) { a.att = null; a.x = clamp(host.x + 0.02, 0, 0.94); a.y = clamp(host.y - 0.04, 0, 0.86); }
+  me.arrows = (me.arrows || []).filter(a => a.from !== host.iid && a.card !== host.iid);
+}
+const wireCard = c => ({ iid:c.iid, id:c.id, face:c.face || 0, tapped:!!c.tapped, fd:!!c.fd, ctr:c.ctr || {}, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0, owner:c.owner || mySeat });
+function cleanWire(c){
+  if (!c || typeof c !== "object" || typeof c.id !== "string" || !/^[0-9a-f-]{36}$/.test(c.id)) return null;
+  return { iid:String(c.iid || uid()).slice(0, 20), id:c.id, face:c.face ? 1 : 0, tapped:!!c.tapped, fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99),
+           owner:clamp(+c.owner || 0, 0, MAX), x:0, y:0,
+           ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, 0, 999)])) : {} };
+}
+/* Control: give one of your battlefield cards to another player (stealing, "gain control"), and take cards given to you */
+function giveCard(iid, seat){
+  const f = findCard(iid); if (!f || f.z !== "bf") return;
+  if (!conns[seat]?.open) { toast(`${nm(seat)} isn't connected.`); return; }
+  const c = f.c; me.zones.bf.splice(f.i, 1); detachFrom(c);
+  send(conns[seat], { type:"give", card:wireCard(c) });
+  changed();
+  return c;
+}
+async function takeCard(from, raw){
+  const c = cleanWire(raw); if (!c) return;
+  if (!c.owner || c.owner === mySeat) delete c.owner;  // your own card, back under your control
+  Object.assign(c, freeSpot(c));
+  me.zones.bf.push(c); changed();
+  if (!cards.has(c.id)) { await cardById(c.id); render(); }
+}
+function takeBack(from, raw, zone, bottom){
+  const c = cleanWire(raw); if (!c || !["hand", "gy", "ex", "lib", "cz"].includes(zone)) return;
+  delete c.owner; c.tapped = false; c.ctr = {}; c.fd = false;
+  if (c.tok) return;
+  if (zone === "lib") { if (bottom) me.zones.lib.push(c); else me.zones.lib.unshift(c); } else me.zones[zone].push(c);
+  changed();
+  if (!cards.has(c.id)) cardById(c.id).then(render);
+}
+/* What other players can do to your cards (a manual table: everyone's trusted, and every action is in the log) */
+function takeAct(from, a){
+  const f = findCard(String(a.iid || "")); if (!f || f.z !== "bf") return;
+  const c = f.c;
+  if (a.act === "tap") { c.tapped = !!a.v; changed(); }
+  else if (a.act === "ctr") {
+    const t = String(a.name || "").slice(0, 20), d = clamp(Math.round(+a.d || 0), -1, 1); if (!t || !d) return;
+    c.ctr[t] = Math.max(0, (c.ctr[t] || 0) + d); if (!c.ctr[t]) delete c.ctr[t]; changed();
+  } else if (["gy", "ex", "hand", "lib"].includes(a.act)) move(c.iid, a.act, { quiet:true });
+  else if (a.act === "steal") giveCard(c.iid, from);
+}
+function sendAct(seat, card, act, extra = {}, text = ""){
+  if (!conns[seat]?.open) { toast(`${nm(seat)} isn't connected.`); return; }
+  send(conns[seat], { type:"act", iid:card.iid, act, ...extra });
+  if (text) say(text);
 }
 function toggleTap(c, want){
   c.tapped = want ?? !c.tapped;
@@ -765,20 +841,65 @@ function cardEl(c, { mine = false, zone = "", small = false } = {}){
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
   if (c.cmdr && c.tax) e.append(el("span", { className:"tax", title:"Commander tax", textContent:`+${c.tax * 2}` }));
+  const own = c.owner || c.own;
+  if (own && own !== ctrlSeat) { e.classList.add("theirs"); e.style.setProperty("--own", SEAT_HEX[own - 1]); e.title = `Owned by ${nm(own)}`; }
   return e;
+}
+let ctrlSeat = 0;  // (whose battlefield is being drawn, to mark cards owned by someone else)
+// Battlefield cards, attachments first (tucked behind and above the card they're attached to, and moving with it)
+function drawBattlefield(box, list, opts){
+  const byIid = new Map(list.map(c => [c.iid, c]));
+  const hosted = c => c.att && byIid.has(c.att);
+  for (const c of [...list.filter(hosted), ...list.filter(c => !hosted(c))]) {
+    const e = cardEl(c, opts), host = hosted(c) ? byIid.get(c.att) : null;
+    if (host) {
+      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, up = host.y - 0.07 * n;
+      place(e, { x:host.x + 0.015 * n, y:up >= 0 ? up : host.y + 0.07 * n }); e.style.zIndex = 0; e.classList.add("attached");
+    }
+    else place(e, c);
+    box.append(e);
+  }
 }
 function render(){
   if (!me) return;
   players[mySeat] = { ...pub(), seat:mySeat };
   renderOpps(); renderMine(); renderTurn();
+  requestAnimationFrame(drawArrows);
 }
+/* Arrows: from a card to the card or player it targets, in the color of the player who drew it; and a dashed line
+   from a card to another player's card it's attached to */
+function drawArrows(){
+  const svg = $("#arrows"); if (!svg) return;
+  const defs = svg.querySelector("defs");
+  if (!defs.childElementCount) SEAT_HEX.forEach((c, i) => defs.insertAdjacentHTML("beforeend",
+    `<marker id="ah${i + 1}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`));
+  svg.querySelectorAll("path:not(marker path)").forEach(p => p.remove());
+  const at = iid => document.querySelector(`#bf .card[data-iid="${CSS.escape(iid)}"], .obf .card[data-iid="${CSS.escape(iid)}"]`);
+  const center = e => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+  const line = (a, b, color, cls, head) => {
+    const [x1, y1] = center(a), [x2, y2] = center(b), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = x2 - x1, dy = y2 - y1;
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", `M${x1},${y1} Q${mx - dy * 0.15},${my + dx * 0.15} ${x2},${y2}`);
+    p.setAttribute("stroke", color); if (cls) p.setAttribute("class", cls); if (head) p.setAttribute("marker-end", `url(#${head})`);
+    svg.append(p);
+  };
+  for (const [s, p] of Object.entries(players)) {
+    const color = SEAT_HEX[s - 1];
+    for (const a of p.arrows || []) {
+      const from = at(a.from), to = a.card ? at(a.card) : a.player ? (+a.player === mySeat ? $("#lifeOut") : document.querySelector(`.opp[data-seat="${a.player}"] .olife`)) : null;
+      if (from && to) line(from, to, color, "", "ah" + s);
+    }
+    for (const c of p.bf || []) if (c.att && !(p.bf || []).some(x => x.iid === c.att)) { const a = at(c.iid), b = at(c.att); if (a && b) line(a, b, color, "link", ""); }
+  }
+}
+addEventListener("resize", () => requestAnimationFrame(drawArrows));
 function place(e, c){ e.style.left = (c.x * 100) + "%"; e.style.top = (c.y * 100) + "%"; }
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = [...seats.filter(s => s > mySeat), ...seats.filter(s => s < mySeat)];
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length);
   for (const s of order) {
-    const p = players[s];
+    const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") }); o.dataset.seat = s;
     const pip = el("span", { className:"pip" }); pip.style.background = SEAT_HEX[s - 1];
     const count = (label, list, zone) => {
@@ -796,7 +917,7 @@ function renderOpps(){
       el("span", { className:"olife", title:"Life", textContent:p.life })));
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true }));
     const bfEl = el("div", { className:"obf" });
-    for (const c of p.bf) { const e = cardEl(c, { small:true }); place(e, c); bfEl.append(e); }
+    drawBattlefield(bfEl, p.bf, { small:true });
     o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     box.append(o);
@@ -805,8 +926,8 @@ function renderOpps(){
 function renderMine(){
   const z = me.zones;
   $("#me").classList.toggle("turn", table.turnSeat === mySeat);
-  const bf = $("#bf"); bf.innerHTML = "";
-  z.bf.forEach(c => { const e = cardEl(c, { mine:true, zone:"bf" }); place(e, c); bf.append(e); });
+  const bf = $("#bf"); bf.innerHTML = ""; ctrlSeat = mySeat;
+  drawBattlefield(bf, z.bf, { mine:true, zone:"bf" });
   const hand = $("#hand"); hand.innerHTML = "";
   z.hand.forEach(c => hand.append(cardEl(c, { mine:true, zone:"hand" })));
   const pile = (id, list, label, back) => {
@@ -865,7 +986,36 @@ function renderTurn(){
    ===================================================================== */
 let drag = null, lastPointer = { x:0, y:0 }, hoverIid = null, longPress = null;
 document.addEventListener("pointermove", e => { lastPointer = { x:e.clientX, y:e.clientY }; });
+/* Targeting: after "Target with an arrow" or "Attach to...", the next click picks a card or a player */
+let targeting = null, swallowClick = false;
+// (the click that picked a target doesn't also draw a card, tap, or open anything)
+document.addEventListener("click", e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+function startTargeting(kind, iid){
+  targeting = { kind, iid }; document.body.classList.add("targeting");
+  const t = $("#toast"); t.textContent = kind === "attach" ? "Click the card to attach it to (Esc to cancel)." : "Click a card or a player to point at (Esc to cancel).";
+  t.classList.remove("hidden"); clearTimeout(toast.t);
+}
+function stopTargeting(){ targeting = null; document.body.classList.remove("targeting"); $("#toast").classList.add("hidden"); }
+function pickTarget(e){
+  const t = targeting; stopTargeting();
+  const src = findCard(t.iid); if (!src || src.z !== "bf") return;
+  const ce = e.target.closest?.(".card"), oppEl = e.target.closest?.(".opp");
+  const cardIid = ce && (ce.closest("#bf") || ce.closest(".obf")) ? ce.dataset.iid : "";
+  const seatOfCard = ce?.closest(".opp")?.dataset.seat ? +ce.closest(".opp").dataset.seat : mySeat;
+  const targetName = cardIid ? (seatOfCard === mySeat ? nameOf(findCard(cardIid).c) : findPub(cardIid)?.name || "a card") : "";
+  if (t.kind === "attach") {
+    if (!cardIid || cardIid === t.iid) { toast("Pick a card on the battlefield."); return; }
+    src.c.att = cardIid;
+    say(`attached ${nameOf(src.c)} to ${seatOfCard === mySeat ? "their" : nm(seatOfCard) + "'s"} ${targetName}.`); changed(); return;
+  }
+  if (cardIid && cardIid !== t.iid) { me.arrows.push({ from:t.iid, card:cardIid }); say(`pointed ${nameOf(src.c)} at ${seatOfCard === mySeat ? "their" : nm(seatOfCard) + "'s"} ${targetName}.`); }
+  else if (oppEl || e.target.closest?.(".lifebox")) { const s = oppEl ? +oppEl.dataset.seat : mySeat; me.arrows.push({ from:t.iid, player:s }); say(`pointed ${nameOf(src.c)} at ${s === mySeat ? "themselves" : nm(s)}.`); }
+  else return;
+  me.arrows = me.arrows.slice(-20); changed();
+}
 document.addEventListener("pointerdown", e => {
+  swallowClick = false;  // (only the click from the press that picked a target is swallowed)
+  if (targeting && e.button === 0) { e.preventDefault(); e.stopPropagation(); swallowClick = true; pickTarget(e); return; }
   if (!$("#menu").contains(e.target)) closeMenu();
   const ce = e.target.closest?.(".card.mine"); if (!ce || e.button !== 0 || !$("#modal").classList.contains("hidden")) return;
   const iid = ce.dataset.iid, zone = ce.dataset.zone; if (!iid) return;
@@ -903,7 +1053,7 @@ document.addEventListener("pointerup", e => {
   if (to === "bf") {
     const r = t.getBoundingClientRect(), cw = parseFloat(getComputedStyle(t).getPropertyValue("--cw")) || 84;
     const x = (e.clientX - d.dx + (d.zone === "bf" ? 0 : 0) - r.left) / r.width, y = (e.clientY - d.dy - r.top) / r.height;
-    if (d.zone === "bf") { const f = findCard(d.iid); f.c.x = clamp(x, 0, 1 - cw / r.width); f.c.y = clamp(y, 0, 0.86); changed(); }
+    if (d.zone === "bf") { const f = findCard(d.iid); f.c.x = clamp(x, 0, 1 - cw / r.width); f.c.y = clamp(y, 0, 0.86); if (f.c.att) { say(`unattached ${nameOf(f.c)}.`); f.c.att = null; } changed(); }
     else move(d.iid, "bf", { x, y });
   } else if (to !== d.zone || to === "lib") move(d.iid, to, { bottom:e.shiftKey });
 });
@@ -921,6 +1071,8 @@ document.addEventListener("contextmenu", e => {
   const ce = e.target.closest?.(".card.mine");
   if (ce) { e.preventDefault(); if (ce.dataset.zone === "lib") libMenu(e.clientX, e.clientY); else cardMenu(ce.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#libPile")) { e.preventDefault(); libMenu(e.clientX, e.clientY); return; }
+  const oc = e.target.closest?.(".opp .card");
+  if (oc && oc.dataset.iid) { e.preventDefault(); theirCardMenu(+oc.closest(".opp").dataset.seat, oc.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#bf")) { e.preventDefault(); openMenu(e.clientX, e.clientY, [{ label:"Untap all (U)", fn:untapAll }, { label:"Create a token...", fn:tokenDialog }]); }
 });
 $("#libPile").onclick = e => { if (!e.target.closest(".card") && me.zones.lib.length) draw(1); };
@@ -944,6 +1096,7 @@ function findPub(iid){ for (const p of Object.values(players)) for (const z of [
 /* Keyboard: D draw, U untap all, T tap or untap the card you're pointing at, Escape closes menus */
 document.addEventListener("keydown", e => {
   if (!me || e.target.matches("input,textarea,select") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "Escape" && targeting) { stopTargeting(); return; }
   if (e.key === "Escape") { closeMenu(); if (!$("#modal").classList.contains("hidden") && modalClosable) closeModal(); return; }
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
@@ -978,6 +1131,12 @@ function cardMenu(iid, x, y){
     items.push({ label:c.fd ? "Turn face up" : "Turn face down", fn:() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); } });
     items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Create a token copy", fn:() => copyCard(c) });
     const rel = related(k); if (rel.length) items.push({ label:`Create its token${rel.length > 1 ? "s" : ""}...`, fn:() => tokenDialog(rel) });
+    items.push("-", { label:"Target with an arrow...", fn:() => startTargeting("arrow", iid) },
+      c.att ? { label:"Unattach", fn:() => { c.att = null; c.x = clamp(c.x + 0.02, 0, 0.94); say(`unattached ${nameOf(c)}.`); changed(); } } : { label:"Attach to...", fn:() => startTargeting("attach", iid) });
+    if (me.arrows.some(a => a.from === iid)) items.push({ label:"Remove its arrows", fn:() => { me.arrows = me.arrows.filter(a => a.from !== iid); changed(); } });
+    const others = presentSeats().filter(s => s !== mySeat);
+    if (c.owner && c.owner !== mySeat) items.push({ label:`Give back to ${nm(c.owner)}`, fn:() => { if (giveCard(iid, c.owner)) say(`gave ${nameOf(c)} back to ${nm(c.owner)}.`); } });
+    for (const s of others.filter(s => s !== c.owner)) items.push({ label:`Give control to ${nm(s)}`, fn:() => { if (giveCard(iid, s)) say(`gave control of ${nameOf(c)} to ${nm(s)}.`); } });
     items.push("-", to("To hand", "hand"), to("To graveyard", "gy"), to("To exile", "ex"), to("To top of library", "lib"), to("To bottom of library", "lib", { bottom:true }));
     if (c.cmdr) items.push(to("To command zone", "cz"));
     items.push({ label:"Reveal to the table", fn:() => reveal([c], "") });
@@ -989,6 +1148,24 @@ function cardMenu(iid, x, y){
   } else {
     items.push(to("To hand", "hand"), to("To battlefield", "bf"), to("To graveyard", "gy"), to("To exile", "ex"), to("To top of library", "lib"));
   }
+  openMenu(x, y, items);
+}
+// Another player's card: tap it, put counters on it, destroy, exile, bounce, or take control of it
+function theirCardMenu(seat, iid, x, y){
+  const c = (players[seat]?.bf || []).find(x => x.iid === iid);
+  if (!c) { const any = findPub(iid); if (any) openMenu(x, y, [{ head:any.name || "A card" }, { label:"Look at it", fn:() => showReveal(nm(seat), [any], "") }]); return; }
+  const whose = `${nm(seat)}'s ${c.fd ? "face-down card" : c.name}`, act = (a, extra, text) => () => sendAct(seat, c, a, extra, text);
+  const items = [{ head:whose },
+    { label:c.tapped ? "Untap it" : "Tap it", fn:act("tap", { v:!c.tapped }, `${c.tapped ? "untapped" : "tapped"} ${whose}.`) },
+    { label:"Put a +1/+1 counter on it", fn:act("ctr", { name:"+1/+1", d:1 }, `put a +1/+1 counter on ${whose}.`) },
+    { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) }];
+  const cs = Object.keys(c.ctr || {}); for (const k of cs) items.push({ label:`Remove a ${k} counter`, fn:act("ctr", { name:k, d:-1 }, `removed a ${k} counter from ${whose}.`) });
+  items.push("-",
+    { label:"Destroy it (to the graveyard)", fn:act("gy", {}, `destroyed ${whose}.`) },
+    { label:"Exile it", fn:act("ex", {}, `exiled ${whose}.`) },
+    { label:"Return it to its owner's hand", fn:act("hand", {}, `returned ${whose} to its owner's hand.`) },
+    { label:"Put it on top of its owner's library", fn:act("lib", {}, `put ${whose} on top of its owner's library.`) }, "-",
+    { label:"Gain control of it", fn:act("steal", {}, `gained control of ${whose}.`) });
   openMenu(x, y, items);
 }
 function libMenu(x, y){
