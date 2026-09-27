@@ -3770,13 +3770,13 @@ const ACTION_PHRASE = /(?:\bi(?:'m| am|'ll| will)?|\blet me)\s+(?:going to |gonn
 /* What a player said they did, read from a line: each action phrase with the card(s) after "I play" / "I cast"
    (null when it can't be made out) or the amount after "I take / lose / gain / heal / pay". */
 const ACTION_ALL = new RegExp(ACTION_PHRASE.source, "g");
-async function parseActions(text, lisp){
+async function parseActions(text, lisp, seat = mySeat){
   const low = text.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim(), out = [];
   const ms = [...low.matchAll(ACTION_ALL)];
   for (let i = 0; i < ms.length; i++) {
     const m = ms[i], verb = m[0].split(/\s+/).pop(), phrase = m[0].replace(/^i\b/, "I");
     const after = low.slice(m.index + m[0].length, i + 1 < ms.length ? ms[i + 1].index : undefined).trim().replace(/\s+(and|then|so)$/, "");
-    if (/^(play|cast)/.test(verb)) out.push({ phrase, cards:await cardsIn(after, lisp) });
+    if (/^(play|cast)/.test(verb)) out.push({ phrase, cards:await cardsIn(after, lisp, seat) });
     else {
       const words = (lisp ? delisp(after) : after).split(" ").slice(0, 4).join(" ").toLowerCase();
       const n = words ? numIn(words) : null, unit = /\bdamage\b/.test(words) ? " damage" : /\blife\b/.test(words) ? " life" : "";
@@ -3786,8 +3786,18 @@ async function parseActions(text, lisp){
   return out;
 }
 // The cards named in what followed "I play" / "I cast": one, or a few joined by "and" / "then"
-async function cardsIn(words, lisp){
+async function cardsIn(words, lisp, seat = mySeat){
   let rest = words.replace(/^(a|an|my|our)\s+/, "").trim(); const out = [];
+  // "I play my commander": the commander that player set (both, for "my commanders" or partners)
+  // (only when that's all the name is: "commander sphere" is Commander's Sphere)
+  const cm = /^(?:(?:both|the two|two)\s+)?(commanders?|generals?|partners?)(?=\s*$|\s+(?:and|then|from|to|with|on|at|for|out|again|now|here|please|too)\b)/.exec(rest);
+  if (cm) {
+    const mine = (seat === mySeat ? me?.cmdrs : players[seat]?.cmdrs) || [];
+    const pick = /s$/.test(cm[1]) || /^(both|the two|two)/.test(rest) ? mine : mine.slice(0, 1);
+    for (const c of pick) { const card = await fetchCard(c.id || null, c.name); if (card) out.push({ card, heard:cm[0] }); }
+    if (out.length) return out;
+    return [{ card:null, heard:cm[0] }];  // no commander set
+  }
   while (rest && out.length < 5) {
     if (NOT_A_CARD.test(rest)) { if (!out.length) out.push({ card:null, heard:rest }); break; }
     // a card named exactly at the start first (keeps names with "and" in them whole, like Fire and Ice)
@@ -3813,7 +3823,7 @@ async function addCaption(seat, text, heardHere, given = null){
   try { await loadIndex(); } catch {}
   const gameOnly = $("#gameOnly").checked, lisp = lispFor(seat);
   // Only what players do: the line is just the phrases and what they name, not the words around them
-  const acts = gameOnly ? (given || await parseActions(text, lisp)) : null;
+  const acts = gameOnly ? (given || await parseActions(text, lisp, seat)) : null;
   if (gameOnly && !acts.length) return;
   const ul = $("#captions");
   const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
@@ -3972,7 +3982,7 @@ function stopRec(){ stopBrowserRec(); }
    caption, so everyone's caption and the card popping up on your camera show the same cards */
 async function onFinalSpeech(t){
   runVoice(t);
-  const acts = await parseActions(t, !!me.lisp).catch(e => { console.warn(e); return []; });
+  const acts = await parseActions(t, !!me.lisp, mySeat).catch(e => { console.warn(e); return []; });
   const wire = actsForWire(acts);
   addCaption(mySeat, t, false, acts); broadcast({ type:"caption", text:t, acts:wire });
   announceCards(mySeat, acts);
@@ -4180,7 +4190,7 @@ async function runAsr(){
       const text = String(out?.text || "").replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, " ").replace(/\s+/g, " ").trim();
       if (!/[a-z0-9]/i.test(text) || (audio.length < 16000 * 1.2 && /^(you|thank you|thanks)\.?$/i.test(text))) continue;
       // (their own browser isn't captioning them, so this one works out what they did, and pops their cards up here)
-      const acts = await parseActions(text, lispFor(s)).catch(() => []);
+      const acts = await parseActions(text, lispFor(s), s).catch(() => []);
       addCaption(s, text, true, acts); announceCards(s, acts);
       if (remoteCap[s]) remoteCap[s].captioned++;
     }

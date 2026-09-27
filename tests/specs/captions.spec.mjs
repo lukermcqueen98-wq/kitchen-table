@@ -21,6 +21,14 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "I cast rhythmic study");
   await expect(tile(a, 1).locator(".played")).toContainText("Rhystic Study");
 
+  // "I play my commander" names the commander that player set, and pops it up too
+  await tile(a, 1).locator(".cmdr.ask").click();
+  await a.locator('.modal-card input[placeholder="Start typing a card name"]').first().fill("Gamma Card");
+  await a.locator(".modal-card button.primary").click();
+  await say(a, "I play my commander");
+  await expect(b.locator("#captions li", { hasText:"I play Gamma Card" })).toHaveCount(1);
+  for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Gamma Card", { timeout:20000 });
+
   // Lands aren't popped up, and a card name that can't be made out gets "Please repeat"
   await say(a, "I play a Forest");
   await a.waitForTimeout(800);
