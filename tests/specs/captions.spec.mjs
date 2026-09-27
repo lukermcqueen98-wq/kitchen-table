@@ -54,11 +54,18 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator("#termList summary")).toHaveText(["Offspring"]);
   await a.fill("#termSearch", "trample");
   await expect(a.locator("#termList p").first()).toContainText("combat damage beyond");
-  // Only what players do is captioned (not small talk, not a card mentioned in passing), unless that's turned off
+  // Only what players do and the cards they name are captioned (not small talk), unless that's turned off.
+  // A card named without "I play" pops up too, but not an everyday word that's also a card name ("order")
   await say(a, "we should order pizza after this");
   await say(a, "remember when Sol Ring was banned");
   await expect(a.locator("#captions li", { hasText:"pizza" })).toHaveCount(0);
   await expect(a.locator("#captions li", { hasText:"banned" })).toHaveCount(0);
+  await expect(a.locator("#captions li").last()).toHaveText("You:Sol Ring");
+  for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Sol Ring", { timeout:20000 });
+  // ...once a minute: saying it again right away doesn't pop it up again
+  await say(a, "that Sol Ring though");
+  await expect(a.locator("#captions li").last()).toHaveText("You:Sol Ring");
+  await expect.poll(() => logLines(a).then(l => l.filter(x => x.includes("You played Sol Ring")).length)).toBe(1);
   await say(a, "I gain 2 life");
   await expect(a.locator("#captions li", { hasText:"I gain 2 life" })).toHaveCount(1);
   // ...and Cancel leaves the life total alone
@@ -77,7 +84,7 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator("#captions .cardlink", { hasText:"Gwenom, Remorseless" })).toHaveCount(1);
   await expect(a.locator("#captions .cardlink", { hasText:"Commander's Sphere" })).toHaveCount(1);
   // every card in a caption pops up on the speaker's camera, on every screen, one after another
-  for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Gwenom, Remorseless (+1 more)");
+  for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Gwenom, Remorseless (+1 more)", { timeout:20000 });
   for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Commander's Sphere", { timeout:10000 });
   await expect(b.locator("#captions li", { hasText:"Commander's Sphere" }).last()).toContainText("Gwenom, Remorseless");
   await say(a, "I cast commander spear");

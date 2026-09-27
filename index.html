@@ -451,7 +451,7 @@ button.mpip{cursor:pointer}
             <option value="device">Chrome on-device (private, audio stays on this computer)</option>
           </select></label>
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
-        <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I heal", "I pay 2 life", "I play...", "I cast...")</label>
+        <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I pay 2 life", "I play...", "I cast...") and cards they name</label>
         <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
         <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "I pass my turn", "what does Sol Ring do")</label>
       </section>
@@ -3910,6 +3910,60 @@ async function parseActions(text, lisp, seat = mySeat){
       out.push({ phrase, amount:n != null && n <= 999 ? `${n}${unit}` : null, heard:after });
     }
   }
+  // Cards named anywhere else in the line ("that Rhystic Study is brutal", "Counterspell!"), without "I play"
+  const named = new Set(out.flatMap(a => (a.cards || []).map(c => c.card?.name)).filter(Boolean));
+  // (the words after "I play" / "I cast" were read above)
+  let said = "", pos = 0;
+  ms.forEach((m, i) => { if (/^(play|cast)/.test(m[0].split(/\s+/).pop())) { said += " " + low.slice(pos, m.index); pos = i + 1 < ms.length ? ms[i + 1].index : low.length; } });
+  said += " " + low.slice(pos);
+  const extra = [];
+  for (const m of mentionsIn(said, lisp)) if (!named.has(m.name) && extra.length < 4) { named.add(m.name); extra.push(m); }
+  if (extra.length) {
+    const cards = (await Promise.all(extra.map(async m => ({ card:await fetchCard(null, m.name), heard:m.heard })))).filter(c => c.card);
+    if (cards.length) out.push({ phrase:"", cards, mention:true });
+  }
+  return out;
+}
+/* Card names in table talk, with no "I play" in front, so only names that are hard to mistake for everyday words:
+   a card at the table (commanders), a card name of two or more words that aren't all everyday words ("Sol Ring",
+   "Rhystic Study", not "Second Chance"), a close sound-alike of one ("ristic study"), a legend's short name
+   ("Atraxa"), or a long one-word name ("Counterspell", "Doomsday"). Short one-word names like Opt, Shock or Order
+   need "I play" / "I cast". */
+const EVERYDAY = new Set(("about above after again against ahead alive all almost alone along already also always another answer any " +
+  "anyone anything anyway around away back bad before begin behind being believe below best better between big bit black blood blue " +
+  "body book both bound break bring brother build burn business call came can care carry case catch cause chance change check " +
+  "child choice city claim clear close cold come comes coming control cool could count course cover crazy cut dark day dead deal " +
+  "death decide deep did different dinner does done door down draw dream drink drive during each early earth easy eat end enough " +
+  "enter even evening ever every everybody everyone everything exactly face fact fair fall family far fast father feel feeling few " +
+  "fight final find fine fire first five food force forever forget forward four free friend friends from front full fun funny game " +
+  "games get give glad good got great green ground group grow guess guy guys half hand hands happen happy hard have head hear heart " +
+  "heaven hello help here hide high hit hold home hope hour house how however idea important inside instead into just keep kid kids " +
+  "kill kind know land last late later laugh lead learn least leave left less let life light like line listen little live long look " +
+  "lose lost lot loud love low luck lucky made make man many may maybe mean meet might mind minute miss moment money more morning most " +
+  "mother move much music must name need never new next nice night nobody none normal nothing now number off office okay old once one " +
+  "only open order other others out outside over own part party pass past pay people perfect person pick piece place plan play please " +
+  "point possible power pretty probably problem pull pure push put question quick quiet quite rather reach read ready real really " +
+  "reason red remember rest return right road rock room round rule run safe said same save saw say second see seek seem send serve " +
+  "set shall short should show side simple since sit six sleep slow small some somebody someone something sometimes soon sorry sound " +
+  "speak special stand start stay still stop story strange strong stuff such sure take talk tell than thank thanks that then there " +
+  "these thing things think this those though thought three through throw time today together tomorrow tonight too top total touch " +
+  "town trade trouble true trust try turn two under understand until upon use used very wait walk want war warm watch water way week " +
+  "welcome well went were what whatever when where which while white who whole why wild will win wind wish with within without wonder " +
+  "word words work world worry would wrong year yes yet you young your yourself").split(" "));
+function mentionsIn(text, lisp){
+  if (!cardIndex || !text.trim()) return [];
+  const pool = deckPool(), out = [];
+  for (const seg of linkify(text, lisp)) {
+    if (!seg.card) continue;
+    const k = norm(seg.t), name = seg.card, nk = norm(name.split(" // ")[0]);
+    const words = k.split(" ").filter(w => !STOP.has(w)), atTable = pool.has(nk) || [...pool.values()].some(v => v.name === name);
+    let ok;
+    if (atTable) ok = true;
+    else if (seg.fuzzy) ok = words.length >= 2 && similarity(lisp ? lispNorm(k) : k, lisp ? lispNorm(nk) : nk) >= 0.7;
+    else if (words.length >= 2) ok = !words.every(w => EVERYDAY.has(w));
+    else ok = !EVERYDAY.has(k) && (k.length >= 8 || (name.includes(",") && norm(name.split(",")[0]) === k && k.length >= 5));
+    if (ok) out.push({ name, heard:seg.t });
+  }
   return out;
 }
 // The cards named in what followed "I play" / "I cast": one, or a few joined by "and" / "then"
@@ -3966,7 +4020,7 @@ async function addCaption(seat, text, heardHere, given = null){
   const unknown = heard => { const u = document.createElement("span"); u.className = "unknown"; u.textContent = "_"; u.title = `Heard "${heard}"`; return u; };
   if (gameOnly) acts.forEach((a, i) => {
     if (i) li.append(" · ");
-    li.append(a.phrase + " ");
+    if (a.phrase) li.append(a.phrase + " ");
     if (a.cards) a.cards.forEach((c, j) => {
       if (j) li.append(" and ");
       li.appendChild(c.card ? cardButton(c.card.name, `Heard "${c.heard}"`, async () => {
@@ -4126,11 +4180,14 @@ function actsFromWire(list){
 }
 // Cards a player said they played or cast pop up on their camera for everyone (not lands); one that couldn't be
 // made out asks them to say it again
+const recentPops = {};  // seat -> card name -> when it last popped up
 function announceCards(seat, acts){
   if (!$("#playIn").checked) return;
-  const cast = acts.filter(a => a.cards);
-  const cards = cast.flatMap(a => a.cards.map(c => c.card)).filter(Boolean)
+  const cast = acts.filter(a => a.cards && a.phrase), now = Date.now(), seen = recentPops[seat] ||= {};
+  // (a card only talked about pops up once a minute; "I play" / "I cast" always does)
+  const cards = acts.filter(a => a.cards).flatMap(a => a.cards.filter(c => c.card && (a.phrase || now - (seen[c.card.name] || 0) > 60000)).map(c => c.card))
     .filter(c => !/\bLand\b/.test(String(c.type_line || c.card_faces?.[0]?.type_line || "").split(" // ")[0]));
+  for (const c of cards) seen[c.name] = now;
   if (cards.length) { showPlayed(seat, cards); if (seat === mySeat) broadcast({ type:"played", cards:cards.map(c => ({ id:c.id, name:c.name })) }); }
   if (cast.some(a => a.cards.every(c => !c.card))) askRepeat(seat);
 }
