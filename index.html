@@ -4127,8 +4127,12 @@ function mentionsIn(text, lisp){
   // words around a real name: "see that sol" hiding Sol Ring)
   const spans = segs => { let at = 0; return segs.map(g => { const n = g.t.split(/\s+/).length, r = { seg:g, start:at, n }; at += n; return r; }); };
   const exact = spans(linkify(text, lisp, { exact:true })), loose = spans(linkify(text, lisp));
-  const taken = exact.filter(r => r.seg.card || r.seg.kw);
-  const cands = [...taken, ...loose.filter(r => r.seg.fuzzy && !taken.some(e => r.start < e.start + e.n && e.start < r.start + r.n))].sort((a, b) => a.start - b.start);
+  // (but a longer sound-alike wins over a one-word name inside it: "ristic study" is Rhystic Study, not the card Study)
+  const overlap = (a, b) => a.start < b.start + b.n && b.start < a.start + a.n;
+  const covers = (f, e) => e.n === 1 && f.n > 1 && f.start <= e.start && e.start + e.n <= f.start + f.n;
+  const fuzzy = loose.filter(r => r.seg.fuzzy);
+  const taken = exact.filter(r => (r.seg.card || r.seg.kw) && !fuzzy.some(f => covers(f, r)));
+  const cands = [...taken, ...fuzzy.filter(r => !taken.some(e => overlap(r, e)))].sort((a, b) => a.start - b.start);
   const words = exact.flatMap(r => r.seg.t.split(/\s+/)).map(norm), out = [];
   for (const { seg, start, n } of cands) {
     let name = seg.card, heard = seg.t, fuzzy = !!seg.fuzzy, len = n;

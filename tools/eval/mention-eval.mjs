@@ -20,7 +20,7 @@ const STAPLES = ["Sol Ring", "Rhystic Study", "Smothering Tithe", "Dark Ritual",
   "Duress", "Cultivate", "Harmonize", "Upheaval", "Armageddon", "Timetwister", "Doomsday", "Thoughtseize", "Preordain", "Wrath of God", "Living Death",
   "Sneak Attack", "Natural Order", "Past in Flames", "Mana Drain", "Birthing Pod", "Tooth and Nail", "Mind Twist", "Night's Whisper", "Dark Confidant", "Deal Damage", "Target Minotaur", "Combat Medic", "Life Goes On",
   // short names several cards share, and a one-word card that's an everyday word
-  "Atraxa, Grand Unifier", "Sheoldred", "Sheoldred, Whispering One", "Krenko, Tin Street Kingpin", "Incoming!"];
+  "Atraxa, Grand Unifier", "Sheoldred", "Sheoldred, Whispering One", "Krenko, Tin Street Kingpin", "Incoming!", "Study", "Korvold, Gleeful Glutton"];
 // FULL_NAMES: a saved copy of Scryfall's full list of card names (api.scryfall.com/catalog/card-names), to test
 // against every card in Magic instead of the benchmark's few thousand
 const FULL = process.env.FULL_NAMES ? JSON.parse(fs.readFileSync(process.env.FULL_NAMES, "utf8")).data : null;
