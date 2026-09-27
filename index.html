@@ -88,6 +88,12 @@ header.bar .btn.primary{padding:6px 16px}
 #grid.n3,#grid.n4{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
 #grid.n3 .tile,#grid.n4 .tile{grid-column:span 2}
 #grid.n3 .tile.third{grid-column:2 / span 2}
+/* One player's camera full screen: the others are hidden (still connected) and the side panel stays for card lookups */
+#grid.focus{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr)}
+#grid.focus .tile{display:none}
+#grid.focus .tile.focused{display:block;grid-column:1;grid-row:1}
+.fsbtn{pointer-events:auto;border:0;background:rgba(0,0,0,.65);border-radius:6px;padding:3px 7px;font-size:15px;line-height:1;color:var(--muted);cursor:pointer}
+.fsbtn:hover{color:var(--ink,#fff)}
 .grip{pointer-events:auto;cursor:grab;touch-action:none;border:0;background:rgba(0,0,0,.65);border-radius:6px;padding:4px 8px;font-size:14px;line-height:1;color:var(--muted)}
 .grip:active{cursor:grabbing}
 .tile.dragging{opacity:.55}
@@ -1451,7 +1457,8 @@ function presentSeats(){ return Object.keys(players).map(Number).filter(s => s =
 function render(bumpMine){
   if (!me) return;
   const grid = $("#grid"), seats = presentSeats();
-  grid.className = "n" + Math.max(1, Math.min(MAX, seats.length));
+  if (focusSeat && !seats.includes(focusSeat)) focusTile(0);  // (the player you had full screen left)
+  grid.className = "n" + Math.max(1, Math.min(MAX, seats.length)) + (focusSeat ? " focus" : "");
   $("#roomLabel").textContent = `Table ${roomCode}, ${modeOf(table.mode).short}`;
   $("#waitNote").classList.toggle("hidden", seats.length > 1);
   $("#passBtn").classList.toggle("primary", !table.turnSeat || table.turnSeat === mySeat);
@@ -1497,6 +1504,25 @@ function render(bumpMine){
   dc.textContent = table.dayNight === "night" ? "Night" : "Day";
 }
 
+/* Full screen for one player's camera: the page goes full screen showing only that camera (plus the side panel, so
+   clicking a card still shows it). The button again, Esc, or that player leaving goes back to everyone. */
+let focusSeat = 0;
+function focusTile(s){
+  if (s && !$(`#grid .tile[data-seat="${s}"]`)) s = 0;
+  focusSeat = s;
+  $("#grid").classList.toggle("focus", !!s);
+  document.querySelectorAll("#grid .tile").forEach(t => {
+    const on = +t.dataset.seat === s; t.classList.toggle("focused", on);
+    const b = t.querySelector(".fsbtn"); b.textContent = on ? "\u2715" : "\u26F6"; b.title = on ? "Back to all cameras (Esc)" : "Full screen (Esc to leave)";
+    b.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
+  });
+  try {
+    if (s && !document.fullscreenElement) document.documentElement.requestFullscreen?.()?.catch?.(() => {});
+    else if (!s && document.fullscreenElement) document.exitFullscreen?.()?.catch?.(() => {});
+  } catch {}
+}
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && focusSeat) focusTile(0); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && focusSeat && $("#modal").classList.contains("hidden")) focusTile(0); });
 function buildTile(s){
   const el = document.createElement("div");
   el.className = "tile enter"; el.dataset.seat = s;
@@ -1507,10 +1533,13 @@ function buildTile(s){
     ${mine ? "" : "<audio autoplay></audio>"}
     <div class="nocam hidden"></div>
     <div class="hit" title="Click a card name to identify it"></div>
-    <div class="plate"><div class="prow"><button class="grip" title="Drag to move this camera. Arrow keys work too." aria-label="Move this camera">⠿</button><span class="nm"><span class="pip" style="background:${SEAT_HEX[s - 1]}"></span><span class="pname"></span></span><span class="badges"></span><span class="turnflag"></span></div><div class="cmdrs"></div></div>
+    <div class="plate"><div class="prow"><button class="grip" title="Drag to move this camera. Arrow keys work too." aria-label="Move this camera">⠿</button><button class="fsbtn" title="Full screen (Esc to leave)" aria-label="Full screen">⛶</button><span class="nm"><span class="pip" style="background:${SEAT_HEX[s - 1]}"></span><span class="pname"></span></span><span class="badges"></span><span class="turnflag"></span></div><div class="cmdrs"></div></div>
     <div class="life">${mine ? '<button aria-label="Lose 1 life" data-d="-1">&minus;</button>' : ""}<output></output>${mine ? '<button aria-label="Gain 1 life" data-d="1">+</button>' : ""}</div>
     <div class="ctrs"></div>`;
   el.querySelectorAll(".life button").forEach(b => b.onclick = ev => { ev.stopPropagation(); changeLife(+b.dataset.d); });
+  const fs = el.querySelector(".fsbtn");
+  fs.addEventListener("pointerdown", e => e.stopPropagation());
+  fs.onclick = e => { e.stopPropagation(); focusTile(focusSeat === s ? 0 : s); };
   attachLookup(el, s);
   attachDrag(el);
   return el;
