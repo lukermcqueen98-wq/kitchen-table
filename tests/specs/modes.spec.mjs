@@ -7,7 +7,7 @@ test("1v1 Commander: the host's mode syncs, a third player is turned away, and o
   const room = await sitDown(a, "Luke", { mode:"duel" }); await settle(a);
   await sitDown(b, "Rick", { room, mode:"cmdr" });
   await expect(b.locator("#roomLabel")).toHaveText(/1v1 Commander/);
-  await expect.poll(() => lifeOf(b, 2)).toBe(20);
+  await expect.poll(() => lifeOf(b, 2)).toBe(30);
   await expect(b.locator("#tblMode")).toBeDisabled();
   await expect(a.locator("#tblMode")).toBeEnabled();
 
