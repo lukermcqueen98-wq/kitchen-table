@@ -44,7 +44,7 @@ jobs:
             || rm -f site/index/cards.json site/index/cards.bin
 
       - name: Assemble the site
-        run: cp index.html play.html README.md site/
+        run: cp index.html play.html card-back.jpg README.md site/
 
       - uses: actions/configure-pages@v6
 

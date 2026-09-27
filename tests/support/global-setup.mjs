@@ -11,7 +11,7 @@ import { makeFixtures, OUT } from "./fixtures.mjs";
 export const PORT = 8765, PEER_PORT = 9000, BASE = `http://127.0.0.1:${PORT}`;
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const TYPES = { ".html":"text/html", ".js":"application/javascript", ".mjs":"application/javascript", ".json":"application/json",
-  ".png":"image/png", ".bin":"application/octet-stream", ".md":"text/markdown" };
+  ".png":"image/png", ".jpg":"image/jpeg", ".bin":"application/octet-stream", ".md":"text/markdown" };
 
 export default async function globalSetup(){
   makeFixtures(BASE);
