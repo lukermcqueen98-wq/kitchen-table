@@ -103,6 +103,16 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "what is my life");
   await expect(a.locator("#cardView h2").first()).toHaveText("Rhystic Study");
 
+  // "I pass my turn" passes the turn, only for the player whose turn it is, and not for passing priority
+  await say(a, "okay I pass my turn");
+  await expect.poll(() => logLines(b)).toContainEqual(expect.stringContaining("Rick's turn 1"));
+  await say(a, "I pass my turn");
+  await say(b, "I pass priority");
+  await a.waitForTimeout(800);
+  expect((await logLines(b)).filter(l => /'s turn \d/.test(l))).toHaveLength(1);
+  await say(b, "I'm done");
+  await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("Luke's turn 1"));
+
   // Rick turns his captions off: Luke's screen says so, can ask, and captions Rick from his audio meanwhile
   await b.click("#capBtn");
   await expect(a.locator("#capPeers")).toContainText("captions are off");
