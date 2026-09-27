@@ -1,0 +1,44 @@
+# Checks the card popups from table talk (tools/eval/mention-eval.mjs) against every card name in Magic, from
+# Scryfall's full name list, since a false popup usually comes from some card whose name is an everyday phrase.
+# Runs when a branch changes the page or the phrase sets, or from Actions > Mention benchmark > Run workflow.
+name: Mention benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths: ["index.html", "tools/eval/mention-*.mjs", ".github/workflows/mention-eval.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mention-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mentions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci --prefix tests --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests
+      - name: Get every card name from Scryfall
+        run: curl -fsSL -H "User-Agent: KitchenTable-benchmark/1.0" -H "Accept: application/json" https://api.scryfall.com/catalog/card-names -o "$RUNNER_TEMP/names.json"
+      - name: Run the phrase sets against all of Magic
+        env:
+          FULL_NAMES: ${{ runner.temp }}/names.json
+        run: |
+          for set in tuning heldout all; do
+            echo "::group::$set"
+            node tools/eval/mention-eval.mjs . $set | tee "$RUNNER_TEMP/$set.txt"
+            echo "::endgroup::"
+          done
+          for set in tuning heldout all; do echo "$set: $(tail -1 "$RUNNER_TEMP/$set.txt")"; grep "^✗" "$RUNNER_TEMP/$set.txt" || true; done

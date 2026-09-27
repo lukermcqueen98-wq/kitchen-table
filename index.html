@@ -4011,6 +4011,7 @@ async function parseActions(text, lisp, seat = mySeat){
    So "that Rhystic Study is brutal" pops up and "rest in peace grandpa" doesn't, but "exile it with Rest in Peace"
    does. */
 const EVERYDAY = new Set(("or and but if so no not nor is it at by up out off as be am are was of to in on for the a an into onto from with " +
+  "ancient coat arms tower command stroke genius heed grudge harmony " +
   "goes going gone went gets getting got gotten does doing did done has having had says saying said makes making made comes coming came " +
   "takes taking took taken gives giving gave given sees seeing saw seen knows knew known thinks thinking thought looks looking looked " +
   "wants wanted needs needed keeps kept lets puts tries tried tells told calls called feels felt leaves left works worked " +
@@ -4089,12 +4090,13 @@ const CUE_VERB = new Set(("cast casts casting casted play plays playing played t
   "ramp ramped drop dropped dropping remove removed wipe wiped").split(" "));
 const CUE_OWNER = new Set("my your his her their our its".split(" "));
 const CUE_WEAK = new Set("that this the a an with into for another".split(" "));
-const CUE_AFTER = /^(shuts|stops|locks|hoses|wrecks|blanks|counters|exiles|destroys|draws|makes|doubles|copies|triggers?|triggered|triggering|resolves?|resolved|resolving|overload(ed|ing)?|activat\w*|etbs?|enters|entered|dies|died|attacks|blocks|untaps|taxes|flips|transforms|is (so |really |pretty |super |kinda |kind of |just |actually )?(good|bad|busted|broken|nuts|insane|annoying|brutal|strong|great|op|cracked|unfair|banned|legal|expensive|cheap|out|online|on the (battlefield|stack|board)|in (play|my hand|hand)))\b/;
+const CUE_AFTER = /^(shuts|stops|locks|hoses|wrecks|turns off|pumps|gives|grants|pitching|targeting|exiling|countering|copying|blanks|counters|exiles|destroys|draws|makes|doubles|copies|triggers?|triggered|triggering|resolves?|resolved|resolving|overload(ed|ing)?|activat\w*|etbs?|enters|entered|dies|died|attacks|blocks|untaps|taxes|flips|transforms|is (so |really |pretty |super |kinda |kind of |just |actually )?(good|bad|busted|broken|nuts|insane|annoying|brutal|strong|great|op|cracked|unfair|banned|legal|expensive|cheap|out|online|on the (battlefield|stack|board)|in (play|my hand|hand)))\b/;
 const MTG_WORDS = new Set(("mana tap taps tapped untap stack graveyard yard exile exiled library hand battlefield board creature creatures spell spells " +
   "instant sorcery artifact enchantment planeswalker token tokens counters trigger triggers commander cast flashback tutor combo deck draw " +
   "attack attacking block blocking damage lands sacrifice sac discard mill scry upkeep response resolve resolves cmc ramp wipe removal target " +
   "opponent opponents priority storm etb dies flash counter cascade proliferate reanimate legendary player players card cards life turn " +
-  "deal deals dealt power toughness combat hexproof trample flying haste lifelink deathtouch vigilance menace reach ward").split(" "));
+  "deal deals dealt power toughness combat hexproof trample flying haste lifelink deathtouch vigilance menace reach ward " +
+  "treasure treasures clue clues food blood map maps powerstone gold shard junk role incubator").split(" "));
 function mentionsIn(text, lisp){
   if (!cardIndex || !text.trim()) return [];
   const pool = deckPool(), atTable = new Set([...pool.values()].map(v => v.name)), seen = new Set(cardHist.slice(0, 30).map(c => c.name));
@@ -4103,7 +4105,7 @@ function mentionsIn(text, lisp){
   for (const seg of segs) {
     const n = seg.t.split(/\s+/).length, start = at; at += n;
     let name = seg.card, heard = seg.t, fuzzy = !!seg.fuzzy, len = n;
-    if (!name && seg.kw) name = cardIndex.get(norm(seg.t));  // a card that's also a game term: "Counterspell"
+    if (!name && seg.kw && !NOT_ALONE.has(norm(seg.t)) && !MTG_WORDS.has(norm(seg.t))) name = cardIndex.get(norm(seg.t));  // a card that's also a game term: "Counterspell"
     if (!name) continue;
     let k = norm(heard);
     // a sound-alike that swallowed a legend's short name and the words after it ("atraxa is so"): just the name
@@ -4125,7 +4127,10 @@ function mentionsIn(text, lisp){
     else if (CUE_OWNER.has(prev)) score += 1;
     else if (CUE_WEAK.has(prev)) score += 0.5;
     if (CUE_AFTER.test(words.slice(start + len, start + len + 6).join(" "))) score += 1;
-    const vocab = words.filter((w, i) => (i < start || i >= start + len) && MTG_WORDS.has(w)).length;
+    // a card used as a verb on something: "I'll path it", "gonna swords your commander", "let me bolt him"
+    else if (/^(i'?ll|i|i'?m|gonna|will|let me|i'?m gonna|going to)$/.test(before.slice(-2).join(" ").replace(/^.* (?=let me|going to|i'?m gonna)/, "")) || /^(i'?ll|gonna|i)$/.test(prev))
+      if (/^(it|that|this|them|him|her|your|his|their)\b/.test(words[start + len] || "")) score += 1.5;
+    const vocab = words.filter((w, i) => (i < start || i >= start + len) && (MTG_WORDS.has(w) || CUE_VERB.has(w))).length;
     score += vocab >= 2 ? 1 : vocab ? 0.5 : 0;
     if (score >= 2) out.push({ name, heard, score });
   }
