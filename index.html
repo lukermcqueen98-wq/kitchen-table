@@ -3600,6 +3600,7 @@ $("#searchBtn").onclick = manualSearch;
    ===================================================================== */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let noPhrases = false, quickEnds = 0;
+var shortNames = new Map();  // short name -> the cards sharing it (var: the name list can load before this line runs)
 let rec = null, capOn = false, cardIndex = null, indexLoading = null, maxWords = 1, interimEl = null;
 // One-word card names that are also everyday words or game terms, so they don't link by accident
 const NOT_ALONE = new Set(("sacrifice lifelink deathtouch vigilance trample flying haste reach menace flash hexproof indestructible " +
@@ -3627,6 +3628,11 @@ function loadIndex(){
       if (face.includes(",")) { const sh = norm(face.split(",")[0]); if (sh.length >= 4) alias.push([sh, face]); }
       if (/'s\b/i.test(face)) alias.push([norm(face.replace(/'s\b/gi, "")), face]);
     }
+    // Short names several cards share ("Atraxa", "Sheoldred", "Krenko"): remembered, so talk that only says the
+    // short name pops up the one at the table or seen lately, not whichever card happens to be first
+    const byShort = new Map();
+    for (const [k, face] of alias) if (k) { if (!byShort.has(k)) byShort.set(k, new Set(m.has(k) ? [m.get(k)] : [])); byShort.get(k).add(face); }
+    shortNames = new Map([...byShort].filter(([, v]) => v.size > 1));
     for (const [k, face] of alias) if (k && !m.has(k)) m.set(k, face);  // (a real card with that name comes first)
     cardIndex = m; phonAll = null; lispPhonAll = null; phonOne = null; soundIdx = null; lispSoundIdx = null;
     loadKeywordCatalogs().catch(() => {});
@@ -3938,7 +3944,7 @@ function fuzzyAll(keys, i, lisp){
   return null;
 }
 // Split a sentence into plain words, card names, and keywords
-function linkify(text, lisp){
+function linkify(text, lisp, { exact = false } = {}){
   const words = text.split(/\s+/).filter(Boolean), raw = words.map(norm), keys = lisp ? raw.map(lispNorm) : raw, out = [];
   const oneWord = $("#oneWord").checked, pool = lisp ? lispPool() : deckPool();
   const L = lisp ? lispMaps() : null, index = lisp ? L.idx : cardIndex, kw = lisp ? L.kw : KW;
@@ -3952,11 +3958,11 @@ function linkify(text, lisp){
     // 1. exact match to a card in someone's decklist
     for (let n = Math.min(mw, words.length - i); n >= 1 && !seg; n--) { const hit = pool.get(key(i, n)); if (hit) seg = { card:hit.name, t:span(i, n), n }; }
     // 2. sound-alike match to a decklist card
-    if (!seg) { const f = fuzzyPool(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
+    if (!seg && !exact) { const f = fuzzyPool(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
     // 3. exact multi-word card name from all of Magic
     for (let n = Math.min(maxWords, words.length - i); n >= 2 && !seg && index; n--) { const name = index.get(key(i, n)); if (name) seg = { card:name, t:span(i, n), n }; }
     // 3b. sound-alike card name from all of Magic
-    if (!seg && index) { const f = fuzzyAll(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
+    if (!seg && index && !exact) { const f = fuzzyAll(keys, i, lisp); if (f) seg = { card:f.name, t:span(i, f.n), n:f.n, fuzzy:true }; }
     // 4. keyword
     for (let n = Math.min(kwMax, words.length - i); n >= 1 && !seg; n--) { const k = kw.get(key(i, n)); if (k) seg = { kw:k, t:span(i, n), n }; }
     // 5. one-word card name from all of Magic
@@ -4027,7 +4033,8 @@ async function parseActions(text, lisp, seat = mySeat, { answer = false } = {}){
    So "that Rhystic Study is brutal" pops up and "rest in peace grandpa" doesn't, but "exile it with Rest in Peace"
    does. */
 const EVERYDAY = new Set(("or and but if so no not nor is it at by up out off as be am are was of to in on for the a an into onto from with " +
-  "ancient coat arms tower command stroke genius heed grudge harmony " +
+  "ancient coat arms tower command stroke genius heed grudge harmony incoming outgoing anything everything something nothing " +
+  "somewhere everywhere anywhere yesterday tomorrow tonight together whatever whenever wherever however seriously honestly " +
   "goes going gone went gets getting got gotten does doing did done has having had says saying said makes making made comes coming came " +
   "takes taking took taken gives giving gave given sees seeing saw seen knows knew known thinks thinking thought looks looking looked " +
   "wants wanted needs needed keeps kept lets puts tries tried tells told calls called feels felt leaves left works worked " +
@@ -4103,7 +4110,7 @@ const CUE_VERB = new Set(("cast casts casting casted play plays playing played t
   "sacrifice sacrificed sacrificing copy copied copying flash flashed flashing equip equipped activate activated activating untap untapped " +
   "tap tapped tapping resolve resolved recur recurred reanimate reanimated steal stole stolen blink blinked flicker flickered mill milled " +
   "discard discarded kill killed killing hold holding holds cracked crack foretell foretold cascade cascaded proliferate topdeck topdecked " +
-  "ramp ramped drop dropped dropping remove removed wipe wiped").split(" "));
+  "ramp ramped drop dropped dropping remove removed").split(" "));
 const CUE_OWNER = new Set("my your his her their our its".split(" "));
 const CUE_WEAK = new Set("that this the a an with into for another".split(" "));
 const CUE_AFTER = /^(shuts|stops|locks|hoses|wrecks|turns off|pumps|gives|grants|pitching|targeting|exiling|countering|copying|blanks|counters|exiles|destroys|draws|makes|doubles|copies|triggers?|triggered|triggering|resolves?|resolved|resolving|overload(ed|ing)?|activat\w*|etbs?|enters|entered|dies|died|attacks|blocks|untaps|taxes|flips|transforms|is (so |really |pretty |super |kinda |kind of |just |actually )?(good|bad|busted|broken|nuts|insane|annoying|brutal|strong|great|op|cracked|unfair|banned|legal|expensive|cheap|out|online|on the (battlefield|stack|board)|in (play|my hand|hand)))\b/;
@@ -4116,10 +4123,14 @@ const MTG_WORDS = new Set(("mana tap taps tapped untap stack graveyard yard exil
 function mentionsIn(text, lisp){
   if (!cardIndex || !text.trim()) return [];
   const pool = deckPool(), atTable = new Set([...pool.values()].map(v => v.name)), seen = new Set(cardHist.slice(0, 30).map(c => c.name));
-  const segs = linkify(text, lisp), words = segs.flatMap(g => g.t.split(/\s+/)).map(norm), out = [];
-  let at = 0;
-  for (const seg of segs) {
-    const n = seg.t.split(/\s+/).length, start = at; at += n;
+  // Names spelled exactly first, then sound-alikes only where no exact name was found (a sound-alike can swallow the
+  // words around a real name: "see that sol" hiding Sol Ring)
+  const spans = segs => { let at = 0; return segs.map(g => { const n = g.t.split(/\s+/).length, r = { seg:g, start:at, n }; at += n; return r; }); };
+  const exact = spans(linkify(text, lisp, { exact:true })), loose = spans(linkify(text, lisp));
+  const taken = exact.filter(r => r.seg.card || r.seg.kw);
+  const cands = [...taken, ...loose.filter(r => r.seg.fuzzy && !taken.some(e => r.start < e.start + e.n && e.start < r.start + r.n))].sort((a, b) => a.start - b.start);
+  const words = exact.flatMap(r => r.seg.t.split(/\s+/)).map(norm), out = [];
+  for (const { seg, start, n } of cands) {
     let name = seg.card, heard = seg.t, fuzzy = !!seg.fuzzy, len = n;
     if (!name && seg.kw && !NOT_ALONE.has(norm(seg.t)) && !MTG_WORDS.has(norm(seg.t))) name = cardIndex.get(norm(seg.t));  // a card that's also a game term: "Counterspell"
     if (!name) continue;
@@ -4128,6 +4139,8 @@ function mentionsIn(text, lisp){
     const short = name.includes(",") ? norm(name.split(",")[0]) : "";
     if (fuzzy && short && (k === short || k.startsWith(short + " "))) { len = short.split(" ").length; heard = seg.t.split(/\s+/).slice(0, len).join(" "); k = short; fuzzy = false; }
     // (Magic's own words are everyday words at a Magic table: "Deal Damage" is said far more often than it's cast)
+    // a short name several cards share: the one at the table or seen lately, or nothing
+    if (shortNames.has(k)) { const pick = [...shortNames.get(k)].find(c => atTable.has(c) || seen.has(c)); if (!pick) continue; name = pick; }
     const nk = norm(name.split(" // ")[0]), sig = k.split(" ").filter(w => !STOP.has(w)), plain = sig.every(w => EVERYDAY.has(w) || MTG_WORDS.has(w));
     let score;
     if (fuzzy) { const sim = similarity(lisp ? lispNorm(k) : k, lisp ? lispNorm(nk) : nk); score = sig.length < 2 || plain || sim < 0.7 ? 0 : sim >= 0.8 ? 1.5 : 1; }
@@ -4170,7 +4183,9 @@ async function cardsIn(words, lisp, seat = mySeat){
     // a card named exactly at the start first (keeps names with "and" in them whole, like Fire and Ice)
     const first = linkify(rest, lisp)[0];
     let heard, card = null;
-    if (first?.card && !first.fuzzy) {
+    const firstKey = first?.card && norm(first.t), likely = shortNames.has(firstKey) ? [...shortNames.get(firstKey)].find(c => likelyNames().has(c)) : null;
+    if (first?.card && !first.fuzzy && (!shortNames.has(firstKey) || likely)) {
+      if (likely) first.card = likely;
       heard = first.t; card = await fetchCard(null, first.card);
       rest = rest.split(" ").slice(first.n).join(" ");
       const more = /^(and|then|plus)\s+/.exec(rest); rest = more ? rest.slice(more[0].length) : "";
