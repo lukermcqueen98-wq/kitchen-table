@@ -17,7 +17,7 @@ const STAPLES = ["Sol Ring", "Rhystic Study", "Smothering Tithe", "Dark Ritual",
   "Turn // Burn", "Catch // Release", "Commit // Memory", "Reason // Believe", "Driven // Despair", "Struggle // Survive", "Heaven // Earth", "Onward // Victory",
   "Good Fortune", "Lucky Clover", "Game Plan", "Fresh Start", "Hard Evidence", "Big Score", "Final Fortune", "Last Stand", "Ancient Grudge", "Fog", "Opt", "Shock",
   "Duress", "Cultivate", "Harmonize", "Upheaval", "Armageddon", "Timetwister", "Doomsday", "Thoughtseize", "Preordain", "Wrath of God", "Living Death",
-  "Sneak Attack", "Natural Order", "Past in Flames", "Mana Drain", "Birthing Pod", "Tooth and Nail", "Mind Twist", "Night's Whisper", "Dark Confidant"];
+  "Sneak Attack", "Natural Order", "Past in Flames", "Mana Drain", "Birthing Pod", "Tooth and Nail", "Mind Twist", "Night's Whisper", "Dark Confidant", "Deal Damage", "Target Minotaur", "Combat Medic", "Life Goes On"];
 const NAMES = [...new Set([...list.tests, ...list.extra].map(x => x.name).concat(STAPLES))].sort();
 const { chromium } = createRequire(path.join(ROOT, "tests") + "/")("@playwright/test");
 // [what was said, cards that should pop up]
@@ -88,6 +88,12 @@ const cases = [
   ["deep analysis of the game", []],
   ["it's the natural order of things", []],
   ["my mind stone is broken", ["Mind Stone"]],
+  // reported from a real game: rules talk that is also a card name
+  ["i deal damage to target creature", []],
+  ["deal damage to any target", []],
+  ["it deals damage to each player", []],
+  ["combat damage to a player", []],
+  ["life goes on", []],
 ];
 // Held out: written after the rules were tuned on the cases above, to check they hold on new sentences
 const heldOut = [
