@@ -2846,6 +2846,8 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
   embed:canvases => aiEmbed(canvases),
   shrink:(canvas, w) => shrinkArt(canvas, w),
   prepWidth,
+  nearestCard:(words, lisp = false) => loadIndex().then(() => nearestCard(words, lisp)),
+  linkCard:(words, lisp = false) => loadIndex().then(() => linkify(words, lisp).find(x => x.card) || null),
   // Search a stand-in index instead of the published one: art pictures with names, fingerprinted here the way the
   // builder would with this prep (for measuring a new way of preparing art before rebuilding the real index)
   // (each item: { name, canvas } to fingerprint here, or { name, v } with a fingerprint worked out before)
@@ -3419,7 +3421,7 @@ function loadIndex(){
       if (/'s\b/i.test(face)) alias.push([norm(face.replace(/'s\b/gi, "")), face]);
     }
     for (const [k, face] of alias) if (k && !m.has(k)) m.set(k, face);  // (a real card with that name comes first)
-    cardIndex = m; phonAll = null; lispPhonAll = null; phonOne = null;
+    cardIndex = m; phonAll = null; lispPhonAll = null; phonOne = null; soundIdx = null; lispSoundIdx = null;
     loadKeywordCatalogs().catch(() => {});
     return m;
   })();
@@ -3815,11 +3817,17 @@ function fromPhrase(segs, at){
   }
   return out.length ? out : segs;
 }
-// The card some words name, if Scryfall's guess is close to what was said
+/* The card some words name (what followed "I play" or "I cast"): the closest-sounding card when it's clearly
+   closest; on a close call, Scryfall's own guess settles it if it's one of the two closest; with no good sound-alike,
+   Scryfall's guess if it's spelled close to what was said. Null when it's not clear (the player is asked again). */
 async function cardFromWords(words, lisp){
-  const q = words.split(" ").slice(0, 6).join(" "), c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
+  try { await loadIndex(); } catch {}
+  const nc = nearestCard(words, lisp);
+  if (nc && nc.score >= 0.72 && nc.margin >= 0.04) return fetchCard(null, nc.name);
+  const q = norm(words).split(" ").slice(0, 6).join(" "), c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
+  if (nc && nc.score >= 0.72) return c && [nc.name, nc.second].includes(c.name) ? c : null;
   if (!c) return null;
-  const named = norm(c.name.split(" // ")[0]), said = norm(q).split(" ").slice(0, named.split(" ").length + 1).join(" ");
+  const named = norm(c.name.split(" // ")[0]), said = q.split(" ").slice(0, named.split(" ").length + 1).join(" ");
   return similarity(lisp ? lispNorm(said) : said, lisp ? lispNorm(named) : named) >= 0.6 ? c : null;
 }
 function showInterim(text){
@@ -3839,7 +3847,8 @@ function startBrowserRec(){
   // Newer Chrome can be told which phrases to expect: the table's card names, commanders, player names, and game terms
   if (window.SpeechRecognitionPhrase && "phrases" in rec && !noPhrases) {
     try {
-      const names = [...new Set([...deckPool().values()].map(v => v.name))].slice(0, 400);
+      // (commanders, then cards seen, looked up or played lately: the likeliest to be said)
+      const names = [...new Set([...[...deckPool().values()].map(v => v.name), ...cardHist.map(h => h.name)])].slice(0, 300);
       const people = presentSeats().filter(s => s !== mySeat).map(nm).filter(Boolean);
       const terms = KEYWORDS.map(k => k[0]).filter(t => t.length > 3).slice(0, 150);
       rec.phrases = [...names.map(n => new SpeechRecognitionPhrase(n, 5)), ...people.map(n => new SpeechRecognitionPhrase(n, 3)),
@@ -4175,6 +4184,82 @@ async function lookUpSpoken(q){
    aren't shown). When it's not clear which card they said, their screen asks them to say it again. */
 const PLAY_RE = /(?:^|\b(?:and|then|so|now|ok|okay|alright)\s+)(?:i(?:'m| am)?\s+(?:going to |gonna )?|i(?:'ll| will)\s+|let me\s+|i\s+)?(?:play|playing|played|cast|casting)\s+(.+)$/;
 const NOT_A_CARD = /^(it|that|this|them|those|these|a land|land|lands|my land|something|nothing|anything|first|second|third|next|again|now|around|with|against|for|on|to|too|well|some|another|a lot|games?|magic|commander|a game|mtg|here|there|at|in|online|every|all|both|one)\b/;
+/* The card that sounds closest to some words, out of every card name (for what follows "I play" or "I cast").
+   Speech recognition often turns a card name into other words ("rhythmic study", "sold ring"); rather than only
+   accepting names that sound exactly alike, this scores every name by how close its sounds are (edit distance over a
+   rough sound spelling, so "counter spell" and "Counterspell" are the same) and by spelling. Cards likely to be
+   said (commanders, cards seen, looked up, or played this game) win close calls. Returns { name, score, margin }. */
+function sounds(w){
+  w = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (!w) return "";
+  w = w.replace(/^(kn|gn|pn|wr)/, m => m[1]).replace(/ph/g, "f").replace(/ck/g, "k").replace(/q/g, "k").replace(/x/g, "ks").replace(/z/g, "s")
+       .replace(/dg/g, "j").replace(/gh/g, "").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k").replace(/th/g, "0").replace(/sh/g, "x").replace(/wh/g, "w");
+  return w.replace(/[aeiouy]+/g, "a").replace(/([^a])h/g, "$1").replace(/(.)\1+/g, "$1");
+}
+const soundOf = (words, lisp, keepSmall = false) => words.filter(w => keepSmall || !STOP.has(w)).map(w => sounds((lisp ? lispNorm(w) : w).replace(/(\w{3,})s$/, "$1"))).join("");
+// First sounds that speech recognition mixes up ("tree" for "three", "vault" for "fault")
+const SOUND_KIN = { t:"t0d", "0":"0tdf", d:"dt0", f:"fv0", v:"vfb", s:"sx0", x:"xsj", j:"jxg", k:"kg", g:"gkj", b:"bpv", p:"pb", a:"a" };
+const FILLER = new Set(["uh", "um", "like", "the", "a", "an", "my", "this", "that", "ah", "er", "erm", "okay", "ok", "so"]);
+var soundIdx = null, lispSoundIdx = null;  // var: the name list can load before this line runs
+function soundIndex(lisp){
+  if (!cardIndex) return null;
+  if (lisp ? lispSoundIdx : soundIdx) return lisp ? lispSoundIdx : soundIdx;
+  const byFirst = new Map();
+  for (const [k, name] of cardIndex) {
+    const sd = soundOf(k.split(" "), lisp); if (sd.length < 2) continue;
+    const f = sd[0]; if (!byFirst.has(f)) byFirst.set(f, []);
+    byFirst.get(f).push({ sd, k, name });
+  }
+  if (lisp) lispSoundIdx = byFirst; else soundIdx = byFirst;
+  return byFirst;
+}
+function editDistance(a, b, max){
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length:b.length + 1 }, (_, j) => j), cur = new Array(b.length + 1);
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = i; let low = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < low) low = cur[j];
+    }
+    if (low > max) return max + 1;
+    [prev, cur] = [cur, prev];
+  }
+  return prev[b.length];
+}
+// Names likely to be said at this table: commanders, cards seen or looked up (the Card history), cards played
+function likelyNames(){
+  const s = new Set();
+  for (const v of deckPool().values()) s.add(v.name);
+  for (const h of cardHist) s.add(h.name);
+  return s;
+}
+function nearestCard(words, lisp){
+  const idx = soundIndex(lisp); if (!idx) return null;
+  const ws = norm(words).split(" ").filter(Boolean).slice(0, 7); if (!ws.length) return null;
+  const likely = likelyNames(), best = new Map();  // name -> best score
+  // try the first 1 to 7 words (a name can be followed by more talk), and after a filler word ("uh", "the")
+  for (const st of FILLER.has(ws[0]) ? [0, 1] : [0]) for (let n = 1; st + n <= ws.length; n++) {
+    const win = ws.slice(st, st + n), text = win.join(" ");
+    // (small words left out, and kept in: "a tracks a" is Atraxa)
+    for (const sd of new Set([soundOf(win, lisp), soundOf(win, lisp, true)])) {
+      if (sd.length < 3) continue;
+      const max = Math.max(1, Math.floor(sd.length * 0.4));
+      // names starting with the same sound or one easily mixed up with it, or with a vowel before it
+      const firsts = new Set([...(SOUND_KIN[sd[0]] || sd[0]), "a"]);
+      for (const f of firsts) for (const e of idx.get(f) || []) {
+        if (Math.abs(e.sd.length - sd.length) > max) continue;
+        const d = editDistance(sd, e.sd, max); if (d > max) continue;
+        const sim = 1 - d / Math.max(sd.length, e.sd.length);
+        // (a name that covers more of what was said wins a tie: "beast within" is Beast Within, not Beast)
+        const score = sim * 0.7 + similarity(text, e.k) * 0.3 + (likely.has(e.name) ? 0.05 : 0) - st * 0.03 + Math.min(n, 4) * 0.01;
+        if (score > (best.get(e.name) || 0)) best.set(e.name, score);
+      }
+    }
+  }
+  const ranked = [...best.entries()].sort((a, b) => b[1] - a[1]);
+  if (!ranked.length) return null;
+  return { name:ranked[0][0], score:ranked[0][1], margin:ranked[0][1] - (ranked[1]?.[1] ?? 0), second:ranked[1]?.[0] || "" };
+}
 async function spokenPlay(seat, raw, lisp){
   if (!$("#playIn").checked) return;
   const t = raw.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ").trim();
@@ -4184,13 +4269,8 @@ async function spokenPlay(seat, raw, lisp){
   try { await loadIndex(); } catch {}
   // The first card name in what follows, if it starts within the first couple of words
   let name = null, i = 0;
-  for (const seg of linkify(tail, lisp)) { if (seg.card) { name = seg.card; break; } i += seg.t.split(/\s+/).length; if (i > 2) break; }
-  let card = name ? await fetchCard(null, name) : null;
-  if (!card) {  // Scryfall's own guess, if it's close to what was said
-    const q = tail.split(" ").slice(0, 6).join(" "), c = await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
-    if (c) { const named = norm(c.name.split(" // ")[0]), said = norm(q).split(" ").slice(0, named.split(" ").length + 1).join(" ");
-      if (similarity(lisp ? lispNorm(said) : said, lisp ? lispNorm(named) : named) >= 0.6) card = c; }
-  }
+  for (const seg of linkify(tail, lisp)) { if (seg.card && !seg.fuzzy) { name = seg.card; break; } i += seg.t.split(/\s+/).length; if (i > 2) break; }
+  let card = name ? await fetchCard(null, name) : await cardFromWords(tail, lisp);
   if (!card) { askRepeat(seat); return; }
   if (/\bLand\b/.test(String(card.type_line || card.card_faces?.[0]?.type_line || "").split(" // ")[0])) return;  // lands aren't popped up
   showPlayed(seat, card);
