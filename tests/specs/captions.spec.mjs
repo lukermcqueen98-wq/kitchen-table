@@ -12,6 +12,13 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator(`#captions .cardlink[title='Heard "thol ring"']`)).toHaveText("Sol Ring");
   // (a caption is just what he did: "I cast Sol Ring · I take 6")
   await expect(a.locator("#captions li", { hasText:"I cast Sol Ring" })).toContainText("I take 6");
+  // A life change heard by voice waits for Rick to accept it, on his own screen only
+  const ask = tile(b, 2).locator(".lifeask");
+  await expect(ask).toContainText("take 6 from Luke (life 40 → 34)");
+  await expect(tile(a, 2).locator(".lifeask")).toHaveCount(0);
+  expect(await lifeOf(b, 2)).toBe(40);
+  await ask.getByRole("button", { name:"Accept" }).click();
+  await expect(ask).toHaveCount(0);
   expect(await lifeOf(b, 2)).toBe(34);
   // ...and saying he cast it pops Sol Ring up on Rick's camera on Luke's screen
   await expect(tile(a, 2).locator(".played")).toContainText("Sol Ring");
@@ -54,6 +61,11 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator("#captions li", { hasText:"banned" })).toHaveCount(0);
   await say(a, "I gain 2 life");
   await expect(a.locator("#captions li", { hasText:"I gain 2 life" })).toHaveCount(1);
+  // ...and Cancel leaves the life total alone
+  const before = await lifeOf(a, 1);
+  await tile(a, 1).locator(".lifeask").getByRole("button", { name:"Cancel" }).click();
+  await expect(tile(a, 1).locator(".lifeask")).toHaveCount(0);
+  expect(await lifeOf(a, 1)).toBe(before);
   await a.click("#tab-captions"); await a.uncheck("#gameOnly");
   await say(a, "we should order pizza after this");
   await expect(a.locator("#captions li", { hasText:"pizza" })).toHaveCount(1);
@@ -90,6 +102,16 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await expect(a.locator("#cardView h2").first()).toHaveText("Rhystic Study");
   await say(a, "what is my life");
   await expect(a.locator("#cardView h2").first()).toHaveText("Rhystic Study");
+
+  // "I pass my turn" passes the turn, only for the player whose turn it is, and not for passing priority
+  await say(a, "okay I pass my turn");
+  await expect.poll(() => logLines(b)).toContainEqual(expect.stringContaining("Rick's turn 1"));
+  await say(a, "I pass my turn");
+  await say(b, "I pass priority");
+  await a.waitForTimeout(800);
+  expect((await logLines(b)).filter(l => /'s turn \d/.test(l))).toHaveLength(1);
+  await say(b, "I'm done");
+  await expect.poll(() => logLines(a)).toContainEqual(expect.stringContaining("Luke's turn 1"));
 
   // Rick turns his captions off: Luke's screen says so, can ask, and captions Rick from his audio meanwhile
   await b.click("#capBtn");

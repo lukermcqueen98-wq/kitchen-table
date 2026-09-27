@@ -170,6 +170,10 @@ header.bar .btn.primary{padding:6px 16px}
 .dmgask .opts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 .dmgask .btn{padding:6px 10px;font-size:14px;display:flex;align-items:center;gap:6px}
 .dmgask label{display:flex;gap:6px;justify-content:center;align-items:center;font-size:13px;margin-top:10px;color:var(--muted)}
+.lifeask{position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:6;background:rgba(13,32,29,.97);border:1px solid var(--brass);border-radius:12px;padding:10px 12px;width:min(92%,380px);display:flex;flex-direction:column;gap:8px}
+.lifeask .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;text-align:center}
+.lifeask .row span{flex:1 1 100%;font-weight:600}
+.lifeask .btn{padding:6px 14px;font-size:14px}
 .dmgask .skip{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;margin-top:6px}
 
 /* Side panel */
@@ -303,11 +307,11 @@ button.mpip{cursor:pointer}
     <div class="lobby-cols">
       <div class="col">
       <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
-      <p class="hint hidden" id="noCam">No webcam found. You can still sit down and use your phone as the camera from the table.</p>
+      <p class="hint hidden" id="noCam">No webcam found, so your phone will be the camera: you'll get a code to scan after you sit down.</p>
+      <p class="hint hidden" id="phoneNote">Your phone will be the camera. After you sit down, scan the code it shows with your phone.</p>
       <label class="field"><span>Camera</span><select id="camSel"></select></label>
       <label class="field"><span>Microphone</span><select id="micSel"></select></label>
       <label class="check"><input type="checkbox" id="rotIn"> My camera is upside down</label>
-      <label class="check"><input type="checkbox" id="phoneIn"> Use my phone as the camera (shows a code to scan after you sit down)</label>
       <details class="adv">
         <summary>Connection settings (TURN relay)</summary>
         <p>If a friend can see the table but their video never loads, one of you is behind a strict network. Add a TURN relay from a provider such as Metered or Twilio. These are saved only in this browser.</p>
@@ -449,7 +453,7 @@ button.mpip{cursor:pointer}
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
         <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I heal", "I pay 2 life", "I play...", "I cast...")</label>
         <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
-        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
+        <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "I pass my turn", "what does Sol Ring do")</label>
       </section>
       </div>
     <div class="pane hidden" role="tabpanel" data-pane="terms" aria-labelledby="tab-terms">
@@ -650,7 +654,10 @@ const nm = s => (s === mySeat ? me?.name : players[s]?.name) || lastNames[s] || 
 
 /* ---------- Lobby ---------- */
 $("#nameIn").value = store.get("kt-name", "");
-$("#phoneIn").checked = store.get("kt-phone", "") === "1";
+// The Camera list's last choice is "My phone": the phone joins as the camera after you sit down (see openPhoneDialog)
+let noWebcam = false;
+const phoneChosen = () => $("#camSel").value === "phone";
+function showPhoneNote(){ $("#phoneNote").classList.toggle("hidden", !phoneChosen() || noWebcam); }
 for (const sel of [$("#modeSel"), $("#tblMode")]) for (const [k, m] of Object.entries(MODES)) {
   const o = document.createElement("option"); o.value = k; o.textContent = sel.id === "modeSel" ? m.label : `${m.short}, ${m.life} life`; sel.appendChild(o);
 }
@@ -675,12 +682,12 @@ async function startCameraNow(deviceId, micId){
   const audio = { echoCancellation:true, noiseSuppression:true, ...(micId ? { deviceId:{ exact:micId } } : {}) };
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ video, audio });
-    $("#noCam").classList.add("hidden");
+    $("#noCam").classList.add("hidden"); noWebcam = false;
   } catch (e) {
     if ((deviceId || micId) && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) return startCameraNow();
     if (e.name === "NotAllowedError") throw e;
     localStream = await navigator.mediaDevices.getUserMedia({ audio });
-    $("#noCam").classList.remove("hidden"); $("#phoneIn").checked = true;  // no webcam: the phone is the camera
+    $("#noCam").classList.remove("hidden"); noWebcam = true;  // no webcam: the phone is the camera
   }
   $("#lobbyPreview").srcObject = localStream;
 }
@@ -688,17 +695,23 @@ async function listDevices(){
   const devs = await navigator.mediaDevices.enumerateDevices();
   const fill = (sel, kind, current, empty, label) => {
     const list = devs.filter(d => d.kind === kind);
-    sel.innerHTML = ""; sel.disabled = !list.length;
-    if (!list.length) { const o = document.createElement("option"); o.textContent = empty; sel.appendChild(o); return; }
+    sel.innerHTML = ""; sel.disabled = !list.length && kind !== "videoinput";
+    if (!list.length && kind !== "videoinput") { const o = document.createElement("option"); o.textContent = empty; sel.appendChild(o); return; }
     list.forEach((d, i) => {
       const o = document.createElement("option");
       o.value = d.deviceId; o.textContent = d.label || `${label} ${i + 1}`;
       if (d.deviceId === current) o.selected = true;
       sel.appendChild(o);
     });
+    if (kind === "videoinput") {
+      const o = document.createElement("option"); o.value = "phone"; o.textContent = "My phone (scan a code after you sit down)";
+      if (noWebcam || !list.length || store.get("kt-phone", "") === "1") o.selected = true;
+      sel.appendChild(o);
+    }
   };
   fill($("#camSel"), "videoinput", localStream?.getVideoTracks()[0]?.getSettings().deviceId, "No webcam found", "Camera");
   fill($("#micSel"), "audioinput", localStream?.getAudioTracks()[0]?.getSettings().deviceId, "No microphone found", "Microphone");
+  showPhoneNote();
 }
 (async () => {
   try { await startCamera(store.get("kt-cam", "") || undefined, store.get("kt-mic", "") || undefined); }
@@ -706,7 +719,8 @@ async function listDevices(){
   listDevices();
 })();
 async function switchDevices(){
-  store.set("kt-cam", $("#camSel").disabled ? "" : $("#camSel").value);
+  store.set("kt-phone", phoneChosen() ? "1" : "");
+  if (!phoneChosen()) store.set("kt-cam", $("#camSel").value);  // (with the phone chosen, the webcam stays as it was)
   store.set("kt-mic", $("#micSel").disabled ? "" : $("#micSel").value);
   try { await startCamera(store.get("kt-cam", "") || undefined, store.get("kt-mic", "") || undefined); listDevices(); }
   catch { $("#lobbyErr").textContent = "That device is blocked or in use by another app."; }
@@ -725,7 +739,7 @@ $("#joinBtn").onclick = async () => {
   }
   if (!localStream) { err.textContent = "No microphone or camera yet. Allow access and reload."; return; }
   const name = $("#nameIn").value.trim() || "Player";
-  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-phone", $("#phoneIn").checked ? "1" : "");
+  store.set("kt-name", name); store.set("kt-mode", $("#modeSel").value); store.set("kt-phone", phoneChosen() ? "1" : "");
   store.set("kt-turn-url", $("#turnUrl").value.trim()); store.set("kt-turn-user", $("#turnUser").value.trim()); store.set("kt-turn-cred", $("#turnCred").value);
   roomCode = $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || randomCode();
   $("#joinBtn").disabled = true; $("#joinBtn").textContent = "Finding a seat...";
@@ -1201,7 +1215,7 @@ function enterTable(){
   try { tileOrder = JSON.parse(store.get("kt-order:" + roomCode, "[]")).map(Number).filter(n => n >= 1 && n <= MAX); } catch { tileOrder = []; }
   wirePeer(); render(); renderDmg();
   // (with the phone as the camera, its code comes first; the commander question follows)
-  setTimeout(() => { if ($("#phoneIn").checked && !LOCAL) openPhoneDialog({ then:() => askCommander() }); else askCommander(); }, 500);
+  setTimeout(() => { if ((phoneChosen() || noWebcam) && !LOCAL) openPhoneDialog({ then:() => askCommander() }); else askCommander(); }, 500);
   setTimeout(artSync, 1500);
   setTimeout(loadCardIndex, 2500);
   // Start downloading the AI card matcher (and the index, which it loads first) now, so the first click is quick
@@ -1348,7 +1362,7 @@ function applyNewGame(by, id){
   table.gameId = id || uid(); restored = true;  // a fresh game: nothing to bring back
   me.startLife = modeOf(table.mode).life;
   Object.assign(me, { life:me.startLife, poison:0, exp:0, energy:0, blessing:false, emblems:[], custom:[], cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 } });
-  lastLife = me.life; pending = null; shown.clear();
+  lastLife = me.life; pending = null; lifeAsks = []; shown.clear();
   Object.assign(table, { turnSeat:0, monarch:0, initiative:0, dayNight:"", turns:{} });
   turnStartAt = null; gameStartAt = null; damageLog = [];
   pushState(); render(); renderDmg();
@@ -1466,7 +1480,7 @@ function render(bumpMine){
     el.querySelector(".life").classList.toggle("low", p.life <= 5);
     renderCounters(el, s);
   });
-  renderAsk(); renderTablePanel(); renderCapPeers(); updateClocks();
+  renderAsk(); renderLifeAsk(); renderTablePanel(); renderCapPeers(); updateClocks();
   const dc = $("#dayChip");
   dc.classList.toggle("hidden", !table.dayNight); dc.classList.toggle("night", table.dayNight === "night");
   dc.textContent = table.dayNight === "night" ? "Night" : "Day";
@@ -1699,6 +1713,36 @@ function changeLife(delta, opts = {}){
     else if (delta > 0 && pending) { pending.amount -= delta; if (pending.amount <= 0) pending = null; }
   }
   pushState(); render(true);
+}
+/* Life changes heard by voice wait on the speaker's camera for Accept or Cancel, so a misheard number never
+   changes anyone's life total by itself */
+let lifeAsks = [], lifeAskId = 0;
+function askLife(text, to, apply){
+  lifeAsks.push({ id:++lifeAskId, text, to, apply });
+  if (lifeAsks.length > 3) lifeAsks.shift();
+  renderLifeAsk();
+}
+function answerLife(id, ok){
+  const a = lifeAsks.find(x => x.id === id); if (!a) return;
+  lifeAsks = lifeAsks.filter(x => x !== a);
+  if (ok) a.apply(); else toast(`Cancelled: ${a.text}`);
+  renderLifeAsk();
+}
+function renderLifeAsk(){
+  const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
+  let box = el.querySelector(".lifeask");
+  if (!lifeAsks.length) { box?.remove(); return; }
+  const sig = JSON.stringify([me.life, lifeAsks.map(a => a.id)]);
+  if (box && box.dataset.sig === sig) return;
+  if (!box) { box = document.createElement("div"); box.className = "lifeask"; box.addEventListener("pointerdown", e => e.stopPropagation()); el.appendChild(box); }
+  box.dataset.sig = sig; box.innerHTML = "";
+  for (const a of lifeAsks) {
+    const row = document.createElement("div"); row.className = "row";
+    const t = document.createElement("span"); t.textContent = `Heard: ${a.text} (life ${me.life} → ${a.to(me.life)})`; row.appendChild(t);
+    const yes = document.createElement("button"); yes.className = "btn primary"; yes.textContent = "Accept"; yes.onclick = () => answerLife(a.id, true);
+    const no = document.createElement("button"); no.className = "btn"; no.textContent = "Cancel"; no.onclick = () => answerLife(a.id, false);
+    row.append(yes, no); box.appendChild(row);
+  }
 }
 function renderAsk(){
   const el = $(`#grid .tile[data-seat="${mySeat}"]`); if (!el) return;
@@ -4446,6 +4490,13 @@ function nextPlayed(seat){
   row.appendChild(b); el.appendChild(row);
   setTimeout(() => { row.classList.add("out"); setTimeout(() => nextPlayed(seat), 400); }, waiting ? 6000 : 10000);
 }
+/* "I pass my turn", "pass the turn", "I pass", "I'm passing", "end my turn", "that's my turn", "I'm done": the turn
+   player's turn passes. Not passing priority or passing on something, and not "if I pass" or "at end of turn". */
+function saysPassTurn(t){
+  if (/\bpriority\b|\b(if|when|before|after|until|once|should|could|can|might|would|do|don't|did|didn't) (i|we) (pass|end)\b|\bdon'?t pass\b|\bpass(ing)? (on|it|that|this|me|you|him|her|them|the (ball|card|salt|dice|die))\b/.test(t)) return false;
+  return /\b(pass(ing|ed)? (the |my )?turn|end(ing)? (the |my )?turn|end turn|go(ing)? to (the )?next turn|(that'?s|that is) (it for )?my turn|(i'?m|i am) (done|finished) with my turn|done with my turn)\b/.test(t)
+    || /(^|\b(ok|okay|alright|all right|so|and|um|uh|yeah|then) )(i pass|i'll pass|i will pass|i'm passing|i am passing|passing|pass|i'?m done|i am done|i'?m finished|i am finished)( now| then| it)?$/.test(t);
+}
 function runVoice(raw){
   if (!$("#voiceIn").checked) return;
   if (me.lisp) raw = delisp(raw);
@@ -4462,8 +4513,11 @@ function runVoice(raw){
   if ((m = t.match(/\broll (?:a |an |the )?d ?(4|6|8|10|12|20|four|six|eight|ten|twelve|twenty)\b/))) {
     const n = /\d/.test(m[1]) ? +m[1] : NUMW[m[1]]; rollDice("d" + n); toast(`Heard: roll a d${n}`); return;
   }
-  if (/\b(pass(ing)? (the |my )?turn|end (of )?my turn|i pass|go to (the )?next turn)\b/.test(t)) {
-    if (table.turnSeat === mySeat || !table.turnSeat) { passTurn(); toast("Heard: pass turn"); }
+  if (saysPassTurn(t)) {
+    if (table.turnSeat === mySeat || !table.turnSeat) {
+      const prev = { turnSeat:table.turnSeat, turns:{ ...table.turns } }, prevStart = turnStartAt;
+      passTurn(); toast(`Heard: pass turn to ${nm(table.turnSeat)}`, () => { turnStartAt = prevStart; changeTable(prev); });
+    }
     return;
   }
   if (/\bmonarch\b/.test(t) && /\b(i|i'm|im|me)\b/.test(t) && /\b(become|became|am|i'm|im|take|took|get|got)\b/.test(t) && !/\b(not|lose|lost)\b/.test(t)) {
@@ -4492,12 +4546,14 @@ function runVoice(raw){
   }
   if ((m = t.match(/\b(?:set my life to|my life is|i'?m at|i am at|i'?m now at|i am now at)\s+(.+)/))) {
     const n = numIn(m[1]); if (n == null || n > 999) return;
-    const prev = me.life; me.life = n; pushState(); render(true);
-    toast(`Heard: life set to ${n}`, () => { me.life = prev; pushState(); render(true); }); return;
+    askLife(`set life to ${n}`, () => n, () => {
+      const prev = me.life; me.life = n; pushState(); render(true);
+      toast(`Life set to ${n}`, () => { me.life = prev; pushState(); render(true); });
+    }); return;
   }
   if ((m = t.match(/\b(?:gain|gained|gaining)\s+(.+?)\s*life\b/))) {
     const n = numIn(m[1]); if (!n || n > 200) return;
-    changeLife(n, { noAsk:true }); toast(`Heard: gain ${n} life`, () => changeLife(-n, { noAsk:true })); return;
+    askLife(`gain ${n} life`, l => l + n, () => { changeLife(n, { noAsk:true }); toast(`Gained ${n} life`, () => changeLife(-n, { noAsk:true })); }); return;
   }
   if ((m = t.match(/\b(?:i|i'll|i will|i'm|im|i am)\s+(?:going to\s+)?(?:take|taking|took|lose|losing|lost)\s+(.+)/)) ||
       (m = t.match(/\b(?:take|taking|took|lose|losing)\s+(.+?\s+(?:damage|life)\b.*)/))) {
@@ -4505,13 +4561,18 @@ function runVoice(raw){
     const n = numIn(rest.split(/\bfrom\b/)[0]); if (!n || n > 200) return;
     const src = matchSource(rest), cmd = /\bcommander\b/.test(rest);
     if (src !== null) {
-      me.life -= n;
-      const e = recordDamage({ source:src, amount:n, cmd:cmd && src !== mySeat });
-      pushState(); render(true);
-      toast(`Heard: took ${n}${e.cmd ? " commander damage" : ""} from ${src === mySeat ? "yourself" : nm(src)}`, () => undoDamage(e.id));
+      const isCmd = cmd && src !== mySeat, who = src === mySeat ? "yourself" : nm(src);
+      askLife(`take ${n}${isCmd ? " commander damage" : ""} from ${who}`, l => l - n, () => {
+        me.life -= n;
+        const e = recordDamage({ source:src, amount:n, cmd:isCmd });
+        pushState(); render(true);
+        toast(`Took ${n}${e.cmd ? " commander damage" : ""} from ${who}`, () => undoDamage(e.id));
+      });
     } else {
-      changeLife(-n);
-      toast(`Heard: lost ${n} life. Pick who it was from on your screen.`, () => changeLife(n));
+      askLife(`lose ${n} life`, l => l - n, () => {
+        changeLife(-n);
+        toast(`Lost ${n} life. Pick who it was from on your screen.`, () => changeLife(n));
+      });
     }
   }
 }

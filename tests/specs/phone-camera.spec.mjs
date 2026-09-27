@@ -14,8 +14,11 @@ test("phone camera: a start-up option, and a viewer who loses its video gets it 
   test.setTimeout(180000);
   const b1 = await launchBrowser(), b2 = await launchBrowser(), b3 = await launchBrowser();
   const a = await newPlayer(b1), b = await newPlayer(b2), phone = await newPlayer(b3);
-  // Luke sits down with "Use my phone as the camera": the phone's code comes up
-  await a.goto(`${BASE}/index.html`); await a.fill("#nameIn", "Luke"); await a.check("#phoneIn"); await a.click("#joinBtn");
+  // Luke picks "My phone" in the lobby's Camera list: after sitting down, the phone's code comes up
+  await a.goto(`${BASE}/index.html`); await a.fill("#nameIn", "Luke");
+  await expect(a.locator("#camSel option[value=phone]")).toHaveCount(1);
+  await a.selectOption("#camSel", "phone"); await expect(a.locator("#phoneNote")).toBeVisible();
+  await a.click("#joinBtn");
   await expect(a.locator(".modal-card h2")).toHaveText("Use your phone as your camera", { timeout:15000 });
   const url = await a.textContent(".camurl"), room = new URL(a.url()).searchParams.get("room");
   await settle(a);
