@@ -270,8 +270,13 @@ button.mpip{cursor:pointer}
 #acBox button{display:block;width:100%;text-align:left;background:none;border:0;padding:7px 9px;border-radius:6px}
 #acBox button:hover,#acBox button.on{background:rgba(255,255,255,.08)}
 /* keyword highlights in captions */
-.kwlink{background:rgba(143,111,201,.22);border:0;border-bottom:1px dotted #b9a2e6;padding:0 3px;border-radius:3px;color:#d9ccf5;font:inherit}
 .fuzzy{font-style:italic}
+/* Terms library */
+#termSearch{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);margin-bottom:6px}
+#termList details{border-bottom:1px solid var(--felt-edge);padding:7px 0}
+#termList summary{cursor:pointer;font-weight:600}
+#termList p{margin:6px 0 4px;font-size:14px}
+#termList a{color:var(--brass);font-size:13px}
 #captions .gap{color:var(--muted)}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--felt-deep);border:1px solid var(--brass);border-radius:10px;padding:10px 14px;z-index:60;display:flex;gap:12px;align-items:center;max-width:92vw}
 
@@ -386,6 +391,7 @@ button.mpip{cursor:pointer}
       <button role="tab" id="tab-log" data-tab="log" aria-selected="false">Log<span class="badge hidden"></span></button>
       <button role="tab" id="tab-captions" data-tab="captions" aria-selected="false">Captions<span class="badge hidden"></span></button>
       <button role="tab" id="tab-table" data-tab="table" aria-selected="false">Table<span class="badge hidden"></span></button>
+      <button role="tab" id="tab-terms" data-tab="terms" aria-selected="false">Terms<span class="badge hidden"></span></button>
     </nav>
     <div class="pane" role="tabpanel" data-pane="card" aria-labelledby="tab-card">
       <section id="cardSec">
@@ -439,11 +445,19 @@ button.mpip{cursor:pointer}
             <option value="device">Chrome on-device (private, audio stays on this computer)</option>
           </select></label>
         <label class="opts-line"><input type="checkbox" id="lispIn"> I have a lisp (match my card names and voice commands with that in mind)</label>
-        <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Game talk only: show captions with card names, Magic terms, or phrases like "I cast" (and trim the rest)</label>
+        <label class="opts-line"><input type="checkbox" id="gameOnly" checked> Only caption what players do ("I take 3", "I gain 2", "I heal", "I pay 2 life", "I play...", "I cast...")</label>
         <label class="opts-line"><input type="checkbox" id="playIn" checked> Pop up cards players say they play ("I play Sol Ring", "I'm casting Counterspell"); lands aren't shown</label>
         <label class="opts-line"><input type="checkbox" id="voiceIn" checked> Voice commands (say "I take 3 from Rick", "gain 5 life", "pass turn", "what does Sol Ring do")</label>
       </section>
       </div>
+    <div class="pane hidden" role="tabpanel" data-pane="terms" aria-labelledby="tab-terms">
+      <section>
+        <h2>Magic terms</h2>
+        <input id="termSearch" type="search" placeholder="Search terms, like trample or ward" aria-label="Search Magic terms" autocomplete="off">
+        <p class="hint" id="termCount"></p>
+        <div id="termList"></div>
+      </section>
+    </div>
     <div class="pane hidden" role="tabpanel" data-pane="table" aria-labelledby="tab-table">
       <section>
         <h2>Table</h2>
@@ -3268,7 +3282,7 @@ function showPanel(on){
   if (on) { const g = $(`#tab-${tabNow} .badge`); if (g) { g.textContent = ""; g.classList.add("hidden"); } }
 }
 $("#panelBtn").onclick = () => showPanel($("#table").classList.contains("nopanel"));
-showTab(["card", "log", "captions", "table"].includes(store.get("kt-tab", "")) ? store.get("kt-tab", "") : "card");
+showTab(["card", "log", "captions", "table", "terms"].includes(store.get("kt-tab", "")) ? store.get("kt-tab", "") : "card");
 showPanel(store.get("kt-panel", "1") !== "0");
 // Scroll the side panel (or the page, on narrow screens) up to the Card section and flash it
 function focusCardView(){
@@ -3552,6 +3566,7 @@ function kwForms(base, flag){
 const KW = new Map(); let kwMax = 1;
 KEYWORDS.forEach(([name, def, flag]) => kwForms(norm(name), flag).forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } }));
 ["equipped", "equipping"].forEach(f => KW.set(f, KW.get("equip")));
+renderTerms();
 /* Every other keyword Magic has, from Scryfall's lists, so new sets are covered too. They link to MTG Wiki for the rules.
    Single common English words are left out ("fear", "gift", "plot"), or everyday talk would light up. */
 const KW_COMMON = new Set(("fear shadow gift craft backup station sneak companion bargain discover plot suspect manifest adapt bolster support " +
@@ -3575,7 +3590,26 @@ async function loadKeywordCatalogs(){
     kwForms(k, j === 1 ? "v" : "").forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } });
   }));
   lispKW = null;  // rebuilt with these next time it's needed
+  renderTerms();
 }
+/* Terms tab: every Magic term with what it means, searchable */
+function renderTerms(){
+  const list = $("#termList"); if (!list) return;
+  const q = norm($("#termSearch").value || ""), byName = new Map();
+  for (const k of KW.values()) if (k && !byName.has(k.name)) byName.set(k.name, k);
+  const all = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const shown = q ? all.filter(k => norm(k.name).includes(q) || norm(k.def).includes(q)) : all;
+  $("#termCount").textContent = q ? `${shown.length} of ${all.length} terms` : `${all.length} terms. Search, or open one to read what it means.`;
+  list.innerHTML = "";
+  for (const k of shown.slice(0, 400)) {
+    const d = document.createElement("details"), sm = document.createElement("summary"); sm.textContent = k.name; d.appendChild(sm);
+    const p = document.createElement("p"); p.textContent = k.def; d.appendChild(p);
+    const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
+    d.appendChild(a); list.appendChild(d);
+    if (shown.length === 1) d.open = true;
+  }
+}
+$("#termSearch").addEventListener("input", renderTerms);
 function showKeyword(k){
   const view = $("#cardView"); view.innerHTML = ""; focusCardView();
   const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
@@ -3722,19 +3756,22 @@ function linkify(text, lisp){
   }
   return out;
 }
-/* Game talk only: captions show what's about the game (a card name, a Magic term, or a game phrase like "I cast"),
-   trimmed to the part around it, and drop the rest of the table talk. After a game phrase, the words that follow get
-   a closer look for a card name (Scryfall's own guess too), so a name the speech recognizer mangles still links. */
-const GAME_PHRASE = /\b(i(?:'m| am| will|'ll)?\s+(?:going to |gonna )?(?:play|playing|cast|casting|activate|activating|sacrifice|sacrificing|exile|exiling|destroy|destroying|counter|countering|tutor|tutoring|equip|equipping|attack|attacking|block|blocking|target|targeting|flash|flashing|return|returning|search|searching)|target(?:ing)?|in response|on the stack|what does|what do|look up|show me|attack(?:ing)? with|block(?:ing)? with|equip(?:ped)? to|enters the battlefield|trigger(?:s|ed)?|resolve[sd]?)\b/;
-const TAIL_PHRASE = /\b(?:play|playing|cast|casting|target|targeting|exile|exiling|destroy|destroying|counter|countering|sacrifice|sacrificing|tutor for|search for|return|returning|equip|equipping|attack with|block with|what does|look up|show me)\s+(?:a |an |my |your |his |her |their |the )?(.+)$/;
+/* Captions switch on for what players do, not all table talk: "I take 3", "I gain 2", "I heal", "I pay 2 life",
+   "I play Sol Ring", "I cast Counterspell". A shown line starts at that phrase. Card names in it are underlined (click
+   to read the card); after "I play" or "I cast", the words that follow get a closer look for a card name
+   (Scryfall's spelling-tolerant search too), so a name the speech recognizer mangles still links. */
+const ACTION_PHRASE = /\bi(?:'m| am|'ll| will)?\s+(?:going to |gonna )?(?:take|taking|took|lose|losing|lost|gain|gaining|gained|heal|healing|healed|pay|paying|paid|play|playing|played|cast|casting)\b/;
+const TAIL_PHRASE = /\b(?:play|playing|played|cast|casting)\s+(?:a |an |my )?(.+)$/;
 async function addCaption(seat, text, heardHere){
   if (seat !== mySeat && !heardHere) lastCapFrom[seat] = Date.now();
   try { await loadIndex(); } catch {}
-  let segs = linkify(text, lispFor(seat));
   const gameOnly = $("#gameOnly").checked, low = text.toLowerCase().replace(/[.,!?;:]/g, " ").replace(/\s+/g, " ");
-  const phrase = GAME_PHRASE.test(low), found = segs.some(x => x.card || x.kw);
-  if (gameOnly && !phrase && !found) return;  // not about the game
-  if (gameOnly) segs = trimAround(segs);
+  const phrase = ACTION_PHRASE.exec(low);
+  if (gameOnly && !phrase) return;  // not something a player did
+  // Only cards are linked in captions (Magic terms are in the Terms tab); a shown line starts at its phrase
+  let segs = linkify(text, lispFor(seat)).map(x => x.kw ? { t:x.t } : x);
+  if (gameOnly) segs = fromPhrase(segs, phrase.index);
+  const found = segs.some(x => x.card);
   const ul = $("#captions");
   const nearBottom = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 40;
   const li = document.createElement("li");
@@ -3746,11 +3783,7 @@ async function addCaption(seat, text, heardHere){
   segs.forEach((seg, idx) => {
     if (idx) li.append(" ");
     if (seg.gap) { const g = document.createElement("span"); g.className = "gap"; g.textContent = "…"; li.appendChild(g); }
-    else if (seg.kw) {
-      const b = document.createElement("button"); b.className = "kwlink"; b.textContent = seg.t; b.title = `${seg.kw.name}: ${seg.kw.def}`;
-      b.onclick = () => showKeyword(seg.kw);
-      li.appendChild(b);
-    } else if (seg.card) {
+    else if (seg.card) {
       const b = document.createElement("button"); b.className = "cardlink" + (seg.fuzzy ? " fuzzy" : "");
       b.textContent = seg.fuzzy ? seg.card : seg.t; b.title = seg.fuzzy ? `Heard "${seg.t}"` : seg.card;
       b.onclick = async () => { setStatus("Looking it up..."); const c = await scry("/cards/named?exact=" + encodeURIComponent(seg.card)) || await findCard(seg.card); if (c) showCard(c); else setStatus(`No card matched "${seg.card}".`); };
@@ -3760,7 +3793,7 @@ async function addCaption(seat, text, heardHere){
   if (interimEl && interimEl.parentNode === ul) ul.insertBefore(li, interimEl); else ul.appendChild(li);
   if (seat !== mySeat) bumpTab("captions");
   // A game phrase with no card after it: ask Scryfall what card the words after it could be
-  const tail = phrase && TAIL_PHRASE.exec(low)?.[1];
+  const tail = phrase && TAIL_PHRASE.exec(low.slice(phrase.index))?.[1];
   if (tail && !found && !NOT_A_CARD.test(tail)) cardFromWords(tail, lispFor(seat)).then(card => {
     if (!card) return;
     const b = document.createElement("button"); b.className = "cardlink fuzzy"; b.textContent = card.name; b.title = `Heard "${tail}"`;
@@ -3770,19 +3803,17 @@ async function addCaption(seat, text, heardHere){
   while (ul.children.length > 120) ul.firstChild.remove();
   if (nearBottom) ul.scrollTop = ul.scrollHeight;
 }
-// Keep a few words either side of each card name, term, or game phrase; longer runs of other words become "…"
-function trimAround(segs, keep = 4){
-  const words = segs.map(x => x.card || x.kw ? null : x.t.split(/\s+/)), isHit = segs.map(x => !!(x.card || x.kw));
-  const text = segs.map(x => x.t).join(" ").toLowerCase();
-  if (!isHit.some(Boolean)) {  // only a game phrase: keep the words from it on
-    const m = GAME_PHRASE.exec(text.replace(/[.,!?;:]/g, " ")); if (!m) return segs;
-    let pos = 0; return segs.filter(x => { const at = pos; pos += x.t.length + 1; return at + x.t.length >= m.index; });
+// The part of a line from the action phrase on (at most about 20 words), dropping the chat before it
+function fromPhrase(segs, at){
+  let pos = 0, words = 0; const out = [];
+  for (const x of segs) {
+    const start = pos; pos += x.t.length + 1;
+    if (pos <= at) continue;
+    words += x.t.split(/\s+/).length;
+    if (words > 20 && !x.card) { out.push({ gap:true }); break; }
+    out.push(x);
   }
-  const near = segs.map((_, i) => segs.slice(Math.max(0, i - keep), i + keep + 1).some(x => x.card || x.kw));
-  const out = []; let gap = false;
-  segs.forEach((x, i) => { if (near[i]) { if (gap && out.length) out.push({ gap:true }); out.push(x); gap = false; } else gap = true; });
-  if (gap) out.push({ gap:true });
-  return out;
+  return out.length ? out : segs;
 }
 // The card some words name, if Scryfall's guess is close to what was said
 async function cardFromWords(words, lisp){

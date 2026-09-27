@@ -24,14 +24,22 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
 
   // Misheard names of cards nobody has in their deck still link, and every Magic keyword (from Scryfall's lists) does too,
   // but not everyday words that happen to be keywords
-  await say(a, "ristic study has offspring and trample so I cast it without fear");
+  // (captions start at the action phrase and link only cards; Magic terms live in the Terms tab)
+  await say(a, "ok so now I cast ristic study with offspring and trample");
   await expect(a.locator("#captions .cardlink.fuzzy", { hasText:"Rhystic Study" })).toHaveAttribute("title", 'Heard "ristic study"');
-  await expect(a.locator("#captions .kwlink", { hasText:"offspring" })).toHaveCount(1);
-  await expect(a.locator("#captions .kwlink", { hasText:"trample" })).toHaveCount(1);
-  await expect(a.locator("#captions .kwlink", { hasText:/^(cast|fear)$/ })).toHaveCount(0);
-  // Game talk only: small talk isn't captioned, unless that's turned off
+  await expect(a.locator("#captions li", { hasText:"Rhystic Study" })).not.toContainText("ok so now");
+  await expect(a.locator("#captions .kwlink")).toHaveCount(0);
+  await a.click("#tab-terms"); await a.fill("#termSearch", "offspring");
+  await expect(a.locator("#termList summary")).toHaveText(["Offspring"]);
+  await a.fill("#termSearch", "trample");
+  await expect(a.locator("#termList p").first()).toContainText("combat damage beyond");
+  // Only what players do is captioned (not small talk, not a card mentioned in passing), unless that's turned off
   await say(a, "we should order pizza after this");
+  await say(a, "remember when Sol Ring was banned");
   await expect(a.locator("#captions li", { hasText:"pizza" })).toHaveCount(0);
+  await expect(a.locator("#captions li", { hasText:"banned" })).toHaveCount(0);
+  await say(a, "I gain 2 life");
+  await expect(a.locator("#captions li", { hasText:"I gain 2 life" })).toHaveCount(1);
   await a.click("#tab-captions"); await a.uncheck("#gameOnly");
   await say(a, "we should order pizza after this");
   await expect(a.locator("#captions li", { hasText:"pizza" })).toHaveCount(1);
