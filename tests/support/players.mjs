@@ -21,7 +21,8 @@ export async function launchBrowser({ camera, mic } = {}){
   return chromium.launch({ args });
 }
 
-export async function newPlayer(browser, { lisp = false } = {}){
+// rejectPhrases: the speech stand-in takes a phrase list (like newer Chrome) but fails with an unexpected error when given one
+export async function newPlayer(browser, { lisp = false, rejectPhrases = false } = {}){
   const ctx = await browser.newContext({ permissions:["camera", "microphone", "clipboard-read", "clipboard-write"], viewport:{ width:1400, height:900 } });
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:"" }));
   await ctx.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/, r => {
@@ -46,20 +47,22 @@ export async function newPlayer(browser, { lisp = false } = {}){
   await ctx.route(/api2\.moxfield\.com/, r => json(r, { name:"Mox Test", boards:{ commanders:{ cards:{ a:{ quantity:1, card:{ name:"Gamma Card" } } } },
     mainboard:{ cards:{ b:{ quantity:1, card:{ name:"Sol Ring" } }, c:{ quantity:30, card:{ name:"Mountain" } } } } } }));
   await ctx.route(/archidekt\.com\/api/, r => r.abort("failed"));  // a site that blocks other pages from reading its decks
-  await ctx.addInitScript(([peerPort, lisp]) => {
+  await ctx.addInitScript(([peerPort, lisp, rejectPhrases]) => {
     // Point PeerJS at the local signaling server
     let P; Object.defineProperty(window, "Peer", { configurable:true, get(){ return P; },
       set(v){ P = class extends v { constructor(id, o = {}){ super(id, { ...o, host:"127.0.0.1", port:peerPort, path:"/", secure:false }); } }; } });
     // Speech recognition stand-in: whatever the test puts in window.__say is "heard" the next time captions start
     // and an error the test puts in window.__speechError is reported the next time it starts (like Brave's "network")
     class FakeSR { start(){
+      if (rejectPhrases && this.phrases?.length) { setTimeout(() => { this.onerror?.({ error:"bad-grammar" }); this.onend?.(); }, 100); return; }
       const t = window.__say, err = window.__speechError;
       if (err) { window.__speechError = null; setTimeout(() => this.onerror?.({ error:err }), 200); }
       if (t) { window.__say = null; setTimeout(() => this.onresult?.({ resultIndex:0, results:[Object.assign([{ transcript:t }], { isFinal:true })] }), 400); }
     } stop(){} }
+    if (rejectPhrases) { FakeSR.prototype.phrases = null; window.SpeechRecognitionPhrase = class { constructor(phrase, boost){ this.phrase = phrase; this.boost = boost; } }; }
     window.SpeechRecognition = FakeSR;
     if (lisp) try { localStorage.setItem("kt-lisp-me", "1"); } catch {}
-  }, [PEER_PORT, lisp]);
+  }, [PEER_PORT, lisp, rejectPhrases]);
   const page = await ctx.newPage();
   page.errors = [];
   page.on("pageerror", e => page.errors.push(e.message));

@@ -3879,6 +3879,9 @@ function startBrowserRec(){
                      ...terms.map(t => new SpeechRecognitionPhrase(t, 2))];
     } catch { noPhrases = true; }
   }
+  // A speech service that won't take the phrase list doesn't always say so by name: if it fails with one, captions
+  // carry on without it rather than giving up
+  const withPhrases = !noPhrases && !!rec.phrases?.length;
   rec.onresult = e => {
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -3889,6 +3892,7 @@ function startBrowserRec(){
     showInterim(interim.trim());
   };
   rec.onerror = e => {
+    if (withPhrases && !["no-speech", "aborted", "network", "not-allowed"].includes(e.error)) { noPhrases = true; console.info("Speech: retrying without the phrase list after", e.error); }
     if (CAP_ERRORS[e.error]) setCapErr(e.error);
     // Some browsers can't take the lobby's microphone directly; use the default microphone from then on
     if (e.error === "audio-capture" && trackInput) { trackInput = false; return; }
@@ -3904,7 +3908,9 @@ function startBrowserRec(){
   const began = Date.now();
   rec.onend = () => {
     rec = null; showInterim("");
-    quickEnds = Date.now() - began < 3000 ? quickEnds + 1 : 0;
+    const quick = Date.now() - began < 3000;
+    if (quick && withPhrases && !noPhrases) { noPhrases = true; if (capOn && micLive()) setTimeout(startBrowserRec, 300); return; }  // try once without the phrase list
+    quickEnds = quick ? quickEnds + 1 : 0;
     if (quickEnds >= 3) {  // ended right away 3 times: blocked or not working, so stop instead of re-asking forever
       capOn = false; quickEnds = 0; updateCapBtn();
       setCapHint("Captions stopped because the microphone kept getting blocked. Click Captions to try again.");
