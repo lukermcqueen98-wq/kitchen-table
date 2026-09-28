@@ -46,8 +46,12 @@ button{cursor:pointer}
 .deckbar select,.deckbar input{flex:1;min-width:130px;padding:7px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
 #deckInfo{font-size:14px;margin:6px 0 10px;min-height:1.5em}
 #deckInfo .bad{color:var(--danger)}
-#cmdrPick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-#cmdrPick label{display:flex;gap:6px;align-items:center;background:rgba(0,0,0,.25);border:1px solid var(--felt-edge);border-radius:8px;padding:4px 9px;font-size:13px;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px;min-height:30px}
+.chips span{display:flex;gap:6px;align-items:center;background:rgba(0,0,0,.3);border:1px solid var(--brass);border-radius:14px;padding:3px 6px 3px 11px;font-size:14px}
+.chips button{border:0;background:none;font-size:16px;line-height:1;padding:0 4px}
+.sugg{display:flex;gap:8px;flex-wrap:wrap}
+.sugg button{display:flex;flex-direction:column;gap:3px;align-items:center;width:112px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.2);border-radius:8px;padding:5px;font-size:12px}
+.sugg img{width:100%;border-radius:4.75%/3.5%}
 #lobbyErr{color:var(--danger);min-height:1.5em;margin-top:8px}
 .bigbtn{width:100%;padding:13px;font-size:17px;margin-top:4px}
 #resume{border:1px solid var(--brass);border-radius:10px;padding:10px 12px;margin-bottom:16px}
@@ -176,7 +180,6 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
         <label class="field"><span>Decklist (paste from Moxfield, Archidekt, MTG Arena or any "1 Sol Ring" list; mark your commander with a "Commander" heading or *CMDR*)</span><textarea id="deckIn" spellcheck="false" placeholder="Commander&#10;1 Atraxa, Praetors' Voice&#10;&#10;Deck&#10;1 Sol Ring&#10;1 Arcane Signet&#10;35 Forest"></textarea></label>
         <div class="deckbar"><input id="deckName" placeholder="Deck name" maxlength="40"><button class="btn small" id="saveDeck">Save deck</button><button class="btn small" id="loadDeck">Check deck</button></div>
         <div id="deckInfo" aria-live="polite"></div>
-        <div id="cmdrPick"></div>
       </div>
     </div>
     <button class="btn primary bigbtn" id="joinBtn">Sit down</button>
@@ -374,7 +377,7 @@ $("#delDeck").onclick = () => {
   const n = $("#savedSel").value; if (!n || !confirm(`Delete the saved deck "${n}"?`)) return;
   delete decks[n]; store.set("kt-dig-decks", JSON.stringify(decks)); fillSaved();
 };
-$("#deckIn").addEventListener("input", () => { loaded = null; $("#deckInfo").textContent = ""; $("#cmdrPick").innerHTML = ""; });
+$("#deckIn").addEventListener("input", () => { loaded = null; $("#deckInfo").textContent = ""; });
 $("#fmtSel").onchange = () => { if (loaded) showDeck(); };
 navigator.mediaDevices?.enumerateDevices?.().then(ds => ds.filter(d => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default")
   .forEach((d, i) => $("#micSel").append(el("option", { value:d.deviceId, textContent:d.label || `Microphone ${i + 1}` })))).catch(() => {});
@@ -392,27 +395,10 @@ async function checkDeck(){
   return loaded;
 }
 function showDeck(){
-  const f = FORMATS[$("#fmtSel").value], info = $("#deckInfo"), pick = $("#cmdrPick");
-  info.innerHTML = ""; pick.innerHTML = "";
-  const n = loaded.main.length + loaded.cmdrs.length;
-  info.append(`${n} cards found.`);
+  const info = $("#deckInfo"); info.innerHTML = "";
+  info.append(`${loaded.main.length + loaded.cmdrs.length} cards found.`);
+  if (loaded.cmdrs.length) info.append(` Commander: ${loaded.cmdrs.map(id => cards.get(id)?.name).join(" and ")}.`);
   if (loaded.missing.length) info.append(" ", el("span", { className:"bad", textContent:`Not found (left out): ${loaded.missing.slice(0, 8).join(", ")}${loaded.missing.length > 8 ? "..." : ""}` }));
-  if (!f.cmdr) return;
-  // Commander: the ones the list marked, or pick from its legendary cards
-  const ids = [...new Set([...loaded.cmdrs, ...loaded.main])].filter(id => loaded.cmdrs.includes(id) || /Legendary/.test(typeOf(cards.get(id))) || /can be your commander/i.test(cards.get(id)?.oracle_text || ""));
-  if (!ids.length) { info.append(" ", el("span", { className:"bad", textContent:"No legendary card to be the commander." })); return; }
-  pick.append(el("span", { className:"hint", textContent:"Commander:" }));
-  for (const id of ids) {
-    const cb = el("input", { type:"checkbox", value:id, checked:loaded.cmdrs.includes(id) });
-    cb.onchange = () => {
-      const on = [...pick.querySelectorAll("input:checked")].map(x => x.value);
-      if (on.length > 2) { cb.checked = false; return; }
-      for (const x of loaded.cmdrs.filter(x => !on.includes(x))) loaded.main.push(x);  // no longer the commander: back in the deck
-      loaded.main = loaded.main.filter((x, i, a) => !on.includes(x) || a.indexOf(x) !== i);
-      loaded.cmdrs = on;
-    };
-    pick.append(el("label", {}, cb, cards.get(id).name));
-  }
 }
 $("#loadDeck").onclick = () => { loaded = null; checkDeck(); };
 
@@ -439,7 +425,7 @@ const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
 let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0 };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1" };
-let deckIds = [], cmdrIds = [];
+let deckIds = [], cmdrIds = [], cmdrFromDeck = [];  // (commanders taken out of the decklist go back if you pick another)
 
 function blankMe(name){
   return { name, life:FORMATS[table.fmt].life, poison:0, energy:0, exp:0, cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 },
@@ -469,7 +455,7 @@ function changed(){ render(); clearTimeout(pushTimer); pushTimer = setTimeout(pu
 function pushState(){ players[mySeat] = { ...pub(), seat:mySeat }; broadcast({ type:"state", state:pub() }); }
 function save(){
   if (!roomCode || !me) return;
-  store.set(saveKey(roomCode), JSON.stringify({ at:Date.now(), seat:mySeat, me, deckIds, cmdrIds, table,
+  store.set(saveKey(roomCode), JSON.stringify({ at:Date.now(), seat:mySeat, me, deckIds, cmdrIds, cmdrFromDeck, table,
     cardData:[...new Set(Object.values(me.zones).flat().map(c => c.id))].map(id => cards.get(id)).filter(Boolean) }));
 }
 
@@ -500,9 +486,9 @@ async function sitDown(resume){
     btn.textContent = "Looking up your cards...";
     const d = await checkDeck();
     if (!d || !d.main.length) { err.textContent = "Load a decklist with at least one card Scryfall knows."; btn.disabled = false; btn.textContent = "Sit down"; return; }
-    deckIds = d.main.slice(); cmdrIds = d.cmdrs.slice();
+    deckIds = d.main.slice(); cmdrIds = d.cmdrs.slice(); cmdrFromDeck = d.cmdrs.slice();
   } else {
-    deckIds = resume.deckIds; cmdrIds = resume.cmdrIds;
+    deckIds = resume.deckIds; cmdrIds = resume.cmdrIds; cmdrFromDeck = resume.cmdrFromDeck || [];
     for (const c of resume.cardData || []) keep(c);
   }
   roomCode = (resume ? params.get("room") : $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "")) || randomCode();
@@ -529,6 +515,7 @@ async function sitDown(resume){
   wirePeer();
   render();
   log(resume ? "You're back at the table." : `You sat down at table ${roomCode}. Share the invite link, then press Start game when everyone's here.`);
+  if (!resume && FORMATS[table.fmt].cmdr) askCommander();
   setInterval(tick, 1000);
 }
 function seatOf(id){ const m = /-(\d)$/.exec(id); return m ? +m[1] : 0; }
@@ -646,6 +633,7 @@ function changeTable(patch){
 }
 function afterTable(before){
   if (before.turnNum !== table.turnNum && me?.arrows?.length) { me.arrows = []; changed(); }
+  if (!table.started && before.fmt !== table.fmt && me && FORMATS[table.fmt].cmdr && !FORMATS[before.fmt].cmdr && $("#modal").classList.contains("hidden")) setTimeout(askCommander, 300);
   if (!table.started && before.fmt !== table.fmt && me) { me.life = FORMATS[table.fmt].life; if (!FORMATS[table.fmt].cmdr) { me.zones.cz = []; } else if (!me.zones.cz.length) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })); changed(); }
   if (table.started && table.gameId && me.gameId !== table.gameId) dealNewGame();
   else if (table.turnSeat === mySeat && (before.turnSeat !== mySeat || before.turnNum !== table.turnNum) && table.turnNum > 0) startMyTurn();
@@ -679,7 +667,7 @@ function dealNewGame(){
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
   const isC = FORMATS[table.fmt].cmdr;
-  me.zones = { lib:shuffle([...deckIds, ...(isC ? [] : cmdrIds)].map(id => newCard(id))), hand:[], bf:[], gy:[], ex:[], cz:isC ? cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })) : [] };
+  me.zones = { lib:shuffle([...deckIds, ...(isC ? [] : cmdrFromDeck)].map(id => newCard(id))), hand:[], bf:[], gy:[], ex:[], cz:isC ? cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })) : [] };
   if (table.turnSeat === mySeat) me.turns = 1;  // (the first turn starts with the deal)
   draw(7, true);
   changed();
@@ -940,6 +928,7 @@ function renderMine(){
   };
   pile("#libPile", z.lib, "Library", true); pile("#gyPile", z.gy, "Graveyard", false); pile("#exPile", z.ex, "Exile", false);
   const cz = $("#czone"); cz.innerHTML = ""; z.cz.forEach(c => cz.append(cardEl(c, { mine:true, zone:"cz" })));
+  if (!z.cz.length && FORMATS[table.fmt].cmdr && !table.started) { const b = el("button", { className:"btn small", textContent:"Choose commander" }); b.onclick = askCommander; cz.append(b); }
   cz.classList.toggle("hidden", !FORMATS[table.fmt].cmdr && !z.cz.length);
   $("#lifeOut").textContent = me.life;
   $("#handCount").textContent = `Hand ${z.hand.length}`;
@@ -1145,6 +1134,7 @@ function cardMenu(iid, x, y){
     items.push("-", { label:"Reveal this card", fn:() => reveal([c], "") }, { label:me.revealHand ? "Stop showing my hand" : "Show my whole hand to the table", fn:() => { me.revealHand = !me.revealHand; say(me.revealHand ? "revealed their hand." : "hid their hand again."); changed(); } });
   } else if (z === "cz") {
     items.push(to("Cast (to the battlefield)", "bf"), to("To hand", "hand"), { label:"Reset commander tax", fn:() => { c.tax = 0; changed(); } });
+    if (!table.started) items.push({ label:"Change commander...", fn:askCommander });
   } else {
     items.push(to("To hand", "hand"), to("To battlefield", "bf"), to("To graveyard", "gy"), to("To exile", "ex"), to("To top of library", "lib"));
   }
@@ -1214,6 +1204,64 @@ function cardGrid(list, acts){
     g.append(box);
   }
   return g;
+}
+/* "Who is your commander?": asked when you sit down at a Commander table (and from the command zone until the game
+   starts). Suggestions are the list's commander and its legendary cards; any card can be typed. A commander that's in
+   the decklist comes out of it (one copy), so it's never shuffled into the library. */
+function askCommander(){
+  let chosen = cmdrIds.map(id => cards.get(id)).filter(Boolean);
+  const pool = [...new Set([...cmdrFromDeck, ...deckIds])].map(id => cards.get(id)).filter(Boolean);
+  const legends = [...new Map(pool.filter(c => /Legendary/.test(typeOf(c)) && /Creature|Planeswalker/.test(typeOf(c)) || /can be your commander/i.test(c.oracle_text || "")).map(c => [c.name, c])).values()].slice(0, 14);
+  const chips = el("div", { className:"chips", ariaLabel:"Your commander" }), sugg = el("div", { className:"sugg" });
+  const input = el("input", { type:"text", placeholder:"Type a card name", autocomplete:"off", ariaLabel:"Commander name" }), list = el("datalist", { id:"cmdrNames" });
+  input.setAttribute("list", "cmdrNames");
+  const add = el("button", { className:"btn small", textContent:"Add" }), msg = el("div", { className:"hint", style:"min-height:1.4em" });
+  const drawChips = () => {
+    chips.innerHTML = "";
+    if (!chosen.length) chips.append(el("span", { className:"hint", style:"border:0;background:none", textContent:"No commander chosen yet." }));
+    for (const c of chosen) { const x = el("button", { textContent:"×", ariaLabel:`Remove ${c.name}` }); x.onclick = () => { chosen = chosen.filter(o => o !== c); drawChips(); }; chips.append(el("span", {}, c.name, x)); }
+  };
+  const pick = c => {
+    if (!c) return;
+    if (chosen.some(o => o.name === c.name)) return;
+    if (chosen.length >= 2) chosen.shift();  // (two for partners or a background)
+    chosen.push(keep(c)); drawChips(); msg.textContent = "";
+  };
+  for (const c of legends) { const b = el("button", { title:c.name }, el("img", { src:imgOf(c, 0, "small"), alt:"" }), c.name); b.onclick = () => pick(c); sugg.append(b); }
+  async function addTyped(){
+    const q = input.value.trim(); if (!q) return;
+    const inDeck = pool.find(c => norm(c.name) === norm(q) || norm(c.name.split(",")[0]) === norm(q));
+    const c = inDeck || await scry("/cards/named?exact=" + encodeURIComponent(q)) || await scry("/cards/named?fuzzy=" + encodeURIComponent(q));
+    if (!c?.id) { msg.textContent = `No card called "${q}".`; return; }
+    pick(c); input.value = "";
+  }
+  add.onclick = addTyped;
+  input.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); addTyped(); } };
+  let t = null;
+  input.oninput = () => { clearTimeout(t); t = setTimeout(async () => {
+    const q = input.value.trim(); if (q.length < 2) return;
+    const r = await scry("/cards/autocomplete?q=" + encodeURIComponent(q));
+    list.innerHTML = ""; for (const n of Array.isArray(r?.data) ? r.data.slice(0, 20) : []) list.append(el("option", { value:n }));
+  }, 250); };
+  drawChips();
+  openModal("Who is your commander?", el("div", {},
+    el("p", { className:"hint", textContent:"Pick one (or two, for partners). If it's in your decklist, it comes out of your library and starts in the command zone." }),
+    chips, legends.length ? el("div", { className:"hint", textContent:"From your deck:" }) : null, sugg,
+    el("div", { className:"row", style:"margin-top:12px" }, input, list, add), msg),
+    [{ label:"No commander", fn:() => setCommanders([]) }, { label:"Done", primary:true, fn:() => setCommanders(chosen) }], { closable:false });
+}
+function setCommanders(list){
+  // (put back any commander taken from the list before, then take the new ones out)
+  deckIds.push(...cmdrFromDeck); cmdrFromDeck = [];
+  cmdrIds = [];
+  for (const c of list) {
+    const i = deckIds.findIndex(id => cards.get(id)?.name === c.name);
+    if (i >= 0) { cmdrIds.push(deckIds[i]); cmdrFromDeck.push(deckIds[i]); deckIds.splice(i, 1); }
+    else cmdrIds.push(c.id);
+  }
+  if (!table.started || me.gameId !== table.gameId) me.zones.cz = FORMATS[table.fmt].cmdr ? cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })) : [];
+  if (list.length) say(`chose ${list.map(c => c.name).join(" and ")} as their commander.`);
+  changed();
 }
 function viewZone(title, list, zone){
   if (!list.length) { toast("Nothing there."); return; }
