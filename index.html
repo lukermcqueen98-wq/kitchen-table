@@ -4237,7 +4237,12 @@ async function cardsIn(words, lisp, seat = mySeat){
 }
 // acts: what the speaker's own browser worked out they did (so every screen shows the same cards); worked out here if missing
 async function addCaption(seat, text, heardHere, given = null){
-  if (seat !== mySeat && !heardHere) lastCapFrom[seat] = Date.now();
+  // (while switching over, a line can arrive both from their own captions and from their audio here: keep theirs)
+  if (heardHere && Date.now() - (lastCapFrom[seat] || 0) < 5000) return;
+  if (seat !== mySeat && !heardHere) {
+    lastCapFrom[seat] = Date.now();
+    document.querySelectorAll(`#captions li[data-audio="${seat}"]`).forEach(l => { if (Date.now() - +l.dataset.at < 15000) l.remove(); });
+  }
   try { await loadIndex(); } catch {}
   const gameOnly = $("#gameOnly").checked, lisp = lispFor(seat);
   // Only what players do: the line is just the phrases and what they name, not the words around them
@@ -4250,7 +4255,7 @@ async function addCaption(seat, text, heardHere, given = null){
   who.style.color = SEAT_HEX[seat - 1] || "inherit";
   who.textContent = (seat === mySeat ? "You" : nm(seat)) + ":";
   li.appendChild(who);
-  if (heardHere) li.title = "Captioned on this computer from their audio";
+  if (heardHere) { li.title = "Captioned on this computer from their audio"; li.dataset.audio = seat; li.dataset.at = Date.now(); }
   const cardButton = (name, title, open) => {
     const b = document.createElement("button"); b.className = "cardlink"; b.textContent = name; b.title = title; b.onclick = open; return b;
   };

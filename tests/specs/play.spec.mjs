@@ -42,9 +42,13 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await a.click("#loadDeck");
   await expect(a.locator("#deckInfo")).toContainText("43 cards found");
   await expect(a.locator("#deckInfo")).toContainText("Not found (left out): Nonexistent Card");
-  await expect(a.locator("#cmdrPick input:checked")).toHaveCount(1);
+  await expect(a.locator("#deckInfo")).toContainText("Commander: Gamma Card");
   await a.click("#joinBtn");
   await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  // Sitting down at a Commander table asks who your commander is (the list's commander is already picked)
+  await expect(a.locator(".modal-card h2")).toHaveText("Who is your commander?");
+  await expect(a.locator(".modal .chips")).toContainText("Gamma Card");
+  await a.locator(".modal").getByRole("button", { name:"Done", exact:true }).click();
   const room = new URL(a.url()).searchParams.get("room");
   await expect(a.locator("#czone .card")).toHaveCount(1);
   await settle(a);
@@ -54,6 +58,12 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await b.fill("#nameIn", "Rick"); await b.fill("#deckIn", DECK_B);
   await b.click("#joinBtn");
   await expect(b.locator("#table")).toBeVisible({ timeout:15000 });
+  // Rick's list has no commander: he types one that's in his deck, and it comes out of his library
+  await expect(b.locator(".modal-card h2")).toHaveText("Who is your commander?");
+  await b.fill(".modal input[type=text]", "Sol Ring"); await b.locator(".modal").getByRole("button", { name:"Add", exact:true }).click();
+  await expect(b.locator(".modal .chips")).toContainText("Sol Ring");
+  await b.locator(".modal").getByRole("button", { name:"Done", exact:true }).click();
+  await expect(b.locator("#czone .card")).toHaveCount(1);
   await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
   await expect(opp(b, "Luke")).toBeVisible();
   await expect(b.locator("#lifeOut")).toHaveText("40");
@@ -73,6 +83,8 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await expect(a.locator("#hand .card")).toHaveCount(6);
   expect(await ktp(a, () => ktPlay.me.zones.lib.length)).toBe(42 - 6);
   await expect(opp(b, "Luke")).toContainText("Hand 6");
+  // (Rick's 36 cards, less the Sol Ring in his command zone)
+  expect(await ktp(b, () => ktPlay.me.zones.lib.length + ktPlay.me.zones.hand.length)).toBe(35);
 
   // Playing a card (double-click) puts it on the battlefield for everyone; clicking it taps it
   await a.locator("#hand .card").first().dblclick();
