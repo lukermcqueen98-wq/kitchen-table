@@ -49,4 +49,8 @@ for (const [k, faces] of groups) {
 }
 fs.mkdirSync(path.dirname(path.resolve(out)), { recursive:true });
 fs.writeFileSync(out, JSON.stringify({ built:new Date().toISOString().slice(0, 10), names }));
-console.log(`${Object.keys(names).length} short names with a clear favorite. ${["atraxa", "sheoldred", "krenko", "korvold", "urza", "yuriko"].map(k => `${k}: ${names[k] || "-"}`).join("; ")}`);
+console.log(`${Object.keys(names).length} short names with a clear favorite.`);
+for (const k of ["atraxa", "sheoldred", "krenko", "korvold", "urza", "yuriko", "edgar", "teferi", "jace", "chandra"]) {
+  const top = [...(groups.get(k) || [])].sort((a, b) => a[1] - b[1]).slice(0, 3).map(([n, r]) => `${n} (#${r})`).join(", ");
+  console.log(`  ${k}: ${names[k] || "-"}   [${top}]`);
+}
