@@ -131,6 +131,8 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .chip{font-size:12px;border:1px solid var(--felt-edge);border-radius:12px;padding:1px 8px;color:var(--muted)}
 .badge{font-size:12px;border:1px solid var(--brass);color:var(--brass);border-radius:12px;padding:0 8px;white-space:nowrap}
 #myBadges{display:flex;gap:6px;flex-wrap:wrap}
+.badge.out{border-color:var(--danger);color:var(--danger)}
+.opp.is-out .obody,#me.is-out #bf{opacity:.45;filter:grayscale(.6)}
 #myBadges:empty{display:none}
 #dayChip{background:none;cursor:pointer}
 #dayChip.night{border-color:#8fa3d8;color:#b9c6ee}
@@ -350,6 +352,7 @@ details.term a{font-size:13px;color:var(--brass)}
       <button class="btn small" id="termsBtn" title="Magic terms and what they mean">Terms</button>
       <button class="btn small" id="statsBtn">Stats</button>
       <button class="btn small" id="helpBtn">Help</button>
+      <button class="btn small playonly" id="outBtn" title="Concede: you're out of this game (the others play on)">Concede</button>
       <button class="btn small" id="leaveBtn">Leave</button>
     </span>
   </header>
@@ -756,7 +759,7 @@ function pub(){
   const z = me.zones;
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
-           bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName };
+           bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -769,7 +772,45 @@ function changed(){
   if (lastSnap && now !== lastSnap && !noUndo) { undoStack.push(lastSnap); if (undoStack.length > 30) undoStack.shift(); }
   lastSnap = now;
   render(); clearTimeout(pushTimer); pushTimer = setTimeout(pushState, 60); save();
+  checkLoss();
 }
+/* Losing: at 0 life, at the poison limit, or at the commander damage limit from one commander (house rules can
+   change those numbers), you're asked whether you're out (a Platinum Angel says not yet). Concede is always there.
+   Players who are out are skipped in turn order and marked Out; the monarch and the initiative pass on. */
+let outAsked = "";
+function lossReason(){
+  if (!me || me.watch || me.out || !table.started || me.gameId !== table.gameId) return "";
+  if (me.life <= 0) return `You're at ${me.life} life.`;
+  if (me.poison >= ruleNum("poison")) return `You have ${me.poison} poison counters.`;
+  if (FORMATS[table.fmt].cmdr) for (const [k, v] of Object.entries(me.cmd || {})) if (v >= ruleNum("cmdrDmg")) return `You've taken ${v} commander damage from ${nm(+k.split(":")[0])}'s commander.`;
+  return "";
+}
+function checkLoss(){
+  const why = lossReason(), kind = /life/.test(why) ? "life" : /poison/.test(why) ? "poison" : why ? "cmdr" : "";
+  if (!why) { outAsked = ""; return; }
+  if (kind === outAsked) return;  // (asked once for each way of losing, until it clears)
+  if (!$("#modal").classList.contains("hidden")) { setTimeout(checkLoss, 800); return; }
+  outAsked = kind;
+  openModal("Are you out of this game?", el("p", { textContent:`${why} That usually means you've lost.` }),
+    [{ label:"Not yet (something keeps me in)" }, { label:"I'm out", primary:true, fn:() => goOut(why) }]);
+}
+function goOut(why = ""){
+  if (me.out) return;
+  me.out = true;
+  say(`is out of the game${why ? ` (${why.replace(/^You're /, "").replace(/^You've /, "").replace(/^You have /, "").replace(/\.$/, "")})` : ""}.`);
+  withoutUndo(() => { for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; } changed(); });
+  // (the monarch and the initiative go to the player whose turn it is, or the next player; and your turn passes)
+  const patch = {}, to = table.turnSeat && table.turnSeat !== mySeat ? table.turnSeat : nextSeat(mySeat);
+  if (to !== mySeat) { if (table.monarch === mySeat) patch.monarch = to; if (table.initiative === mySeat) patch.initiative = to; }
+  if (table.turnSeat === mySeat && to !== mySeat) Object.assign(patch, { turnSeat:to, turnNum:table.turnNum + 1, phase:0 });
+  if (Object.keys(patch).length) changeTable(patch);
+  announceLast();
+}
+function announceLast(){
+  const left = presentSeats().filter(s => !isOut(s));
+  if (left.length === 1 && presentSeats().length > 1) { const msg = `${nm(left[0])} is the last one standing. Press New game to record the win.`; log(msg); broadcast({ type:"log", text:msg }); }
+}
+function comeBack(){ if (!me.out) return; me.out = false; const w = lossReason(); outAsked = /life/.test(w) ? "life" : /poison/.test(w) ? "poison" : w ? "cmdr" : ""; say("is back in the game."); changed(); }
 function undo(){
   if (rule("noUndo")) { toast("Undo is off at this table (house rule: no take-backs)."); return; }
   if (!undoStack.length) { toast("Nothing to undo."); return; }
@@ -923,7 +964,7 @@ function cleanPub(st){
   return { name:String(st.name || "Player").slice(0, 24), life:num(st.life, -999, 9999), poison:num(st.poison, 0, 99), energy:num(st.energy, 0, 999), exp:num(st.exp, 0, 999),
            cmd:st.cmd && typeof st.cmd === "object" ? Object.fromEntries(Object.entries(st.cmd).slice(0, 12).map(([k, v]) => [String(k).slice(0, 40), num(v, 0, 999)])) : {},
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), gameId:String(st.gameId || "").slice(0, 30),
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
@@ -999,7 +1040,13 @@ function afterTable(before){
   render(); save();
 }
 function presentSeats(){ return Object.keys(players).map(Number).filter(s => s === mySeat || (players[s] && !players[s].away)).sort((a, b) => a - b); }
-function nextSeat(s){ const seats = presentSeats(); const i = seats.indexOf(s); return seats[(i + 1) % seats.length] || s; }
+const isOut = s => s === mySeat ? !!me?.out : !!players[s]?.out;
+// The next player in turn order, skipping anyone who's out of the game
+function nextSeat(s){
+  const seats = presentSeats(), i = seats.indexOf(s);
+  for (let k = 1; k <= seats.length; k++) { const c = seats[(i + k + seats.length) % seats.length]; if (!isOut(c)) return c; }
+  return s;
+}
 $("#startBtn").onclick = () => {
   if (!table.started) { rulesDialog(startGame); return; }
   // A game in progress: who won? (saved in everyone's game records), then a new game
@@ -1130,6 +1177,7 @@ const nm = s => s === mySeat ? me.name : players[s]?.name || `Seat ${s}`;
 // Your turn begins: untap, draw (not on the very first turn of a two-player game), and reset the land count and mana
 function startMyTurn(){ withoutUndo(startMyTurn_); }
 function startMyTurn_(){
+  if (me.out) { const to = nextSeat(mySeat); if (to !== mySeat) changeTable({ turnSeat:to, turnNum:table.turnNum + 1, phase:0 }); return; }  // (out of the game: skipped)
   me.turns++; me.lands = 0; for (const k of COLORS) me.mana[k] = 0;
   if (settings.autoUntap) for (const c of me.zones.bf) c.tapped = false;
   if (settings.autoDraw) draw(1, true);
@@ -1166,7 +1214,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) docu
 // (asked when you sit down, since the browser only asks after a click)
 function askAlerts(){ try { if (settings.turnAlert && window.Notification?.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }
 function dealNewGame(){
-  me.gameId = table.gameId; me.arrows = []; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
+  me.gameId = table.gameId; me.arrows = []; me.out = false; outAsked = ""; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
   const isC = FORMATS[table.fmt].cmdr;
@@ -1606,7 +1654,7 @@ function renderOpps(){
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length);
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
-    const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") }); o.dataset.seat = s;
+    const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
     const pip = el("span", { className:"pip" }); pip.style.background = SEAT_HEX[s - 1];
     const count = (label, list, zone) => {
       const b = el("span", { className:"ocount" + (list?.length ? " link" : ""), textContent:`${label} ${Array.isArray(list) ? list.length : list}` });
@@ -1620,6 +1668,7 @@ function renderOpps(){
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
       cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
       p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
+      p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
       el("span", { className:"olife", title:"Life", textContent:p.life })));
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
@@ -1650,6 +1699,9 @@ function renderMine(){
   cz.classList.toggle("hidden", !FORMATS[table.fmt].cmdr && !z.cz.length);
   $("#lifeOut").textContent = me.life;
   const mb_ = $("#myBadges"); mb_.innerHTML = ""; mb_.append(...desigBadges(mySeat));
+  if (me.out) mb_.append(el("span", { className:"badge out", textContent:"You're out" }));
+  $("#me").classList.toggle("is-out", !!me.out);
+  $("#outBtn").textContent = me.out ? "Back in the game" : "Concede";
   $("#handCount").textContent = `Hand ${z.hand.length}`;
   const lc = $("#landChip"); lc.textContent = `Lands played: ${me.lands}`; lc.classList.toggle("warn", me.lands > 1);
   // Poison, energy, experience, and commander damage from each other player's commander
@@ -2477,6 +2529,11 @@ $("#micBtn").onclick = e => {
   const t = localStream?.getAudioTracks()[0]; if (!t) { toast("No microphone. Allow it in the address bar and rejoin."); return; }
   t.enabled = !t.enabled; e.target.textContent = t.enabled ? "Mic on" : "Mic muted"; e.target.classList.toggle("off", !t.enabled);
 };
+$("#outBtn").onclick = () => {
+  if (!table.started) { toast("The game hasn't started."); return; }
+  if (me.out) { comeBack(); return; }
+  if (confirm("Concede this game? You'll be skipped in turn order until the next game.")) goOut("conceded");
+};
 $("#leaveBtn").onclick = () => {
   if (!confirm("Leave the table? You can come back to this game from this browser with the same table code.")) return;
   // Leaving the game as the monarch (or with the initiative): the player whose turn it is takes it, or the next
@@ -2503,6 +2560,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Combat:</b> on your turn press <b>Attack</b>, click the creatures that attack (or <b>Attack with all</b>), then <b>Done attacking</b> and <b>Combat damage</b>. Only the defending player decides the damage: their combat screen (also <b>Take or block</b> on the combat bar) has a <b>Block with</b> picker for each attacker and shows what happens: who dies and what gets through, counting trample, deathtouch, first and double strike, lifelink and indestructible. One button applies it all. <b>Call off attack</b> ends an attack with no damage." }),
     el("p", { innerHTML:"<b>Power/toughness:</b> creatures show what they are now (counters and changes included; green is bigger than printed, red smaller). Right-click one and choose <b>Power/toughness...</b> for pump spells (until end of turn) or lasting changes. <b>Point</b> at any card to see it large." }),
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
+    el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
