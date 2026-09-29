@@ -32,6 +32,13 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await expect(a.locator("#choose")).toBeVisible();
   await a.click("#chooseDigital");
   await expect(a).toHaveURL(/play\.html/);
+  // (the main screen shows every time the site is opened, not just the first time)
+  await a.goto(`${BASE}/index.html`);
+  await expect(a.locator("#choose")).toBeVisible();
+  await a.click("#chooseDigital");
+  await expect(a).toHaveURL(/play\.html/);
+  await a.click("#homeLink");
+  await expect(a.locator("#choose")).toBeVisible();
   await a.goto(`${BASE}/play.html?kt-test`);
 
   // Luke pastes a Commander list: sections and a commander heading are read, the sideboard is left out, and names

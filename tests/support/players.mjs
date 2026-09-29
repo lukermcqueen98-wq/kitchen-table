@@ -28,8 +28,9 @@ export async function launchBrowser({ camera, mic } = {}){
 
 // noWebcam: the computer has a microphone but no camera (like a player whose phone is their camera)
 // rejectPhrases: the speech stand-in takes a phrase list (like newer Chrome) but fails with an unexpected error when given one
-// choose: show the first-visit "webcam or digital table?" question (otherwise the webcam table is already picked)
-export async function newPlayer(browser, { lisp = false, rejectPhrases = false, noWebcam = false, choose = false } = {}){
+// choose: show the main screen ("Digital Magic or WEBCAM Magic?"); otherwise the webcam lobby opens directly
+// mediaOff: start with the mic muted and the camera hidden at the table, as players do (otherwise both start on)
+export async function newPlayer(browser, { lisp = false, rejectPhrases = false, noWebcam = false, choose = false, mediaOff = false } = {}){
   const ctx = await browser.newContext({ permissions:["camera", "microphone", "clipboard-read", "clipboard-write"], viewport:{ width:1400, height:900 } });
   await ctx.route(/fonts\.g/, r => r.fulfill({ status:200, body:"" }));
   await ctx.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/, r => {
@@ -77,7 +78,8 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false, 
     window.RTCPeerConnection = class extends RPC { constructor(...x){ super(...x); window.__pcs.push(this); } };
     if (lisp) try { localStorage.setItem("kt-lisp-me", "1"); } catch {}
   }, [PEER_PORT, lisp, rejectPhrases]);
-  if (!choose) await ctx.addInitScript(() => { try { if (!localStorage.getItem("kt-play-choice")) localStorage.setItem("kt-play-choice", "webcam"); } catch {} });
+  if (!choose) await ctx.addInitScript(() => { try { localStorage.setItem("kt-skip-chooser", "1"); } catch {} });
+  if (!mediaOff) await ctx.addInitScript(() => { try { localStorage.setItem("kt-media-on", "1"); } catch {} });
   if (noWebcam) await ctx.addInitScript(() => {
     const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md), en = md.enumerateDevices.bind(md);
     md.getUserMedia = c => c?.video ? Promise.reject(new DOMException("No camera", "NotFoundError")) : gum(c);

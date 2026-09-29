@@ -283,7 +283,7 @@ details.term a{font-size:13px;color:var(--brass)}
 <section id="lobby">
   <div class="lobby-card">
     <h1>Kitchen Table: digital</h1>
-    <p class="lede">Play Magic with decklists instead of real cards. Pick an official deck or paste your own, share the table code, and play on a shared digital table with voice chat. You play by the rules as at a real table; the table handles the cards. <a href="index.html?webcam" id="webcamLink" style="color:var(--brass)">Playing with real cards on webcams? Use the webcam table.</a></p>
+    <p class="lede">Play Magic with decklists instead of real cards. Pick an official deck or paste your own, share the table code, and play on a shared digital table with voice chat. You play by the rules as at a real table; the table handles the cards. <a href="index.html?webcam" id="webcamLink" style="color:var(--brass)">Playing with real cards on webcams? Use the webcam table.</a> · <a href="index.html" id="homeLink" style="color:var(--brass)">Back to the main screen</a></p>
     <div id="resume" class="hidden"><div id="resumeText"></div><div class="row" style="margin-top:8px"><button class="btn primary" id="resumeBtn">Continue that game</button><button class="btn" id="resumeDrop">Start fresh</button></div></div>
     <div class="cols">
       <div>
@@ -722,7 +722,7 @@ function savedGame(room){ try { const s = JSON.parse(store.get(saveKey(room), "n
   }
 }
 $("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown(null); };
-$("#webcamLink").onclick = () => store.set("kt-play-choice", "webcam");
+
 
 /* =====================================================================
    State
@@ -877,6 +877,8 @@ async function sitDown(resume){
   try { history.replaceState(null, "", `?room=${roomCode}`); } catch {}
   try { localStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, ...($("#micSel").value ? { deviceId:{ exact:$("#micSel").value } } : {}) }, video:false }); }
   catch { localStream = null; }
+  // Your mic starts muted at the table; the Mic button turns it on (kt-media-on: the tests start with it on)
+  if (localStream && store.get("kt-media-on", "") !== "1") { localStream.getAudioTracks().forEach(t => { t.enabled = false; }); $("#micBtn").textContent = "Mic muted"; $("#micBtn").classList.add("off"); }
   if (resume) { table = { ...resume.table, tv:0 }; me = resume.me; me.arrows ||= []; me.zones.st ||= []; me.zones.hand.push(...me.zones.st.splice(0)); }
   else { table.fmt = $("#fmtSel").value; me = blankMe(name); if (FORMATS[table.fmt].cmdr) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })); }
   if (watch) { me.watch = true; document.body.classList.add("watching"); }
@@ -992,7 +994,7 @@ function onMessage(s, msg){
     case "record": saveRecord(cleanRecord(msg.rec)); break;
     case "log": if (typeof msg.text === "string") log(msg.text.slice(0, 300), s); break;
     case "act": takeAct(s, msg); break;
-    case "combatAsk": if (incoming().some(a => a.s === s)) { if ($("#modal").classList.contains("hidden")) defendDialog(); else toast(`${nm(s)} is ready for combat damage: press Take or block.`); } break;
+    case "combatAsk": combatAsk(s); break;
     case "combatDone": combatDone(s); break;
     case "effect": takeEffect(s, msg); break;
     case "combatEnd": if (me.zones.bf.some(c => c.blk)) { for (const c of me.zones.bf) c.blk = ""; withoutUndo(changed); } break;
@@ -1405,6 +1407,12 @@ $("#dmgBtn").onclick = () => {
 /* Being attacked: only you decide. The combat screen lists each attacker with a "Block with" picker, works out
    each fight as you block (who dies, what gets through to you: trample, deathtouch, first and double strike,
    lifelink, indestructible, several blockers), and one button applies it all. */
+// Asked for combat damage: open the combat screen (the attack itself can arrive a moment after the ask, so wait
+// for it; with another window open, say so instead)
+function combatAsk(from, tries = 0){
+  if (!incoming().some(a => a.s === from)) { if (tries < 20) setTimeout(() => combatAsk(from, tries + 1), 150); return; }
+  if ($("#modal").classList.contains("hidden")) defendDialog(); else toast(`${nm(from)} is ready for combat damage: press Take or block.`);
+}
 function incoming(){ return Object.entries(players).filter(([s]) => +s !== mySeat).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === mySeat).map(c => ({ s:+s, c }))); }
 const kwOf = c => c.fd ? [] : (cards.get(c.id)?.card_faces?.[c.face || 0]?.keywords || cards.get(c.id)?.keywords || []);
 const ptParse = str => { const m = /^(-?\d+)\/(-?\d+)/.exec(str || ""); return m ? { p:Math.max(0, +m[1]), t:+m[2] } : { p:0, t:0 }; };
