@@ -10,6 +10,7 @@
    bulk file is downloaded. */
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 
 const args = process.argv.slice(2), out = args[0];
 const opt = k => { const i = args.indexOf(k); return i > 0 ? args[i + 1] : ""; };
@@ -53,10 +54,25 @@ async function loadOracle(){
   let cards;
   if (file) cards = JSON.parse(fs.readFileSync(file, "utf8"));
   else {
-    const meta = (await getJson("https://api.scryfall.com/bulk-data")).data?.find(b => b.type === "oracle_cards");
-    if (!meta?.download_uri) throw new Error("Scryfall's bulk data list has no oracle cards file.");
-    console.log(`Downloading Scryfall oracle cards (${Math.round(meta.size / 1e6)} MB)...`);
-    cards = await getJson(meta.download_uri);
+    // (as in build-index.mjs: the link may not be called download_uri, and the file may be gzipped JSON Lines)
+    const bulk = await getJson("https://api.scryfall.com/bulk-data");
+    const entry = (bulk?.data || []).find(b => b.type === "oracle_cards");
+    if (!entry) throw new Error(`Scryfall's bulk data list has no oracle_cards entry (types: ${(bulk?.data || []).map(b => b.type).join(", ") || "none"})`);
+    const find = e => {
+      const urls = [];
+      const walk = v => { if (typeof v === "string" && /^https?:\/\//.test(v) && !/^https:\/\/api\.scryfall\.com\//.test(v)) urls.push(v); else if (v && typeof v === "object") Object.values(v).forEach(walk); };
+      if (e?.download_uri) urls.push(e.download_uri); else walk(e);
+      return urls.find(u => /\.json(l)?(\.gz)?(\?|$)/.test(u)) || urls[0];
+    };
+    let url = find(entry);
+    if (!url && /^https:\/\/api\.scryfall\.com\//.test(entry.uri || "")) url = find(await getJson(entry.uri));
+    if (!url) throw new Error(`Scryfall's oracle_cards entry has no download link. Its fields: ${JSON.stringify(entry).slice(0, 800)}`);
+    console.log(`Downloading Scryfall's oracle cards from ${url}...`);
+    const r = await fetch(url, { headers:UA }); if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+    let buf = Buffer.from(await r.arrayBuffer());
+    if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);
+    const t = buf.toString("utf8").trimStart();
+    cards = t.startsWith("[") ? JSON.parse(t) : t.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
   }
   const byName = new Map();
   for (const c of cards) {
