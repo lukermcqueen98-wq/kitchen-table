@@ -46,6 +46,21 @@ jobs:
       - name: Assemble the site
         run: cp index.html play.html card-back.jpg README.md site/
 
+      # The official decks for the digital table's deck picker (MTGJSON's deck files, described from Scryfall's card
+      # data). If that fails, the list published last time is kept.
+      - name: Build the official decks list
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/decks"
+          curl -fsSL https://mtgjson.com/api/v5/AllDeckFiles.tar.gz | tar -xz -C "$RUNNER_TEMP/decks" || echo "The deck archive didn't download; the builder fetches decks one by one."
+          node tools/build-precons.mjs site/precons.json --decks "$RUNNER_TEMP/decks"
+
+      - name: Keep the published official decks list
+        if: hashFiles('site/precons.json') == ''
+        run: |
+          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          curl -fsSL "$site/precons.json" -o site/precons.json || rm -f site/precons.json
+
       - uses: actions/configure-pages@v6
 
       # What actions/upload-pages-artifact does, with the Node 24 version of upload-artifact

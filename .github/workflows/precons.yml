@@ -1,0 +1,34 @@
+# Builds the official decks list from the real MTGJSON and Scryfall data when its builder changes (or by hand), and
+# prints how many decks it found with a few descriptions, so a change can be checked before it's published.
+# (The published list is built by "Deploy site" on every push to main.)
+name: Official decks list
+
+on:
+  pull_request:
+    paths: [tools/build-precons.mjs, .github/workflows/precons.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  precons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build it
+        run: |
+          mkdir -p "$RUNNER_TEMP/decks"
+          curl -fsSL https://mtgjson.com/api/v5/AllDeckFiles.tar.gz | tar -xz -C "$RUNNER_TEMP/decks" || echo "The deck archive didn't download; the builder fetches decks one by one."
+          node tools/build-precons.mjs "$RUNNER_TEMP/precons.json" --decks "$RUNNER_TEMP/decks"
+          node -e '
+            const p = require(process.argv[1]), by = {};
+            for (const d of p.decks) by[d.type] = (by[d.type] || 0) + 1;
+            console.log("Deck types:", JSON.stringify(by));
+            for (const n of ["Foundations", "Duskmourn", "Bloomburrow", "Starter Kit"]) { const d = p.decks.find(d => d.name.includes(n) || d.type.includes(n)); if (d) console.log(`- ${d.name} [${d.type}, ${d.size} cards, ${d.colors}]: ${d.desc}`); }
+          ' "$RUNNER_TEMP/precons.json"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: precons
+          path: ${{ runner.temp }}/precons.json
+          retention-days: 7
