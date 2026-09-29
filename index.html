@@ -161,6 +161,14 @@ header.bar .btn.primary{padding:6px 16px}
 .played{flex:1;min-width:0;cursor:pointer;border:0;padding:0;background:none}
 .played img{width:100%;display:block;border-radius:4.75%/3.5%;box-shadow:0 8px 30px rgba(0,0,0,.6),0 0 0 2px var(--brass)}
 .played span{display:block;margin-top:6px;text-align:center;font-size:13px;font-weight:600;background:rgba(0,0,0,.7);border-radius:6px;padding:3px 6px}
+.whichrow{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:min(62%,420px);z-index:5;background:rgba(10,10,14,.88);border:1px solid var(--brass);border-radius:10px;padding:8px;animation:playIn .35s ease-out}
+.whichhead{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:14px;margin-bottom:6px}
+.whichx{background:none;border:0;color:inherit;font-size:20px;line-height:1;cursor:pointer;padding:0 4px}
+.whichcards{display:flex;gap:8px}
+.which{flex:1;min-width:0;cursor:pointer;border:0;padding:0;background:none;color:inherit}
+.which img{width:100%;display:block;border-radius:4.75%/3.5%}
+.which:hover img,.which:focus-visible img{box-shadow:0 0 0 2px var(--brass)}
+.which span{display:block;margin-top:4px;text-align:center;font-size:11px;line-height:1.2}
 .playedrow.out{opacity:0;transform:translateY(-50%) scale(.9);transition:opacity .4s,transform .4s}
 @keyframes playIn{from{opacity:0;transform:translateY(-50%) scale(.6)}to{opacity:1;transform:translateY(-50%) scale(1)}}
 .repeatask{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;background:rgba(13,32,29,.96);border:1px solid var(--brass);border-radius:10px;padding:8px 14px;font-weight:600;white-space:nowrap}
@@ -345,7 +353,7 @@ button.mpip{cursor:pointer}
   header.bar .grp.game{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){
-  .life output{transition:none}.tile.enter{animation:none}.playedrow{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
+  .life output{transition:none}.tile.enter{animation:none}.playedrow{animation:none}.whichrow{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
 }
 </style>
 </head>
@@ -3135,7 +3143,7 @@ if (location.hash.startsWith("#kt-eval")) window.ktEval = {
   nearestCard:(words, lisp = false) => loadIndex().then(() => nearestCard(words, lisp)),
   linkCard:(words, lisp = false) => loadIndex().then(() => linkify(words, lisp).find(x => x.card) || null),
   // Cards named in table talk (no "I play"), as the popups would show them
-  mentions:(text, lisp = false) => loadIndex().then(() => mentionsIn(text.toLowerCase(), lisp).map(m => m.name)),
+  mentions:(text, lisp = false) => loadIndex().then(() => mentionsIn(text.toLowerCase(), lisp).map(m => m.choices ? "?" + m.choices.join("|") : m.name)),
   // Search a stand-in index instead of the published one: art pictures with names, fingerprinted here the way the
   // builder would with this prep (for measuring a new way of preparing art before rebuilding the real index)
   // (each item: { name, canvas } to fingerprint here, or { name, v } with a fingerprint worked out before)
@@ -3705,9 +3713,15 @@ $("#searchBtn").onclick = manualSearch;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let noPhrases = false, quickEnds = 0;
 var shortNames = new Map();  // short name -> the cards sharing it (var: the name list can load before this line runs)
-// short name -> the card people play by far the most (popular-names.json, built from Scryfall's EDHREC ranks)
+// short name -> the cards people play the most with it, most played first (popular-names.json, built from Scryfall's
+// EDHREC ranks), offered when someone says just the short name: "Which one?"
 var popularNames = new Map();
-fetch("popular-names.json").then(r => r.ok ? r.json() : null).then(j => { if (j?.names) popularNames = new Map(Object.entries(j.names).map(([k, v]) => [norm(k), v])); }).catch(() => {});
+fetch("popular-names.json").then(r => r.ok ? r.json() : null).then(j => { if (j?.names) popularNames = new Map(Object.entries(j.names).map(([k, v]) => [norm(k), [v].flat().filter(n => typeof n === "string")])); }).catch(() => {});
+// The cards to offer for a short name several cards share: the most played first (up to 3)
+function shortChoices(k){
+  const all = shortNames.get(k); if (!all) return [];
+  return [...new Set([...(popularNames.get(k) || []).filter(n => all.has(n)), ...all])].slice(0, 3);
+}
 let rec = null, capOn = false, cardIndex = null, indexLoading = null, maxWords = 1, interimEl = null;
 // One-word card names that are also everyday words or game terms, so they don't link by accident
 const NOT_ALONE = new Set(("sacrifice lifelink deathtouch vigilance trample flying haste reach menace flash hexproof indestructible " +
@@ -3987,7 +4001,7 @@ async function parseActions(text, lisp, seat = mySeat, { answer = false } = {}){
   if (answer && !ms.length && !WHAT_CARD.test(low)) {
     const said = low.replace(ANSWER_LEAD, "").trim();
     if (said && said.split(" ").length <= 8 && !NOT_A_CARD.test(said)) {
-      const cards = (await cardsIn(said, lisp, seat)).filter(c => c.card);
+      const cards = (await cardsIn(said, lisp, seat)).filter(c => c.card || c.choices);
       if (cards.length) { out.push({ phrase:"", cards, mention:true, answer:true }); askedCard = null; }
     }
   }
@@ -4000,7 +4014,9 @@ async function parseActions(text, lisp, seat = mySeat, { answer = false } = {}){
   const extra = [];
   for (const m of mentionsIn(said, lisp)) if (!named.has(m.name) && extra.length < 4) { named.add(m.name); extra.push(m); }
   if (extra.length) {
-    const cards = (await Promise.all(extra.map(async m => ({ card:await fetchCard(null, m.name), heard:m.heard })))).filter(c => c.card);
+    // (a short name several cards share has no card yet: the table asks which one)
+    const cards = (await Promise.all(extra.map(async m => m.choices ? { card:null, heard:m.heard, choices:m.choices } : { card:await fetchCard(null, m.name), heard:m.heard })))
+      .filter(c => c.card || c.choices);
     if (cards.length) out.push({ phrase:"", cards, mention:true });
   }
   return out;
@@ -4131,8 +4147,9 @@ function mentionsIn(text, lisp){
     if (fuzzy && short && (k === short || k.startsWith(short + " "))) { len = short.split(" ").length; heard = seg.t.split(/\s+/).slice(0, len).join(" "); k = short; fuzzy = false; }
     // (Magic's own words are everyday words at a Magic table: "Deal Damage" is said far more often than it's cast)
     // a short name several cards share: the one at the table or seen lately, or nothing
-    // (else the one people play by far the most: "Atraxa" is Praetors' Voice)
-    if (shortNames.has(k)) { const pick = [...shortNames.get(k)].find(c => atTable.has(c) || seen.has(c)) || (shortNames.get(k).has(popularNames.get(k)) ? popularNames.get(k) : null); if (!pick) continue; name = pick; }
+    // (else the table asks which one, with the most-played cards of that name: "Atraxa" could be either Atraxa)
+    let choices = null;
+    if (shortNames.has(k)) { const pick = [...shortNames.get(k)].find(c => atTable.has(c) || seen.has(c)); if (pick) name = pick; else { choices = shortChoices(k); name = choices[0]; } }
     const nk = norm(name.split(" // ")[0]), sig = k.split(" ").filter(w => !STOP.has(w)), plain = sig.every(w => EVERYDAY.has(w) || MTG_WORDS.has(w));
     let score;
     if (fuzzy) { const sim = similarity(lisp ? lispNorm(k) : k, lisp ? lispNorm(nk) : nk); score = sig.length < 2 || plain || sim < 0.7 ? 0 : sim >= 0.8 ? 1.5 : 1; }
@@ -4156,7 +4173,7 @@ function mentionsIn(text, lisp){
     const vocab = words.filter((w, i) => (i < start || i >= start + len) && (MTG_WORDS.has(w) || CUE_VERB.has(w))).length;
     score += vocab >= 2 ? 1 : vocab ? 0.5 : 0;
     if (words.some((w, i) => (i < start || i >= start + len) && NOT_MAGIC.has(w))) score -= 1.5;
-    scored.push({ name, heard, score, start, len });
+    scored.push({ name, heard, score, start, len, ...(choices ? { choices } : {}) });
   }
   // A card next to one that's clearly a card counts too: "ponder into brainstorm", "entomb then animate dead"
   const JOIN = /^(and|then|into|plus|or|with|,)$/;
@@ -4168,7 +4185,7 @@ function mentionsIn(text, lisp){
     const b = words.slice(Math.max(0, i - 3), i);
     if (CUE_VERB.has(b[b.length - 1]) || (b[b.length - 1] === "with" && b.some(x => CUE_VERB.has(x)))) scored.push({ name:cardIndex.get(w), heard:w, score:2, start:i, len:1 });
   });
-  for (const c of scored.sort((a, b) => a.start - b.start)) if (c.score >= 2) out.push({ name:c.name, heard:c.heard, score:c.score });
+  for (const c of scored.sort((a, b) => a.start - b.start)) if (c.score >= 2) out.push({ name:c.name, heard:c.heard, score:c.score, ...(c.choices ? { choices:c.choices } : {}) });
   return out;
 }
 // The cards named in what followed "I play" / "I cast": one, or a few joined by "and" / "then"
@@ -4189,7 +4206,14 @@ async function cardsIn(words, lisp, seat = mySeat){
     // a card named exactly at the start first (keeps names with "and" in them whole, like Fire and Ice)
     const first = linkify(rest, lisp)[0];
     let heard, card = null;
-    const firstKey = first?.card && norm(first.t), likely = shortNames.has(firstKey) ? [...shortNames.get(firstKey)].find(c => likelyNames().has(c)) || (shortNames.get(firstKey).has(popularNames.get(firstKey)) ? popularNames.get(firstKey) : null) : null;
+    const firstKey = first?.card && norm(first.t), likely = shortNames.has(firstKey) ? [...shortNames.get(firstKey)].find(c => likelyNames().has(c)) : null;
+    // "I cast Krenko" with no Krenko at the table or seen lately: ask which one
+    if (first?.card && !first.fuzzy && shortNames.has(firstKey) && !likely) {
+      out.push({ card:null, heard:first.t, choices:shortChoices(firstKey) });
+      rest = rest.split(" ").slice(first.n).join(" ");
+      const more = /^(and|then|plus)\s+/.exec(rest); rest = more ? rest.slice(more[0].length) : "";
+      rest = rest.replace(/^(a|an|my|our)\s+/, "").trim(); continue;
+    }
     if (first?.card && !first.fuzzy && (!shortNames.has(firstKey) || likely)) {
       if (likely) first.card = likely;
       heard = first.t; card = await fetchCard(null, first.card);
@@ -4237,7 +4261,8 @@ async function addCaption(seat, text, heardHere, given = null){
       if (j) li.append(" and ");
       li.appendChild(c.card ? cardButton(c.card.name, `Heard "${c.heard}"`, async () => {
         const full = c.card.type_line ? c.card : await fetchCard(c.card.id || null, c.card.name); if (full) showCard(full);
-      }) : unknown(c.heard));
+      }) : c.choices ? cardButton(`${c.heard.replace(/^./, x => x.toUpperCase())}?`, `Heard "${c.heard}": several cards have that name. Click to pick one.`,
+        () => whichOne(seat, c.heard, c.choices)) : unknown(c.heard));
     });
     else if (a.amount) li.append(a.amount); else li.appendChild(unknown(a.heard));
   });
@@ -4383,13 +4408,16 @@ async function onFinalSpeech(t){
 }
 // Actions as sent to other players: card ids and names instead of whole cards
 const actsForWire = acts => acts.map(a => ({ phrase:a.phrase, amount:a.amount ?? null, heard:a.heard ?? "",
-  ...(a.cards ? { cards:a.cards.map(c => ({ id:c.card?.id || "", name:c.card?.name || "", heard:c.heard || "" })) } : {}) }));
+  ...(a.cards ? { cards:a.cards.map(c => ({ id:c.card?.id || "", name:c.card?.name || "", heard:c.heard || "", ...(c.choices ? { choices:c.choices } : {}) })) } : {}) }));
 function actsFromWire(list){
   if (!Array.isArray(list)) return null;
   const str = (v, n) => typeof v === "string" ? v.slice(0, n) : "";
   return list.slice(0, 6).filter(a => a && typeof a === "object" && typeof a.phrase === "string").map(a => ({
     phrase:str(a.phrase, 40), amount:typeof a.amount === "string" ? str(a.amount, 20) : null, heard:str(a.heard, 200),
-    ...(Array.isArray(a.cards) ? { cards:a.cards.slice(0, 5).map(c => ({ card:c?.name ? { id:str(c.id, 40), name:str(c.name, 141) } : null, heard:str(c?.heard, 200) })) } : {}) }));
+    ...(Array.isArray(a.cards) ? { cards:a.cards.slice(0, 5).map(c => {
+      const choices = !c?.name && Array.isArray(c?.choices) ? c.choices.filter(n => typeof n === "string" && n).slice(0, 3).map(n => n.slice(0, 141)) : [];
+      return { card:c?.name ? { id:str(c.id, 40), name:str(c.name, 141) } : null, heard:str(c?.heard, 200), ...(choices.length ? { choices } : {}) };
+    }) } : {}) }));
 }
 // Cards a player said they played or cast pop up on their camera for everyone (not lands); one that couldn't be
 // made out asks them to say it again
@@ -4402,7 +4430,49 @@ function announceCards(seat, acts){
     .filter(c => !/\bLand\b/.test(String(c.type_line || c.card_faces?.[0]?.type_line || "").split(" // ")[0]));
   for (const c of cards) seen[c.name] = now;
   if (cards.length) { showPlayed(seat, cards); if (seat === mySeat) broadcast({ type:"played", cards:cards.map(c => ({ id:c.id, name:c.name })) }); }
-  if (cast.some(a => a.cards.every(c => !c.card))) askRepeat(seat);
+  // A short name several cards share: the speaker picks which one (once a minute for talk; always for "I cast")
+  if (seat === mySeat) for (const a of acts) for (const c of a.cards || []) {
+    if (!c.choices?.length) continue;
+    const key = "?" + norm(c.heard);
+    if (!a.phrase && !a.answer && now - (seen[key] || 0) < 60000) continue;
+    seen[key] = now; whichOne(seat, c.heard, c.choices, true);
+  }
+  if (cast.some(a => a.cards.every(c => !c.card && !c.choices))) askRepeat(seat);
+}
+/* "Which one?": a short name several cards share ("Atraxa", "Krenko", "Jace") was said, and nobody at the table has
+   shown which. The cards people play most with that name show on the speaker's camera; one click picks. For the
+   speaker (announce) the pick pops up for everyone, as if they'd said its full name; for anyone else it just opens
+   the card. The pick counts as seen, so saying the short name again means that card. */
+async function whichOne(seat, heard, choices, announce = false){
+  const el = $(`#grid .tile[data-seat="${seat}"]`); if (!el) return;
+  el.querySelector(".whichrow")?.remove();
+  const box = document.createElement("div"); box.className = "whichrow"; box.setAttribute("role", "dialog");
+  const title = heard.replace(/^./, x => x.toUpperCase());
+  box.setAttribute("aria-label", `Which ${title}?`);
+  const h = document.createElement("div"); h.className = "whichhead";
+  const t = document.createElement("span"); t.textContent = `Which ${title}?`;
+  const x = document.createElement("button"); x.type = "button"; x.className = "whichx"; x.textContent = "×"; x.title = "None of these"; x.setAttribute("aria-label", "None of these");
+  x.onclick = e => { e.stopPropagation(); box.remove(); };
+  h.append(t, x); box.appendChild(h);
+  const row = document.createElement("div"); row.className = "whichcards"; box.appendChild(row);
+  el.appendChild(box);
+  let timer = setTimeout(() => box.remove(), 20000);
+  box.onpointerenter = () => clearTimeout(timer);
+  box.onpointerleave = () => { clearTimeout(timer); timer = setTimeout(() => box.remove(), 8000); };
+  const cards = (await Promise.all(choices.slice(0, 3).map(n => fetchCard(null, n).catch(() => null)))).filter(Boolean);
+  if (!box.isConnected) return;
+  if (!cards.length) { box.remove(); return; }
+  for (const card of cards) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "which"; b.title = card.name;
+    const im = document.createElement("img"); im.src = cardImg(card); im.alt = card.name; b.appendChild(im);
+    const cap = document.createElement("span"); cap.textContent = card.name; b.appendChild(cap);
+    b.onclick = e => {
+      e.stopPropagation(); box.remove(); clearTimeout(timer);
+      if (announce && seat === mySeat) { (recentPops[seat] ||= {})[card.name] = Date.now(); showPlayed(seat, [card]); broadcast({ type:"played", cards:[{ id:card.id, name:card.name }] }); }
+      else { remember(card, false, { quiet:true }); showCard(card); }
+    };
+    row.appendChild(b);
+  }
 }
 $("#engineSel").onchange = async e => {
   stopRec(); engine = e.target.value; store.set("kt-engine", engine);

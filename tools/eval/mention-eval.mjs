@@ -150,12 +150,15 @@ await page.route(/api\.scryfall\.com/, r => r.request().url().includes("/catalog
 await page.route(/cdn\.jsdelivr|huggingface|fonts\.g|index\/cards/, r => r.fulfill({ status:404, body:"" }));
 await page.goto("http://127.0.0.1:8799/index.html#kt-eval");
 const out = await page.evaluate(async cases => { const res = []; for (const [said, want] of cases) res.push({ said, want, got:await window.ktEval.mentions(said) }); return res; }, RUN);
-let hit = 0, pos = 0, fp = 0, neg = 0, extra = 0;
+let hit = 0, pos = 0, fp = 0, neg = 0, extra = 0, asked = 0, askedRight = 0;
+// A "Which one?" choice ("?Atraxa, Praetors' Voice|Atraxa, Grand Unifier") counts as the card wanted when it offers it
+for (const r of out) r.got = r.got.map(g => { if (!g.startsWith("?")) return g; asked++; const opts = g.slice(1).split("|"), w = r.want.find(w => opts.includes(w)); if (w) askedRight++; return w || `Which one? (${opts.join(" / ")})`; });
 for (const r of out) {
   const ok = JSON.stringify([...r.got].sort()) === JSON.stringify([...r.want].sort());
   if (r.want.length) { pos++; hit += ok; } else { neg++; fp += r.got.length > 0; }
   if (r.want.length) extra += r.got.filter(g => !r.want.includes(g)).length;
   console.log(`${ok ? "✓" : "✗"}  "${r.said}" -> ${r.got.join(", ") || "-"}${ok ? "" : `   (want ${r.want.join(", ") || "nothing"})`}`);
 }
-console.log(`\nCard mentions found: ${hit}/${pos}. Everyday talk with a false popup: ${fp}/${neg}. Wrong extra cards on mention lines: ${extra}.`);
+console.log(`\n"Which one?" asked ${asked} times, offering the right card ${askedRight} times.`);
+console.log(`Card mentions found: ${hit}/${pos}. Everyday talk with a false popup: ${fp}/${neg}. Wrong extra cards on mention lines: ${extra}.`);
 await b.close(); server.close();

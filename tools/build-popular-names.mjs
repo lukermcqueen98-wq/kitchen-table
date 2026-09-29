@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /* Builds popular-names.json for the webcam table's card popups: for each short name several cards share ("Atraxa",
-   "Sheoldred", "Krenko"), the one people play by far the most (EDHREC rank from Scryfall's oracle cards), so table
-   talk that only says the short name can pop that one up when nobody at the table has shown which they mean.
-   A short name is only listed when its most-played card is clearly ahead (ranked at least twice as high as the next).
+   "Sheoldred", "Krenko"), the three people play the most (EDHREC rank from Scryfall's oracle cards), most played
+   first. When table talk only says the short name and nobody at the table has shown which they mean, the table asks
+   "Which one?" with these. (It doesn't guess: EDHREC rank counts decks running a card, not what people mean by a
+   name, so "Jace" would be Wielder of Mysteries and "Krenko" Tin Street Kingpin.)
 
    node tools/build-popular-names.mjs <out.json> [--oracle <Scryfall oracle-cards .json or .jsonl(.gz)>] */
 import fs from "node:fs";
@@ -42,15 +43,12 @@ for (const c of cards) {
 const names = {};
 for (const [k, faces] of groups) {
   if (faces.size < 2) continue;
-  const ranked = [...faces].sort((a, b) => a[1] - b[1]);
-  const [best, next] = ranked;
-  if (best[1] === Infinity || !(best[1] * 2 <= next[1])) continue;
-  names[k] = best[0];
+  names[k] = [...faces].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).slice(0, 3).map(f => f[0]);
 }
 fs.mkdirSync(path.dirname(path.resolve(out)), { recursive:true });
 fs.writeFileSync(out, JSON.stringify({ built:new Date().toISOString().slice(0, 10), names }));
-console.log(`${Object.keys(names).length} short names with a clear favorite.`);
-for (const k of ["atraxa", "sheoldred", "krenko", "korvold", "urza", "yuriko", "edgar", "teferi", "jace", "chandra"]) {
+console.log(`${Object.keys(names).length} short names several cards share.`);
+for (const k of ["atraxa", "sheoldred", "krenko", "korvold", "urza", "jace", "teferi", "chandra"]) {
   const top = [...(groups.get(k) || [])].sort((a, b) => a[1] - b[1]).slice(0, 3).map(([n, r]) => `${n} (#${r})`).join(", ");
-  console.log(`  ${k}: ${names[k] || "-"}   [${top}]`);
+  console.log(`  ${k}: ${top || "-"}`);
 }
