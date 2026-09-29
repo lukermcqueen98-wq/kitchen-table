@@ -33,7 +33,7 @@ button{cursor:pointer}
 
 /* Lobby */
 #lobby{height:100%;overflow:auto;padding:24px;display:grid;place-items:center}
-.lobby-card{width:min(100%,960px)}
+.lobby-card{width:min(100%,1100px)}
 .lobby-card h1{font:700 clamp(36px,7vw,58px)/1 var(--serif);margin:0 0 8px}
 .lede{color:var(--muted);margin:0 0 22px;max-width:60ch}
 .cols{display:grid;grid-template-columns:1fr 1.2fr;gap:0 32px;align-items:start}
@@ -56,6 +56,29 @@ button{cursor:pointer}
 .sugg button{display:flex;flex-direction:column;gap:3px;align-items:center;width:112px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.2);border-radius:8px;padding:5px;font-size:12px}
 .sugg img{width:100%;border-radius:4.75%/3.5%}
 #lobbyErr{color:var(--danger);min-height:1.5em;margin-top:8px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--felt-edge)}
+.tabs button{border:0;background:none;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected=true]{color:var(--parchment);border-bottom-color:var(--brass)}
+.pcbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.pcbar input[type=search]{flex:1 1 220px;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+.pcbar select{padding:7px 8px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
+.pips{display:flex;gap:3px}
+.pips button{width:30px;height:30px;border-radius:50%;border:2px solid transparent;background:rgba(0,0,0,.25);padding:2px;opacity:.55}
+.pips button[aria-pressed=true]{border-color:var(--brass);opacity:1}
+.pips img,.pcmeta img{width:100%;display:block}
+.pcmeta img{width:15px;height:15px;display:inline-block;vertical-align:-3px;margin-left:2px}
+#pcList{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto;padding-right:4px}
+.pc{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:start;border:1px solid var(--felt-edge);border-radius:10px;padding:8px;background:rgba(0,0,0,.18)}
+.pc.on{border-color:var(--brass);background:rgba(201,164,76,.1)}
+.pc .art{width:92px;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#0a1714}
+.pc h4{margin:0;font-size:15px}
+.pcmeta{font-size:12px;color:var(--muted);margin:1px 0 3px}
+.pcmeta .tag{border:1px solid #7fd08a;color:#aef0b6;border-radius:9px;padding:0 6px;margin-left:4px}
+.pc p{margin:0;font-size:13px;line-height:1.4}
+.pc .acts{display:flex;flex-direction:column;gap:4px}
+#pcCount{font-size:12px;color:var(--muted);margin:4px 0}
+.cardlist{columns:2 220px;font-size:14px;margin:0;padding:0;list-style:none}
+.cardlist li{break-inside:avoid;padding:1px 0}
 .bigbtn{width:100%;padding:13px;font-size:17px;margin-top:4px}
 #resume{border:1px solid var(--brass);border-radius:10px;padding:10px 12px;margin-bottom:16px}
 
@@ -244,7 +267,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 <section id="lobby">
   <div class="lobby-card">
     <h1>Kitchen Table: digital</h1>
-    <p class="lede">Play Magic with decklists instead of real cards. Paste your deck, share the table code, and play on a shared digital table with voice chat. You play by the rules as at a real table; the table handles the cards. <a href="index.html?webcam" id="webcamLink" style="color:var(--brass)">Playing with real cards on webcams? Use the webcam table.</a></p>
+    <p class="lede">Play Magic with decklists instead of real cards. Pick an official deck or paste your own, share the table code, and play on a shared digital table with voice chat. You play by the rules as at a real table; the table handles the cards. <a href="index.html?webcam" id="webcamLink" style="color:var(--brass)">Playing with real cards on webcams? Use the webcam table.</a></p>
     <div id="resume" class="hidden"><div id="resumeText"></div><div class="row" style="margin-top:8px"><button class="btn primary" id="resumeBtn">Continue that game</button><button class="btn" id="resumeDrop">Start fresh</button></div></div>
     <div class="cols">
       <div>
@@ -257,9 +280,26 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
         <p class="hint">Voice chat only; no webcams and no voice commands. Everything about the cards is on the table.</p>
       </div>
       <div>
+        <div class="tabs" role="tablist" id="deckTabs">
+          <button role="tab" id="tabOfficial" aria-selected="false" aria-controls="paneOfficial" class="hidden">Official decks</button>
+          <button role="tab" id="tabMine" aria-selected="true" aria-controls="paneMine">My decks</button>
+        </div>
+        <div id="paneOfficial" role="tabpanel" class="hidden">
+          <p class="hint" style="margin:0 0 8px">Every official preconstructed deck. Pick one to play it as it comes out of the box.</p>
+          <div class="pcbar">
+            <input type="search" id="pcSearch" placeholder="Search: deck, commander, card, color or theme" aria-label="Search the official decks">
+            <select id="pcKind" aria-label="Kind of deck"><option value="cmdr">Commander decks</option><option value="std">Standard-legal 60-card decks</option><option value="sixty">All 60-card decks</option></select>
+          </div>
+          <div class="pcbar"><span class="hint">Colors:</span><span class="pips" id="pcPips"></span>
+            <label class="hint" id="pcFirstWrap" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pcFirst"> Good first decks only</label></div>
+          <div id="pcCount"></div>
+          <div id="pcList"></div>
+        </div>
+        <div id="paneMine" role="tabpanel">
         <div class="deckbar"><select id="savedSel" aria-label="Saved decks"><option value="">Saved decks...</option></select><button class="btn small" id="delDeck">Delete</button></div>
         <label class="field"><span>Decklist (paste from Moxfield, Archidekt, MTG Arena or any "1 Sol Ring" list; mark your commander with a "Commander" heading or *CMDR*)</span><textarea id="deckIn" spellcheck="false" placeholder="Commander&#10;1 Atraxa, Praetors' Voice&#10;&#10;Deck&#10;1 Sol Ring&#10;1 Arcane Signet&#10;35 Forest"></textarea></label>
         <div class="deckbar"><input id="deckName" placeholder="Deck name" maxlength="40"><button class="btn small" id="saveDeck">Save deck</button><button class="btn small" id="loadDeck">Check deck</button></div>
+        </div>
         <div id="deckInfo" aria-live="polite"></div>
       </div>
     </div>
@@ -345,7 +385,7 @@ const FORMATS = {
   sixty:{ label:"60-card formats (up to 4 players, 20 life)", short:"60-card", life:20, max:4, cmdr:false }
 };
 const PHASES = ["Untap", "Upkeep", "Draw", "Main 1", "Combat", "Main 2", "End"];
-const COLORS = ["W", "U", "B", "R", "G", "C"];
+const COLORS = ["W", "U", "B", "R", "G", "C"], ORDER5 = ["W", "U", "B", "R", "G"];
 const $ = s => document.querySelector(s);
 const store = {
   get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
@@ -562,6 +602,91 @@ function showDeck(){
   if (FORMATS[fmt].cmdr && !loaded.cmdrs.length) info.append(el("div", { className:"hint", textContent:"Colors are checked once you choose your commander (you're asked when you sit down)." }));
 }
 $("#loadDeck").onclick = () => { loaded = null; checkDeck(); };
+
+/* Official decks: every preconstructed Commander and 60-card deck (precons.json, built from MTGJSON and Scryfall when
+   the site is published), with a description of each. Picking one fills in its list, name and format. */
+let precons = null, pcPicked = "";
+const pcColors = new Set();
+function deckTab(which){
+  for (const [t, p] of [["#tabOfficial", "#paneOfficial"], ["#tabMine", "#paneMine"]]) {
+    const on = t === (which === "official" ? "#tabOfficial" : "#tabMine");
+    $(t).setAttribute("aria-selected", on); $(p).classList.toggle("hidden", !on);
+  }
+  store.set("kt-dig-tab", which);
+}
+$("#tabOfficial").onclick = () => deckTab("official");
+$("#tabMine").onclick = () => deckTab("mine");
+const pcList = d => { const n = precons.names, out = []; for (let i = 0; i < d.length; i += 2) out.push([d[i + 1], n[d[i]]]); return out; };
+function preconText(d){
+  const lines = [];
+  if (d.cmdr.length) lines.push("Commander", ...d.cmdr.map(i => `1 ${precons.names[i]}`), "", "Deck");
+  lines.push(...pcList(d.main).map(([n, name]) => `${n} ${name}`));
+  if (d.side.length) lines.push("", "Sideboard", ...pcList(d.side).map(([n, name]) => `${n} ${name}`));
+  return lines.join("\n");
+}
+const pip = c => el("img", { src:`https://svgs.scryfall.io/card-symbols/${c}.svg`, alt:c });
+function usePrecon(d){
+  pcPicked = d.name + d.date;
+  $("#deckIn").value = preconText(d); $("#deckName").value = d.name; $("#savedSel").value = "";
+  $("#fmtSel").value = d.fmt === "cmdr" ? ($("#fmtSel").value === "duel" ? "duel" : "cmdr") : "sixty";
+  if (d.fmt === "sixty") $("#legalSel").value = d.std ? "standard" : "";
+  store.set("kt-dig-legal", $("#legalSel").value); showLegal();
+  loaded = null; checkDeck(); drawPrecons();
+  toast(`${d.name} is your deck. Press Sit down when you're ready.`);
+}
+function showPrecon(d){
+  const ul = el("ul", { className:"cardlist" });
+  for (const i of d.cmdr) ul.append(el("li", {}, el("b", { textContent:`1 ${precons.names[i]} (commander)` })));
+  for (const [n, name] of pcList(d.main)) ul.append(el("li", { textContent:`${n} ${name}` }));
+  const body = el("div", {}, el("p", { textContent:d.desc }), ul);
+  if (d.side.length) body.append(el("h3", { textContent:"Sideboard" }), el("ul", { className:"cardlist" }, ...pcList(d.side).map(([n, name]) => el("li", { textContent:`${n} ${name}` }))));
+  openModal(d.name, body, [{ label:"Close" }, { label:"Use this deck", primary:true, fn:() => usePrecon(d) }]);
+}
+let pcShown = 40;
+function drawPrecons(){
+  if (!precons) return;
+  const kind = $("#pcKind").value, q = norm($("#pcSearch").value), first = $("#pcFirst").checked && kind !== "cmdr";
+  $("#pcFirstWrap").classList.toggle("hidden", kind === "cmdr");
+  const words = q.split(" ").filter(Boolean);
+  const hit = d => {
+    if (kind === "cmdr" ? d.fmt !== "cmdr" : d.fmt !== "sixty" || (kind === "std" && !d.std)) return false;
+    if (first && !d.beginner) return false;
+    for (const c of pcColors) if (c === "C" ? d.colors : !d.colors.includes(c)) return false;
+    if (!words.length) return true;
+    const hay = d._hay ||= norm(`${d.name} ${d.type} ${d.set} ${d.desc} ${d.cmdr.map(i => precons.names[i]).join(" ")}`);
+    return words.every(w => hay.includes(w) || (w.length > 3 && pcList(d.main).some(([, n]) => norm(n).includes(w))));
+  };
+  const list = precons.decks.filter(hit), box = $("#pcList"); box.innerHTML = "";
+  $("#pcCount").textContent = `${list.length} deck${list.length === 1 ? "" : "s"}${kind === "std" ? ` (Standard as of ${precons.built})` : ""}. Newest first.`;
+  for (const d of list.slice(0, pcShown)) {
+    const art = el("img", { className:"art", alt:"", loading:"lazy", src:d.art ? `https://cards.scryfall.io/${d.art}` : "card-back.jpg" });
+    const use = el("button", { className:"btn small primary", textContent:pcPicked === d.name + d.date ? "Chosen" : "Use this deck" }); use.onclick = () => usePrecon(d);
+    const see = el("button", { className:"btn small", textContent:"See the cards" }); see.onclick = () => showPrecon(d);
+    const meta = el("div", { className:"pcmeta" }, `${d.type} · ${d.set} · ${d.date.slice(0, 4)} · ${d.size} cards `, ...(d.colors ? [...d.colors].map(pip) : [pip("C")]),
+      d.beginner ? el("span", { className:"tag", textContent:"good first deck" }) : null);
+    box.append(el("div", { className:"pc" + (pcPicked === d.name + d.date ? " on" : "") }, art, el("div", {}, el("h4", { textContent:d.name }), meta, el("p", { textContent:d.desc })), el("div", { className:"acts" }, use, see)));
+  }
+  if (list.length > pcShown) { const more = el("button", { className:"btn small", textContent:`Show more (${list.length - pcShown} left)` }); more.onclick = () => { pcShown += 40; drawPrecons(); }; box.append(more); }
+  if (!list.length) box.append(el("p", { className:"hint", textContent:"No decks match. Try fewer words or colors." }));
+}
+for (const c of [...ORDER5, "C"]) {
+  const b = el("button", { title:c === "C" ? "Colorless" : `Has ${c}`, ariaPressed:"false" }, pip(c));
+  b.onclick = () => { if (pcColors.has(c)) pcColors.delete(c); else pcColors.add(c); b.setAttribute("aria-pressed", pcColors.has(c)); pcShown = 40; drawPrecons(); };
+  $("#pcPips").append(b);
+}
+let pcT = null;
+$("#pcSearch").oninput = () => { clearTimeout(pcT); pcT = setTimeout(() => { pcShown = 40; drawPrecons(); }, 150); };
+$("#pcKind").onchange = $("#pcFirst").onchange = () => { pcShown = 40; drawPrecons(); };
+fetch("precons.json").then(r => r.ok ? r.json() : null).then(p => {
+  if (!p || !Array.isArray(p.decks) || !Array.isArray(p.names) || !p.decks.length) return;
+  precons = p;
+  $("#tabOfficial").classList.remove("hidden");
+  $("#pcKind").value = FORMATS[$("#fmtSel").value]?.cmdr ? "cmdr" : "std";
+  drawPrecons();
+  // (new players start on the official decks; someone with their own list keeps seeing it)
+  const tab = store.get("kt-dig-tab", "");
+  deckTab(tab || ($("#deckIn").value.trim() ? "mine" : "official"));
+}).catch(() => {});
 
 // A game in progress on this browser can be picked back up (a refresh, a dropped connection)
 const saveKey = room => `kt-dig-save:${room}`;
