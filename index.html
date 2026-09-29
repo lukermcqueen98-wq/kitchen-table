@@ -366,7 +366,7 @@ button.mpip{cursor:pointer}
   <div class="lobby-card">
     <h1>Kitchen Table</h1>
     <p class="lede">Play paper Magic over webcam. Point a camera at your playmat, share the table, and click any card on screen to read it.</p>
-    <p class="hint" style="margin:-14px 0 18px">No real cards handy? <a id="digitalLink" href="play.html" style="color:var(--brass)">Play on the digital table with a pasted decklist</a>.</p>
+    <p class="hint" style="margin:-14px 0 18px">No real cards handy? <a id="digitalLink" href="play.html" style="color:var(--brass)">Play on the digital table with a pasted decklist</a>. · <a href="index.html" id="homeLink" style="color:var(--brass)">Back to the main screen</a></p>
     <div class="lobby-cols">
       <div class="col">
       <video id="lobbyPreview" class="preview" autoplay playsinline muted></video>
@@ -652,18 +652,17 @@ function drawChooseScenes(){
     w.append(t);
   }
 }
-/* First visit: webcam table or digital table? The answer is remembered. An invite link (?room=) always opens the
-   webcam lobby, and ?webcam opens it from the digital table's link. */
+/* The main screen, Digital Magic or WEBCAM Magic, every time the site is opened. An invite link (?room=) goes
+   straight to the webcam lobby, and so does ?webcam (the digital table's link, and a refresh after picking webcam).
+   (kt-skip-chooser: the tests start in the webcam lobby) */
 {
-  const choice = store.get("kt-play-choice", "");
   const digital = () => { location.href = "play.html" + (params.get("room") ? "?room=" + encodeURIComponent(params.get("room")) : ""); };
-  $("#digitalLink").onclick = e => { e.preventDefault(); store.set("kt-play-choice", "digital"); digital(); };
-  if (params.get("room") || params.has("webcam") || choice === "webcam") $("#lobby").classList.remove("hidden");
-  else if (choice === "digital") { digital(); return; }
+  $("#digitalLink").onclick = e => { e.preventDefault(); digital(); };
+  if (params.get("room") || params.has("webcam") || store.get("kt-skip-chooser", "")) $("#lobby").classList.remove("hidden");
   else {
     $("#choose").classList.remove("hidden"); drawChooseScenes();
-    $("#chooseWebcam").onclick = () => { store.set("kt-play-choice", "webcam"); $("#choose").classList.add("hidden"); $("#lobby").classList.remove("hidden"); };
-    $("#chooseDigital").onclick = () => { store.set("kt-play-choice", "digital"); digital(); };
+    $("#chooseWebcam").onclick = () => { $("#choose").classList.add("hidden"); $("#lobby").classList.remove("hidden"); try { history.replaceState(null, "", "?webcam"); } catch {} };
+    $("#chooseDigital").onclick = digital;
   }
 }
 
@@ -874,6 +873,14 @@ $("#joinBtn").onclick = async () => {
          manaOn:false, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 }, cmdrs:[], manaEmptyOnPass:store.get("kt-mana-empty", "0") === "1",
          stream:localStream, deck:[], camKey:uid() };
   players[mySeat] = me; lastLife = me.life;
+  // Your mic starts muted and your camera hidden at the table; the Mic and Camera buttons turn them on
+  // (kt-media-on: the tests start with them on)
+  if (store.get("kt-media-on", "") !== "1") {
+    localStream.getAudioTracks().forEach(t => { t.enabled = false; });
+    camHidden = true; applyWebcam();
+    $("#micBtn").textContent = "Mic muted"; $("#micBtn").classList.add("off");
+    $("#camBtn").textContent = "Camera hidden"; $("#camBtn").classList.add("off");
+  }
   enterTable();
 };
 
@@ -1355,7 +1362,7 @@ function enterTable(){
         engine = "browser"; $("#engineSel").value = "browser";
         setCapHint("Chrome's on-device speech isn't ready on this computer, so captions are using Chrome or Edge speech. Pick On-device again to download it.");
       }
-      startRec();
+      if (localStream?.getAudioTracks()[0]?.enabled !== false) startRec();  // (a muted mic starts captions when it's turned on)
     })();
   }
   updateCapBtn();
