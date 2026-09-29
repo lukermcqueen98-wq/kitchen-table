@@ -113,6 +113,14 @@ test("digital table: undo, casting, and combat", async () => {
   await a.click("#calloffBtn");
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
 
+  // The library: a single click doesn't draw (it says how); a double-click does
+  const before = await a.locator("#hand .card").count();
+  await a.locator("#libPile").click();
+  await expect(a.locator("#toast")).toContainText("Double-click your library to draw");
+  await expect(a.locator("#hand .card")).toHaveCount(before);
+  await a.locator("#libPile").dblclick();
+  await expect(a.locator("#hand .card")).toHaveCount(before + 1);
+
   // The fight rules the combat screen works out
   const f = (att, ...bl) => ktp(a, ([att, bl]) => { const r = ktPlay.fight(att, bl); return [r.toYou, r.attDies, r.deadBlockers.length, r.attGain, r.blkGain]; }, [att, bl]);
   const C = (p, t, ...kw) => ({ p, t, kw });

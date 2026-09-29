@@ -363,7 +363,7 @@ details.term a{font-size:13px;color:var(--brass)}
         <div class="lifebox"><button id="lifeMinus" aria-label="Lose 1 life">&minus;</button><output id="lifeOut" aria-label="Your life"></output><button id="lifePlus" aria-label="Gain 1 life">+</button></div>
         <div id="ctrlBox"></div>
         <div class="piles">
-          <div class="pile" id="libPile" data-drop="lib" title="Click to draw. Right-click for more."></div>
+          <div class="pile" id="libPile" data-drop="lib" title="Double-click to draw (or press D). Right-click for more."></div>
           <div class="pile" id="gyPile" data-drop="gy" title="Graveyard"></div>
           <div class="pile" id="exPile" data-drop="ex" title="Exile"></div>
         </div>
@@ -1793,7 +1793,7 @@ function clickCard(iid, zone, e){
   const f = findCard(iid); if (!f) return;
   if (zone === "bf" && attackMode) toggleAttack(f.c, attackMode);
   else if (zone === "bf") toggleTap(f.c);
-  else if (zone === "lib") draw(1);
+  else if (zone === "lib") libHint();
   else if (zone === "gy" || zone === "ex") viewZone(`Your ${ZONE_NAME[zone]}`, me.zones[zone], zone);
 }
 document.addEventListener("dblclick", e => {
@@ -1808,7 +1808,10 @@ document.addEventListener("contextmenu", e => {
   if (oc && oc.dataset.iid) { e.preventDefault(); theirCardMenu(+oc.closest(".opp").dataset.seat, oc.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#bf")) { e.preventDefault(); openMenu(e.clientX, e.clientY, [{ label:"Untap all (U)", fn:untapAll }, { label:"Create a token...", fn:tokenDialog }]); }
 });
-$("#libPile").onclick = e => { if (!e.target.closest(".card") && me.zones.lib.length) draw(1); };
+// Drawing takes a double-click (or D, or dragging a card to your hand), so a stray click doesn't draw
+function libHint(){ if (me.zones.lib.length) toast("Double-click your library to draw (or press D). Right-click for more."); }
+$("#libPile").onclick = e => { if (!e.target.closest(".card")) libHint(); };
+$("#libPile").ondblclick = () => { if (me.zones.lib.length) draw(1); };
 $("#gyPile").onclick = e => { if (!e.target.closest(".card")) viewZone("Your graveyard", me.zones.gy, "gy"); };
 $("#exPile").onclick = e => { if (!e.target.closest(".card")) viewZone("Your exile", me.zones.ex, "ex"); };
 // Point at any card to see it large, with its rules text
