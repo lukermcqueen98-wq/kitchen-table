@@ -288,7 +288,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
           <p class="hint" style="margin:0 0 8px">Every official preconstructed deck. Pick one to play it as it comes out of the box.</p>
           <div class="pcbar">
             <input type="search" id="pcSearch" placeholder="Search: deck, commander, card, color or theme" aria-label="Search the official decks">
-            <select id="pcKind" aria-label="Kind of deck"><option value="cmdr">Commander decks</option><option value="std">Standard-legal 60-card decks</option><option value="sixty">All 60-card decks</option></select>
+            <select id="pcKind" aria-label="Kind of deck"><option value="cmdr">Commander decks</option><option value="sixty">All 60-card decks</option><option value="std">Standard-legal 60-card decks</option></select>
           </div>
           <div class="pcbar"><span class="hint">Colors:</span><span class="pips" id="pcPips"></span>
             <label class="hint" id="pcFirstWrap" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="pcFirst"> Good first decks only</label></div>
@@ -681,7 +681,7 @@ fetch("precons.json").then(r => r.ok ? r.json() : null).then(p => {
   if (!p || !Array.isArray(p.decks) || !Array.isArray(p.names) || !p.decks.length) return;
   precons = p;
   $("#tabOfficial").classList.remove("hidden");
-  $("#pcKind").value = FORMATS[$("#fmtSel").value]?.cmdr ? "cmdr" : "std";
+  $("#pcKind").value = FORMATS[$("#fmtSel").value]?.cmdr ? "cmdr" : "sixty";
   drawPrecons();
   // (new players start on the official decks; someone with their own list keeps seeing it)
   const tab = store.get("kt-dig-tab", "");

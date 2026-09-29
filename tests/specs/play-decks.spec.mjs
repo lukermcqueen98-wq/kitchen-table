@@ -8,9 +8,9 @@ const PRECONS = { built:"2026-09-01", names, decks:[
   { name:"Gamma Growth", set:"TCM", date:"2026-08-01", type:"Commander Deck", fmt:"cmdr", std:false, beginner:false, colors:"UG", size:100, art:"",
     cmdr:[0], main:[1, 1, 2, 98], side:[], desc:"Simic (blue-green) Commander deck (2026), led by Gamma Card. Focus: ramp (extra mana)." },
   { name:"Alpha Starter", set:"TST", date:"2026-07-01", type:"Starter Kit", fmt:"sixty", std:true, beginner:true, colors:"", size:60, art:"",
-    cmdr:[], main:[3, 20, 2, 40], side:[4, 2], desc:"Colorless starter kit (60-card, 2026). Legal in Standard." },
+    cmdr:[], main:[3, 20, 2, 40], side:[4, 2], desc:"Colorless Starter Kit (60-card, 2026). Legal in Standard." },
   { name:"Old Beta Theme", set:"OLD", date:"2004-01-01", type:"Theme Deck", fmt:"sixty", std:false, beginner:true, colors:"", size:60, art:"",
-    cmdr:[], main:[4, 20, 2, 40], side:[], desc:"Colorless theme deck (60-card, 2004). Not legal in Standard any more (fine for casual games)." }] };
+    cmdr:[], main:[4, 20, 2, 40], side:[], desc:"Colorless Theme Deck (60-card, 2004). Not legal in Standard any more (fine for casual games)." }] };
 
 test("digital table: picking an official deck (Commander and 60-card), with descriptions and card lists", async () => {
   test.setTimeout(120000);
