@@ -112,6 +112,8 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 #bf .card{--w:var(--cw)}
 #bf.drop,.pile.drop,#hand.drop,#czone.drop{outline:2px dashed var(--brass);outline-offset:-4px}
 #side{width:210px;border-left:1px solid var(--felt-edge);display:flex;flex-direction:column;gap:8px;padding:8px;overflow:auto}
+#side>*{flex-shrink:0}  /* (a short window scrolls the side column instead of squeezing the command zone under its card) */
+.ctrlhead{font-size:11px;color:var(--muted);margin:4px 0 -2px}
 .lifebox{display:flex;align-items:center;justify-content:space-between;gap:4px}
 .lifebox output{font:700 38px/1 var(--serif);min-width:2.2ch;text-align:center}
 .lifebox button,.ctrl button{border:0;background:rgba(255,255,255,.1);border-radius:6px;width:28px;height:28px;font-size:17px;line-height:1;padding:0}
@@ -1540,7 +1542,9 @@ function renderMine(){
   };
   ctrl("Poison", () => me.poison, v => { me.poison = v; }, ruleNum("poison"));
   if (me.energy || settings.showEnergy) ctrl("Energy", () => me.energy, v => { me.energy = v; });
-  if (FORMATS[table.fmt].cmdr) for (const s of presentSeats().filter(s => s !== mySeat)) for (const c of [...(players[s]?.cz || []), ...(players[s]?.bf || [])].filter(c => c.cmdr)) {
+  const theirCmdrs = FORMATS[table.fmt].cmdr ? presentSeats().filter(s => s !== mySeat).flatMap(s => [...(players[s]?.cz || []), ...(players[s]?.bf || [])].filter(c => c.cmdr).map(c => [s, c])) : [];
+  if (theirCmdrs.length) box.append(el("div", { className:"ctrlhead", textContent:"Commander damage you've taken" }));
+  for (const [s, c] of theirCmdrs) {
     const key = `${s}:${c.iid}`;
     ctrl(`${(c.name || "Commander").split(",")[0].slice(0, 12)}`, () => me.cmd[key] || 0, v => {
       const d = v - (me.cmd[key] || 0); me.cmd[key] = v; me.life -= d;
