@@ -7,7 +7,8 @@ import path from "node:path";
 import zlib from "node:zlib";
 
 export const OUT = path.resolve(import.meta.dirname, "..", ".fixtures");
-export const NAMES = ["Alpha Card", "Beta Card", "Gamma Card", "Sol Ring", "Rhystic Study", "Gwenom, Remorseless", "Commander's Sphere"];
+export const NAMES = ["Alpha Card", "Beta Card", "Gamma Card", "Sol Ring", "Rhystic Study", "Gwenom, Remorseless", "Commander's Sphere",
+  "Krenko, Mob Boss", "Krenko, Tin Street Kingpin"];  // (two Krenkos: a short name several cards share)
 export const cardId = k => `0000000${k}-0000-4000-8000-00000000000${k}`;
 export const ART_W = 626, ART_H = 457;  // Scryfall art_crop size
 

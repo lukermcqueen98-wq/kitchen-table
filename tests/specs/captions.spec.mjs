@@ -83,6 +83,26 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "I cast commander spear");
   await expect(a.locator("#captions li", { hasText:"I cast Commander's Sphere" })).toHaveCount(1);
 
+  // A short name two cards share ("Krenko"), with neither at the table: nothing is guessed. Luke's camera asks
+  // "Which Krenko?" with both, Rick's caption has a "Krenko?" link, and Luke's pick pops up for everyone
+  await say(a, "krenko is out of control");
+  const which = tile(a, 1).locator(".whichrow");
+  await expect(which).toContainText("Which Krenko?");
+  await expect(which.locator("button.which")).toHaveCount(2);
+  await expect(b.locator("#captions .cardlink", { hasText:"Krenko?" })).toHaveCount(1);
+  await which.locator("button.which", { hasText:"Krenko, Mob Boss" }).click();
+  await expect(which).toHaveCount(0);
+  for (const p of [a, b]) await expect(tile(p, 1).locator(".played")).toContainText("Krenko, Mob Boss", { timeout:30000 });
+  // ...and now that it's been seen, "Krenko" means that one
+  await say(a, "krenko is out of control again");
+  await expect(a.locator("#captions .cardlink", { hasText:"Krenko, Mob Boss" })).toHaveCount(1);
+  await expect(tile(a, 1).locator(".whichrow")).toHaveCount(0);
+  // Rick's "Krenko?" link opens the choice on his screen too
+  await b.click("#tab-captions");
+  await b.locator("#captions .cardlink", { hasText:"Krenko?" }).click();
+  await tile(b, 1).locator(".whichrow button.which", { hasText:"Krenko, Tin Street Kingpin" }).click();
+  await expect(b.locator("#cardView h2").first()).toHaveText("Krenko, Tin Street Kingpin");
+
   // Rick's speech service fails (as in Brave): Luke's screen says why his captions aren't arriving
   await b.evaluate(() => { window.__speechError = "network"; });
   await b.click("#capBtn"); await b.click("#capBtn");
