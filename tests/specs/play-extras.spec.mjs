@@ -5,6 +5,8 @@ import { BASE } from "../support/global-setup.mjs";
 // Gamma Card is a 3/4 creature in the test cards; Sol Ring is banned in Modern and Gwenom in Commander (test data)
 const opp = (page, name) => page.locator(".opp", { hasText:name });
 const ktp = (page, fn, arg) => page.evaluate(fn, arg);
+// (ending a turn with more than 7 cards asks for discards; these tests keep them)
+const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
 const fetchTo = (page, name, zone) => ktp(page, ([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); return c.iid; }, [name, zone]);
 const menu = (page, name) => page.getByRole("menuitem", { name, exact:true }).click();
 const button = (page, name) => page.locator(".modal").getByRole("button", { name, exact:true }).click();
@@ -109,7 +111,7 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
     Object.defineProperty(document, "hidden", { configurable:true, get:() => true });
     window.__notes = []; window.Notification = class { static permission = "granted"; constructor(t){ window.__notes.push(t); } };
   });
-  const pass = async (page) => { const n = await ktp(a, () => ktPlay.table.turnNum); await page.click("#nextTurn"); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
+  const pass = async (page) => { const n = await ktp(a, () => ktPlay.table.turnNum); await page.click("#nextTurn"); await keepHand(page); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
   if (await ktp(a, () => ktPlay.table.turnSeat) === 2) { await pass(b); await expect(a.locator("#log")).toContainText("Rick drew a card for being the monarch (end step)."); }
   await pass(a);
   await expect(pt).toHaveText("2/3");  // (the +2/+2 wore off; the counter stays)
