@@ -121,6 +121,20 @@ test("digital table: undo, casting, and combat", async () => {
   await a.locator("#libPile").dblclick();
   await expect(a.locator("#hand .card")).toHaveCount(before + 1);
 
+  // Looking at the top 3: take one into hand, the rest to the bottom in a random order
+  const [hand0, lib0] = await ktp(a, () => [ktPlay.me.zones.hand.length, ktPlay.me.zones.lib.length]);
+  const top3 = await ktp(a, () => ktPlay.me.zones.lib.slice(0, 3).map(c => c.iid));
+  await a.locator("#libPile").click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Look at the top cards (take some, the rest to the bottom or top)..." }).click();
+  await a.fill(".modal input[type=number]", "3"); await a.locator(".modal").getByRole("button", { name:"OK", exact:true }).click();
+  await expect(a.locator(".modal-card h2")).toHaveText("Top 3 cards");
+  await a.locator(".modal .gcard").first().getByRole("button", { name:"Hand" }).click();
+  await expect(a.locator(".modal .gcard").first().getByRole("button", { name:"✓ Hand" })).toHaveCount(1);
+  await a.locator(".modal").getByRole("button", { name:"Done", exact:true }).click();
+  expect(await ktp(a, () => [ktPlay.me.zones.hand.length, ktPlay.me.zones.lib.length])).toEqual([hand0 + 1, lib0 - 1]);
+  expect(await ktp(a, t => ktPlay.me.zones.hand.some(c => c.iid === t[0]) && ktPlay.me.zones.lib.slice(-2).every(c => t.slice(1).includes(c.iid)), top3)).toBe(true);
+  await expect(b.locator("#log li").last()).toContainText("Luke looked at the top 3 cards of their library, put 1 card into their hand, and put the rest (2) on the bottom in a random order.");
+
   // The fight rules the combat screen works out
   const f = (att, ...bl) => ktp(a, ([att, bl]) => { const r = ktPlay.fight(att, bl); return [r.toYou, r.attDies, r.deadBlockers.length, r.attGain, r.blkGain]; }, [att, bl]);
   const C = (p, t, ...kw) => ({ p, t, kw });

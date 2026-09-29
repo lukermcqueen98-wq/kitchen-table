@@ -1944,7 +1944,7 @@ function libMenu(x, y){
     { label:"Shuffle", fn:shuffleLib }, "-",
     { label:"Scry...", fn:() => askNumber("Scry how many?", 1, v => lookTop(v, "scry")) },
     { label:"Surveil...", fn:() => askNumber("Surveil how many?", 1, v => lookTop(v, "surveil")) },
-    { label:"Look at the top cards...", fn:() => askNumber("Look at how many?", 3, v => lookTop(v, "look")) },
+    { label:"Look at the top cards (take some, the rest to the bottom or top)...", fn:() => askNumber("Look at how many?", 3, v => lookTop(v, "look")) },
     { label:"Mill...", fn:() => askNumber("Mill how many?", 1, v => { const k = Math.min(v, me.zones.lib.length); for (let i = 0; i < k; i++) move(me.zones.lib[0].iid, "gy", { quiet:true }); say(`milled ${k} card${k === 1 ? "" : "s"}.`); }) },
     { label:"Search your library...", fn:searchLib }, "-",
     { label:"Reveal the top card", fn:() => me.zones.lib[0] && reveal([me.zones.lib[0]], "the top of their library") },
@@ -2112,6 +2112,7 @@ function viewZone(title, list, zone){
 }
 function lookTop(n, mode){
   const top = me.zones.lib.slice(0, Math.min(n, me.zones.lib.length)); if (!top.length) return;
+  if (mode === "look") { digDialog(top); return; }
   const choice = new Map(top.map(c => [c.iid, "top"]));
   const order = top.slice();
   const opts = mode === "scry" ? [["top", "Top"], ["bottom", "Bottom"]] : mode === "surveil" ? [["top", "Top"], ["gy", "Graveyard"]] : null;
@@ -2133,6 +2134,44 @@ function lookTop(n, mode){
     changed();
   } }], { closable:!opts });
 }
+/* Look at the top cards, take any of them (to your hand, the battlefield, the graveyard or exile), and put the rest
+   on the bottom or top, in a random order or the order shown. Taking none and leaving them on top in order is a
+   plain look. */
+function digDialog(top){
+  const where = new Map(top.map(c => [c.iid, "rest"]));
+  const order = top.slice();
+  let rest = "bottom-random", reveal = false;
+  const DEST = [["hand", "Hand"], ["bf", "Battlefield"], ["gy", "Graveyard"], ["ex", "Exile"]];
+  const REST = [["bottom-random", "Bottom, random order"], ["top-random", "Top, random order"], ["bottom", "Bottom, in this order"], ["top", "Top, in this order"]];
+  const body = el("div");
+  const draw_ = () => {
+    body.innerHTML = "";
+    body.append(el("p", { className:"hint", textContent:"Pick where the cards you take go; the others are \"the rest\". Left is the top of your library." }));
+    body.append(cardGrid(order, c => [...DEST.map(([v, label]) => [(where.get(c.iid) === v ? "✓ " : "") + label, () => { where.set(c.iid, where.get(c.iid) === v ? "rest" : v); draw_(); }]),
+      ["◀", () => { const i = order.indexOf(c); if (i > 0) { [order[i - 1], order[i]] = [order[i], order[i - 1]]; draw_(); } }],
+      ["▶", () => { const i = order.indexOf(c); if (i < order.length - 1) { [order[i + 1], order[i]] = [order[i], order[i + 1]]; draw_(); } }]]));
+    const taken = order.filter(c => where.get(c.iid) !== "rest").length, left = order.length - taken;
+    const restRow = el("div", { className:"row", style:"margin-top:12px;gap:6px" }, el("b", { textContent:`The rest (${left}):` }),
+      ...REST.map(([v, label]) => { const b = el("button", { className:"btn small" + (rest === v ? " primary" : ""), textContent:label }); b.onclick = () => { rest = v; draw_(); }; return b; }));
+    const rv = el("input", { type:"checkbox", checked:reveal }); rv.onchange = () => { reveal = rv.checked; };
+    body.append(restRow, el("label", { style:"display:flex;gap:8px;align-items:center;margin-top:10px" }, rv, "Reveal the cards I take to the table"));
+  };
+  draw_();
+  openModal(`Top ${top.length} cards`, body, [{ label:"Done", primary:true, fn:() => {
+    const taken = order.filter(c => where.get(c.iid) !== "rest"), others = order.filter(c => where.get(c.iid) === "rest");
+    me.zones.lib.splice(0, top.length);
+    const back = rest.endsWith("random") ? shuffle(others.slice()) : others;
+    if (rest.startsWith("top")) me.zones.lib.unshift(...back); else me.zones.lib.push(...back);
+    me.zones.hand.push(...taken.filter(c => where.get(c.iid) === "hand"));  // (taken cards go back on top for a moment so move() can place them)
+    for (const c of taken.filter(c => where.get(c.iid) !== "hand")) { me.zones.lib.unshift(c); move(c.iid, where.get(c.iid), { quiet:true }); }
+    if (reveal && taken.length) reveal_(taken);
+    const named = cs => reveal || cs.every(c => where.get(c.iid) !== "hand") ? cs.map(nameOf).join(", ") : `${cs.length} card${cs.length === 1 ? "" : "s"}`;
+    const parts = DEST.map(([v, label]) => { const cs = taken.filter(c => where.get(c.iid) === v); return cs.length ? `${v === "hand" ? named(cs) : cs.map(nameOf).join(", ")} ${v === "hand" ? "into their hand" : v === "bf" ? "onto the battlefield" : v === "gy" ? "into their graveyard" : "into exile"}` : ""; }).filter(Boolean);
+    say(`looked at the top ${top.length} card${top.length === 1 ? "" : "s"} of their library${parts.length ? `, put ${parts.join(" and ")},` : ""}${others.length ? ` and put the rest (${others.length}) on the ${rest.startsWith("top") ? "top" : "bottom"}${rest.endsWith("random") ? " in a random order" : ""}` : ""}.`);
+    changed();
+  } }, { label:"Cancel" }], { wide:true });
+}
+const reveal_ = list => reveal(list, "");
 function searchLib(){
   const input = el("input", { type:"search", placeholder:"Filter by name or type", ariaLabel:"Filter" });
   const list = el("div");
