@@ -3705,6 +3705,9 @@ $("#searchBtn").onclick = manualSearch;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let noPhrases = false, quickEnds = 0;
 var shortNames = new Map();  // short name -> the cards sharing it (var: the name list can load before this line runs)
+// short name -> the card people play by far the most (popular-names.json, built from Scryfall's EDHREC ranks)
+var popularNames = new Map();
+fetch("popular-names.json").then(r => r.ok ? r.json() : null).then(j => { if (j?.names) popularNames = new Map(Object.entries(j.names).map(([k, v]) => [norm(k), v])); }).catch(() => {});
 let rec = null, capOn = false, cardIndex = null, indexLoading = null, maxWords = 1, interimEl = null;
 // One-word card names that are also everyday words or game terms, so they don't link by accident
 const NOT_ALONE = new Set(("sacrifice lifelink deathtouch vigilance trample flying haste reach menace flash hexproof indestructible " +
@@ -4014,7 +4017,7 @@ async function parseActions(text, lisp, seat = mySeat, { answer = false } = {}){
    So "that Rhystic Study is brutal" pops up and "rest in peace grandpa" doesn't, but "exile it with Rest in Peace"
    does. */
 const EVERYDAY = new Set(("or and but if so no not nor is it at by up out off as be am are was of to in on for the a an into onto from with " +
-  "ancient coat arms tower command stroke genius heed grudge harmony incoming outgoing anything everything something nothing " +
+  "ancient coat arms tower command stroke genius heed grudge harmony harmonize clover incoming outgoing anything everything something nothing " +
   "somewhere everywhere anywhere yesterday tomorrow tonight together whatever whenever wherever however seriously honestly " +
   "goes going gone went gets getting got gotten does doing did done has having had says saying said makes making made comes coming came " +
   "takes taking took taken gives giving gave given sees seeing saw seen knows knew known thinks thinking thought looks looking looked " +
@@ -4100,7 +4103,10 @@ const MTG_WORDS = new Set(("mana tap taps tapped untap stack graveyard yard exil
   "attack attacking block blocking damage lands sacrifice sac discard mill scry upkeep response resolve resolves cmc ramp wipe removal target " +
   "opponent opponents priority storm etb dies flash counter cascade proliferate reanimate legendary player players card cards life turn " +
   "deal deals dealt power toughness combat hexproof trample flying haste lifelink deathtouch vigilance menace reach ward " +
-  "treasure treasures clue clues food blood map maps powerstone gold shard junk role incubator").split(" "));
+  "treasure treasures clue clues food blood map maps powerstone gold shard junk role incubator " +
+  "goblins elves zombies dragons angels vampires merfolk wizards slivers dinosaurs spirits demons knights squirrels saprolings thopters").split(" "));
+// Talk about shows, films and songs: a card name there is usually the everyday phrase ("time warp in that movie")
+const NOT_MAGIC = new Set("movie movies film films tv television song songs video videos episode netflix youtube".split(" "));
 function mentionsIn(text, lisp){
   if (!cardIndex || !text.trim()) return [];
   const pool = deckPool(), atTable = new Set([...pool.values()].map(v => v.name)), seen = new Set(cardHist.slice(0, 30).map(c => c.name));
@@ -4114,7 +4120,7 @@ function mentionsIn(text, lisp){
   const fuzzy = loose.filter(r => r.seg.fuzzy);
   const taken = exact.filter(r => (r.seg.card || r.seg.kw) && !fuzzy.some(f => covers(f, r)));
   const cands = [...taken, ...fuzzy.filter(r => !taken.some(e => overlap(r, e)))].sort((a, b) => a.start - b.start);
-  const words = exact.flatMap(r => r.seg.t.split(/\s+/)).map(norm), out = [];
+  const words = exact.flatMap(r => r.seg.t.split(/\s+/)).map(norm), out = [], scored = [];
   for (const { seg, start, n } of cands) {
     let name = seg.card, heard = seg.t, fuzzy = !!seg.fuzzy, len = n;
     if (!name && seg.kw && !NOT_ALONE.has(norm(seg.t)) && !MTG_WORDS.has(norm(seg.t))) name = cardIndex.get(norm(seg.t));  // a card that's also a game term: "Counterspell"
@@ -4125,7 +4131,8 @@ function mentionsIn(text, lisp){
     if (fuzzy && short && (k === short || k.startsWith(short + " "))) { len = short.split(" ").length; heard = seg.t.split(/\s+/).slice(0, len).join(" "); k = short; fuzzy = false; }
     // (Magic's own words are everyday words at a Magic table: "Deal Damage" is said far more often than it's cast)
     // a short name several cards share: the one at the table or seen lately, or nothing
-    if (shortNames.has(k)) { const pick = [...shortNames.get(k)].find(c => atTable.has(c) || seen.has(c)); if (!pick) continue; name = pick; }
+    // (else the one people play by far the most: "Atraxa" is Praetors' Voice)
+    if (shortNames.has(k)) { const pick = [...shortNames.get(k)].find(c => atTable.has(c) || seen.has(c)) || (shortNames.get(k).has(popularNames.get(k)) ? popularNames.get(k) : null); if (!pick) continue; name = pick; }
     const nk = norm(name.split(" // ")[0]), sig = k.split(" ").filter(w => !STOP.has(w)), plain = sig.every(w => EVERYDAY.has(w) || MTG_WORDS.has(w));
     let score;
     if (fuzzy) { const sim = similarity(lisp ? lispNorm(k) : k, lisp ? lispNorm(nk) : nk); score = sig.length < 2 || plain || sim < 0.7 ? 0 : sim >= 0.8 ? 1.5 : 1; }
@@ -4144,10 +4151,24 @@ function mentionsIn(text, lisp){
     // a card used as a verb on something: "I'll path it", "gonna swords your commander", "let me bolt him"
     else if (/^(i'?ll|i|i'?m|gonna|will|let me|i'?m gonna|going to)$/.test(before.slice(-2).join(" ").replace(/^.* (?=let me|going to|i'?m gonna)/, "")) || /^(i'?ll|gonna|i)$/.test(prev))
       if (/^(it|that|this|them|him|her|your|his|their)\b/.test(words[start + len] || "")) score += 1.5;
+    // a Magic verb that's also a card, said as an order: "reanimate the fatty", "entomb it"
+    if (start === 0 && len === 1 && CUE_VERB.has(k) && !NOT_ALONE.has(k) && !["flicker", "blink"].includes(k) && /^(it|that|this|them|him|her|the|my|your|his|their)$/.test(words[len] || "")) score += 1.5;
     const vocab = words.filter((w, i) => (i < start || i >= start + len) && (MTG_WORDS.has(w) || CUE_VERB.has(w))).length;
     score += vocab >= 2 ? 1 : vocab ? 0.5 : 0;
-    if (score >= 2) out.push({ name, heard, score });
+    if (words.some((w, i) => (i < start || i >= start + len) && NOT_MAGIC.has(w))) score -= 1.5;
+    scored.push({ name, heard, score, start, len });
   }
+  // A card next to one that's clearly a card counts too: "ponder into brainstorm", "entomb then animate dead"
+  const JOIN = /^(and|then|into|plus|or|with|,)$/;
+  for (const c of scored) if (c.score >= 1 && c.score < 2 && scored.some(o => o !== c && o.score >= 2 && (
+      (o.start === c.start + c.len + 1 && JOIN.test(words[c.start + c.len] || "")) || (c.start === o.start + o.len + 1 && JOIN.test(words[o.start + o.len] || ""))))) c.score = 2;
+  // A one-word card that's also a game term, right after a Magic verb: "counter it with negate", "cast shock"
+  words.forEach((w, i) => {
+    if (!NOT_ALONE.has(w) || /^(plains|island|swamp|mountain|forest|wastes)$/.test(w) || !cardIndex.has(w) || scored.some(c => i >= c.start && i < c.start + c.len)) return;
+    const b = words.slice(Math.max(0, i - 3), i);
+    if (CUE_VERB.has(b[b.length - 1]) || (b[b.length - 1] === "with" && b.some(x => CUE_VERB.has(x)))) scored.push({ name:cardIndex.get(w), heard:w, score:2, start:i, len:1 });
+  });
+  for (const c of scored.sort((a, b) => a.start - b.start)) if (c.score >= 2) out.push({ name:c.name, heard:c.heard, score:c.score });
   return out;
 }
 // The cards named in what followed "I play" / "I cast": one, or a few joined by "and" / "then"
@@ -4168,7 +4189,7 @@ async function cardsIn(words, lisp, seat = mySeat){
     // a card named exactly at the start first (keeps names with "and" in them whole, like Fire and Ice)
     const first = linkify(rest, lisp)[0];
     let heard, card = null;
-    const firstKey = first?.card && norm(first.t), likely = shortNames.has(firstKey) ? [...shortNames.get(firstKey)].find(c => likelyNames().has(c)) : null;
+    const firstKey = first?.card && norm(first.t), likely = shortNames.has(firstKey) ? [...shortNames.get(firstKey)].find(c => likelyNames().has(c)) || (shortNames.get(firstKey).has(popularNames.get(firstKey)) ? popularNames.get(firstKey) : null) : null;
     if (first?.card && !first.fuzzy && (!shortNames.has(firstKey) || likely)) {
       if (likely) first.card = likely;
       heard = first.t; card = await fetchCard(null, first.card);

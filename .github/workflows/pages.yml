@@ -55,6 +55,17 @@ jobs:
           curl -fsSL https://mtgjson.com/api/v5/AllDeckFiles.tar.gz | tar -xz -C "$RUNNER_TEMP/decks" || echo "The deck archive didn't download; the builder fetches decks one by one."
           node tools/build-precons.mjs site/precons.json --decks "$RUNNER_TEMP/decks"
 
+      # The most-played card for each short name several cards share ("Atraxa"), for the webcam table's popups
+      - name: Build the popular short names list
+        continue-on-error: true
+        run: node tools/build-popular-names.mjs site/popular-names.json
+
+      - name: Keep the published popular short names list
+        if: hashFiles('site/popular-names.json') == ''
+        run: |
+          site="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          curl -fsSL "$site/popular-names.json" -o site/popular-names.json || rm -f site/popular-names.json
+
       - name: Keep the published official decks list
         if: hashFiles('site/precons.json') == ''
         run: |
