@@ -71,7 +71,7 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await expect(opp(b, "Luke").locator(".ocz .card")).toHaveCount(1);
 
   // Start: everyone is dealt 7 and asked to keep or mulligan (London: draw 7, put one on the bottom per mulligan)
-  await a.click("#startBtn");
+  await a.click("#startBtn"); await a.locator(".modal").getByRole("button", { name:"Start the game" }).click();  // (house rules first)
   for (const p of [a, b]) await expect(p.locator(".modal-card h2")).toHaveText("Keep this hand?", { timeout:10000 });
   await expect(a.locator(".modal .gcard")).toHaveCount(7);
   await a.locator(".modal").getByRole("button", { name:"Mulligan", exact:true }).click();

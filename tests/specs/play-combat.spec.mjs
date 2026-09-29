@@ -21,7 +21,7 @@ test("digital table: undo, the stack, and combat", async () => {
   await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
   await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", DECK); await b.click("#joinBtn");
   await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
-  await a.click("#startBtn");
+  await a.click("#startBtn"); await a.locator(".modal").getByRole("button", { name:"Start the game" }).click();  // (house rules first)
   for (const p of [a, b]) await p.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();
   await expect(a.locator("#hand .card")).toHaveCount(7);
 

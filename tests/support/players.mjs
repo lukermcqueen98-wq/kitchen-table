@@ -9,7 +9,9 @@ import { BASE, PEER_PORT } from "./global-setup.mjs";
 const MODULES = path.resolve(import.meta.dirname, "..", "node_modules");
 const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js", "opencv.js":"@techstark/opencv-js/dist/opencv.js" };
 const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : "Artifact", oracle_text:"{T}: Add {C}{C}.", mana_cost:"{2}{G/U}", scryfall_uri:"https://scryfall.com",
-  color_identity:k === 2 ? ["G", "U"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
+  color_identity:k === 2 ? ["G", "U"] : k === 5 ? ["B"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
+  // (for the deck check: Gwenom is banned in Commander, and Sol Ring is banned in Modern and restricted in Vintage)
+  legalities:{ commander:k === 5 ? "banned" : "legal", duel:"legal", modern:k === 3 ? "banned" : "legal", vintage:k === 3 ? "restricted" : "legal" },
   image_uris:{ small:`https://cards.scryfall.io/small/${k % 3}.png`, normal:`https://cards.scryfall.io/normal/${k % 3}.png`, art_crop:`https://cards.scryfall.io/art_crop/${k % 3}.png` } });
 const FOREST = { object:"card", id:"00000009-0000-4000-8000-000000000009", name:"Forest", type_line:"Basic Land — Forest", oracle_text:"({T}: Add {G}.)", mana_cost:"",
   produced_mana:["G"], image_uris:{ small:"https://cards.scryfall.io/small/0.png", normal:"https://cards.scryfall.io/normal/0.png" } };

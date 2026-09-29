@@ -13,7 +13,7 @@
   --parchment:#efe6cf; --muted:#a9b8ae; --brass:#c9a44c; --danger:#e0765c;
   --serif:"Spectral", Georgia, "Times New Roman", serif;
   --sans:"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --cw:84px;  /* a card on your battlefield */
+  --cw:108px;  /* a card on your battlefield */
   box-sizing:border-box;
 }
 *,*::before,*::after{box-sizing:inherit}
@@ -46,6 +46,9 @@ button{cursor:pointer}
 .deckbar select,.deckbar input{flex:1;min-width:130px;padding:7px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
 #deckInfo{font-size:14px;margin:6px 0 10px;min-height:1.5em}
 #deckInfo .bad{color:var(--danger)}
+#deckInfo .good{color:#9fd3a2}
+.warns{margin:4px 0 0;padding-left:20px;color:var(--danger);font-size:13px}
+.warns li{margin:2px 0}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px;min-height:30px}
 .chips span{display:flex;gap:6px;align-items:center;background:rgba(0,0,0,.3);border:1px solid var(--brass);border-radius:14px;padding:3px 6px 3px 11px;font-size:14px}
 .chips button{border:0;background:none;font-size:16px;line-height:1;padding:0 4px}
@@ -79,8 +82,8 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .obody{flex:1;display:flex;min-height:0}
 .ocz{display:flex;flex-direction:column;gap:4px;padding:4px;border-right:1px solid var(--felt-edge)}
 .obf{flex:1;position:relative;min-height:0}
-.obf .card{--w:46px}
-.ocz .card{--w:40px;position:relative}
+.obf .card{--w:64px}
+.ocz .card{--w:52px;position:relative}
 #me{flex:1;display:flex;min-height:0;margin:8px;border:1px solid var(--felt-edge);border-radius:10px;background:rgba(0,0,0,.12);overflow:hidden}
 #bf{flex:1;position:relative;min-width:0}
 #bf .card{--w:var(--cw)}
@@ -97,16 +100,26 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .pile .card{--w:52px;position:relative;margin:0 auto 2px}
 .pile .ph{width:52px;aspect-ratio:63/88;margin:0 auto 2px;border:1px dashed var(--felt-edge);border-radius:4px}
 #czone{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;min-height:60px;border:1px solid var(--felt-edge);border-radius:8px;padding:4px;position:relative}
-#czone .card{--w:56px;position:relative}
+#czone .card{--w:70px;position:relative}
 #czone::before{content:"Command zone";position:absolute;top:-9px;left:6px;font-size:11px;color:var(--muted);background:var(--felt-deep);padding:0 4px}
 .mana{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
 .mana button{border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);border-radius:12px;padding:1px 6px;font-size:12px;display:flex;align-items:center;gap:3px}
 .mana img{width:14px;height:14px}
 .chip{font-size:12px;border:1px solid var(--felt-edge);border-radius:12px;padding:1px 8px;color:var(--muted)}
+.badge{font-size:12px;border:1px solid var(--brass);color:var(--brass);border-radius:12px;padding:0 8px;white-space:nowrap}
+#myBadges{display:flex;gap:6px;flex-wrap:wrap}
+#myBadges:empty{display:none}
+#dayChip{background:none;cursor:pointer}
+#dayChip.night{border-color:#8fa3d8;color:#b9c6ee}
+#dayChip.day{border-color:var(--brass);color:var(--brass)}
+.sbcols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sbcols ul{list-style:none;margin:0;padding:0;max-height:52vh;overflow:auto}
+.sbcols li{margin:3px 0}
+.sbcols li button{width:100%;text-align:left}
 .chip.warn{border-color:var(--danger);color:var(--danger)}
 #handWrap{grid-column:1;border-top:1px solid var(--felt-edge);padding:6px 10px;display:flex;gap:10px;align-items:center}
 #hand{flex:1;display:flex;min-height:134px;align-items:flex-end;overflow-x:auto;overflow-y:visible;padding-top:10px}
-#hand .card{--w:96px;position:relative;margin-right:-22px;transition:transform .12s}
+#hand .card{--w:124px;position:relative;margin-right:-26px;transition:transform .12s}
 #hand .card:hover{transform:translateY(-10px);z-index:5}
 aside#panel{grid-row:2 / span 2;grid-column:2;border-left:1px solid var(--felt-edge);display:flex;flex-direction:column;min-height:0}
 #zoom{padding:8px;border-bottom:1px solid var(--felt-edge)}
@@ -135,6 +148,10 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card.back,.card.fd{background:#1a1208 url(card-back.jpg) center/100% 100% no-repeat}
 .card.mine{cursor:grab}
 .card.dragging{opacity:.35}
+.card .pt{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.85);border:1px solid var(--muted);color:var(--parchment);border-radius:6px;padding:0 5px;font:700 12px/16px var(--sans);white-space:nowrap}
+.card .pt.up{border-color:#7fd08a;color:#aef0b6}
+.card .pt.down{border-color:var(--danger);color:#ffb3a1}
+.obf .card .pt{font-size:10px;line-height:13px;padding:0 3px}
 .card .ctrs{position:absolute;left:2px;bottom:2px;display:flex;flex-direction:column;gap:1px;align-items:flex-start}
 .card .ctrs span{background:rgba(0,0,0,.8);border:1px solid var(--brass);color:var(--parchment);border-radius:8px;padding:0 4px;font-size:10px;line-height:14px;white-space:nowrap}
 .card .tok{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.75);font-size:9px;padding:0 3px;border-radius:4px}
@@ -155,7 +172,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 #stackBar{display:flex;align-items:center;gap:10px;margin:8px 8px 0;padding:4px 10px;border:1px dashed var(--felt-edge);border-radius:10px;min-height:36px;background:rgba(0,0,0,.15)}
 #stackBar.has{border-style:solid;border-color:var(--brass)}
 #stackCards{display:flex;gap:10px;align-items:center;overflow-x:auto;padding:14px 0 4px}
-#stackCards .card{--w:52px;position:relative;flex:0 0 auto}
+#stackCards .card{--w:66px;position:relative;flex:0 0 auto}
 #stackCards .who{position:absolute;left:0;right:0;top:-14px;font-size:10px;text-align:center;white-space:nowrap;overflow:hidden}
 #combatNote{font-size:13px}
 .ghost{position:fixed;pointer-events:none;z-index:90;opacity:.9;transform:rotate(-3deg)}
@@ -167,7 +184,13 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 #menu hr{border:0;border-top:1px solid var(--felt-edge);margin:4px 0}
 #menu .mh{font-size:12px;color:var(--muted);padding:4px 10px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:70;padding:16px}
-.modal-card{background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:12px;padding:16px 18px;width:min(100%,860px);max-height:90vh;overflow:auto}
+.modal-card{background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:12px;padding:16px 18px;width:min(100%,860px);max-height:92vh;overflow:auto}
+.modal-card.wide{width:min(100%,1240px)}
+.modal-card .good{color:#9fd3a2}
+.modal-card.wide .gcard{width:164px}
+.modal-card.wide .gcard .card{--w:164px}
+#pop{position:fixed;z-index:85;pointer-events:none;filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))}
+#pop img{width:100%;display:block;border-radius:4.75%/3.5%;aspect-ratio:63/88;background:#000}
 .modal-card h2{font:700 22px var(--serif);margin:0 0 10px}
 .grid{display:flex;flex-wrap:wrap;gap:8px}
 .gcard{width:120px;display:flex;flex-direction:column;gap:3px;align-items:stretch}
@@ -228,6 +251,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
         <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" autocomplete="nickname"></label>
         <label class="field"><span>Table code (leave empty to start a new table)</span><input id="roomIn" maxlength="12" autocomplete="off"></label>
         <label class="field"><span>Format (the first player's pick is used)</span><select id="fmtSel"></select></label>
+        <label class="field" id="legalField"><span>Check my deck against</span><select id="legalSel"></select></label>
         <label class="check" style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="watchIn"> Just watch this table (no deck needed; you won't take a seat)</label>
         <label class="field"><span>Microphone for voice chat</span><select id="micSel"><option value="">Default microphone</option></select></label>
         <p class="hint">Voice chat only; no webcams and no voice commands. Everything about the cards is on the table.</p>
@@ -251,6 +275,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
     <span class="grp mid">
       <button class="btn small primary playonly" id="startBtn">Start game</button>
       <span id="turnInfo"></span>
+      <button class="chip hidden" id="dayChip" title="Day and night: click to switch"></button>
       <span class="phases" id="phases"></span>
       <button class="btn small hidden playonly" id="attackBtn">Attack</button>
       <button class="btn small hidden playonly" id="dmgBtn">Combat damage</button>
@@ -261,6 +286,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
       <button class="btn small playonly" id="d20Btn" title="Roll a twenty-sided die">d20</button>
       <button class="btn small playonly" id="coinBtn">Coin</button>
       <button class="btn small playonly" id="tokenBtn">Tokens</button>
+      <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
+      <button class="btn small playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
+      <button class="btn small hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
       <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
       <button class="btn small" id="micBtn">Mic on</button>
       <button class="btn small" id="statsBtn">Stats</button>
@@ -274,6 +302,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
       <div id="side">
+        <div id="myBadges"></div>
         <div class="lifebox"><button id="lifeMinus" aria-label="Lose 1 life">&minus;</button><output id="lifeOut" aria-label="Your life"></output><button id="lifePlus" aria-label="Gain 1 life">+</button></div>
         <div id="ctrlBox"></div>
         <div class="piles">
@@ -296,6 +325,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 </section>
 
 <div id="menu" class="hidden" role="menu"></div>
+<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""></div>
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
 <div id="toast" class="hidden" role="status"></div>
 <div id="audios" class="hidden"></div>
@@ -370,10 +400,10 @@ function textOf(c, face = 0){
 }
 
 /* Decklists: "1 Sol Ring", "1x Sol Ring (CMR) 472", "4 Lightning Bolt", sections like "Commander", "Deck", "Sideboard"
-   (MTG Arena and Moxfield exports), and Archidekt's "[Commander]" or "*CMDR*" marks. Sideboard, maybeboard and token
-   sections are left out of the deck. */
+   (MTG Arena and Moxfield exports), and Archidekt's "[Commander]" or "*CMDR*" marks. The sideboard (and a companion,
+   or "SB:" lines) is kept apart for sideboarding between games; maybeboard and token sections are left out. */
 function parseDeck(text){
-  const out = { main:[], cmdrs:[] }; let section = "main";
+  const out = { main:[], cmdrs:[], side:[] }; let section = "main";
   for (let line of String(text).split(/\r?\n/)) {
     line = line.trim(); if (!line || line.startsWith("#")) continue;
     const head = /^(?:\/\/\s*)?([a-z ]+?)\s*:?\s*(?:\(\d+\))?$/i.exec(line);
@@ -381,9 +411,11 @@ function parseDeck(text){
       const h = head[1].toLowerCase().trim();
       if (/^commanders?$/.test(h)) { section = "cmdr"; continue; }
       if (/^(deck|main|mainboard|main deck|creatures?|lands?|spells?|instants?|sorcer(y|ies)|artifacts?|enchantments?|planeswalkers?|battles?|other)$/.test(h)) { section = "main"; continue; }
-      if (/^(sideboard|side|maybeboard|maybe|considering|tokens?|companion|about|name .*)$/.test(h)) { section = "skip"; continue; }
+      if (/^(sideboard|side|companion)$/.test(h)) { section = "side"; continue; }
+      if (/^(maybeboard|maybe|considering|tokens?|about|name .*)$/.test(h)) { section = "skip"; continue; }
     }
-    if (/^sb:\s*/i.test(line)) continue;
+    let sb = false;
+    if (/^sb:\s*/i.test(line)) { sb = true; line = line.replace(/^sb:\s*/i, ""); }
     const cmdrMark = /\*cmdr\*|\[commander/i.test(line);
     const m = /^(\d+)\s*x?\s+(.+)$/i.exec(line);
     let n = m ? +m[1] : 1, name = (m ? m[2] : line)
@@ -391,13 +423,14 @@ function parseDeck(text){
       .replace(/\s+\([A-Za-z0-9]{2,6}\)(\s+[A-Za-z0-9★\-]+)?\s*$/, "").trim();
     if (!name || section === "skip") continue;
     n = clamp(n, 1, 250);
-    if (section === "cmdr" || cmdrMark) out.cmdrs.push(name); else out.main.push({ n, name });
+    if (section === "side" || sb) out.side.push({ n, name });
+    else if (section === "cmdr" || cmdrMark) out.cmdrs.push(name); else out.main.push({ n, name });
   }
   return out;
 }
 // Every name in a decklist, looked up on Scryfall 75 at a time
 async function resolveDeck(parsed){
-  const names = [...new Set([...parsed.main.map(x => x.name), ...parsed.cmdrs])];
+  const names = [...new Set([...parsed.main.map(x => x.name), ...parsed.side.map(x => x.name), ...parsed.cmdrs])];
   const found = new Map(), missing = [];
   for (let i = 0; i < names.length; i += 75) {
     const part = names.slice(i, i + 75);
@@ -411,10 +444,65 @@ async function resolveDeck(parsed){
     for (const nf of r.not_found || []) if (nf?.name) missing.push(part.find(n => norm(n.split(" // ")[0]) === norm(nf.name)) || nf.name);
   }
   const get = n => found.get(norm(n)) || [...found.values()].find(c => norm(c.name.split(" // ")[0]) === norm(n.split(" // ")[0]));
-  const main = [], cmdrs = [];
+  const main = [], cmdrs = [], side = [];
   for (const { n, name } of parsed.main) { const c = get(name); if (c) for (let k = 0; k < n; k++) main.push(c.id); }
+  for (const { n, name } of parsed.side) { const c = get(name); if (c) for (let k = 0; k < n; k++) side.push(c.id); }
   for (const name of parsed.cmdrs) { const c = get(name); if (c) cmdrs.push(c.id); }
-  return { main, cmdrs, missing:[...new Set(missing)] };
+  return { main, cmdrs, side, missing:[...new Set(missing)] };
+}
+
+/* Deck check: warnings (never a block) from Scryfall's card data. Commander: exactly 100 cards with the commander,
+   one copy of each card (basic lands and "any number of cards named" aside), nothing outside the commander's
+   colors, and nothing banned. 60-card: at least 60 cards, up to 4 copies, a sideboard of up to 15, and, if you pick a
+   format to check against, nothing banned or not legal there (and one copy of a card restricted in Vintage). */
+const LEGAL_FMTS = { "":"Don't check a format", standard:"Standard", pioneer:"Pioneer", modern:"Modern", legacy:"Legacy", vintage:"Vintage", pauper:"Pauper" };
+const NUMWORDS = { two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10 };
+function copyLimit(c, normal){
+  if (/^Basic\b/.test(typeOf(c))) return Infinity;
+  const t = String(c?.oracle_text || "");
+  if (/A deck can have any number of cards named/i.test(t)) return Infinity;
+  const m = /A deck can have up to (\w+) cards named/i.exec(t); if (m) return NUMWORDS[m[1].toLowerCase()] || +m[1] || normal;
+  return normal;
+}
+function deckProblems({ main, cmdrs = [], side = [] }, fmt, legalFmt = ""){
+  const out = [], card = id => cards.get(id), name = id => card(id)?.name || "?";
+  const list = (xs, n = 6) => xs.slice(0, n).join(", ") + (xs.length > n ? ` and ${xs.length - n} more` : "");
+  const counts = ids => { const m = new Map(); for (const id of ids) { const c = card(id); if (c) m.set(c.name, [c, (m.get(c.name)?.[1] || 0) + 1]); } return m; };
+  const status = (ids, key) => { const m = new Map(); for (const id of ids) { const v = card(id)?.legalities?.[key]; if (v && v !== "legal") (m.get(v) || m.set(v, new Set()).get(v)).add(name(id)); } return m; };
+  if (FORMATS[fmt].cmdr) {
+    const total = main.length + cmdrs.length, key = fmt === "duel" ? "duel" : "commander";
+    if (total !== 100) out.push(`${total} cards${cmdrs.length ? " with the commander" : ""}: Commander decks have exactly 100${cmdrs.length ? "" : " (commander included)"}.`);
+    const extra = [...counts([...main, ...cmdrs]).values()].filter(([c, n]) => n > copyLimit(c, 1)).map(([c, n]) => `${c.name} (${n})`);
+    if (extra.length) out.push(`More than one copy: ${list(extra)}.`);
+    const bad = cmdrs.map(card).filter(c => c && !(/Legendary/.test(typeOf(c)) && /Creature|Background/.test(typeOf(c))) && !/can be your commander/i.test(c.oracle_text || ""));
+    if (bad.length) out.push(`${list(bad.map(c => c.name))} can't be a commander (not a legendary creature).`);
+    if (cmdrs.length) {
+      const colors = new Set(cmdrs.flatMap(id => card(id)?.color_identity || []));
+      const off = [...new Set(main.map(card).filter(c => c && (c.color_identity || []).some(x => !colors.has(x))).map(c => c.name))];
+      if (off.length) out.push(`Outside your commander's colors (${[...colors].join("") || "colorless"}): ${list(off)}.`);
+    }
+    const st = status([...main, ...cmdrs], key);
+    if (st.get("banned")) out.push(`Banned in ${FORMATS[fmt].short}: ${list([...st.get("banned")])}.`);
+    if (st.get("not_legal")) out.push(`Not legal in ${FORMATS[fmt].short}: ${list([...st.get("not_legal")])}.`);
+    return out;
+  }
+  if (main.length < 60) out.push(`${main.length} cards: 60-card formats need at least 60.`);
+  if (side.length > 15) out.push(`${side.length} cards in the sideboard: the most is 15.`);
+  const extra = [...counts([...main, ...side]).values()].filter(([c, n]) => n > copyLimit(c, 4)).map(([c, n]) => `${c.name} (${n})`);
+  if (extra.length) out.push(`More than 4 copies: ${list(extra)}.`);
+  if (legalFmt && LEGAL_FMTS[legalFmt]) {
+    const st = status([...main, ...side], legalFmt), f = LEGAL_FMTS[legalFmt];
+    if (st.get("banned")) out.push(`Banned in ${f}: ${list([...st.get("banned")])}.`);
+    if (st.get("not_legal")) out.push(`Not legal in ${f}: ${list([...st.get("not_legal")])}.`);
+    const restricted = [...counts([...main, ...side]).values()].filter(([c, n]) => c.legalities?.[legalFmt] === "restricted" && n > 1).map(([c]) => c.name);
+    if (restricted.length) out.push(`Restricted in ${f} (one copy only): ${list(restricted)}.`);
+  }
+  return out;
+}
+function problemList(probs){
+  const ul = el("ul", { className:"warns" });
+  for (const p of probs) ul.append(el("li", { textContent:p }));
+  return ul;
 }
 
 /* =====================================================================
@@ -423,6 +511,10 @@ async function resolveDeck(parsed){
 for (const [k, f] of Object.entries(FORMATS)) $("#fmtSel").append(el("option", { value:k, textContent:f.label }));
 $("#nameIn").value = store.get("kt-name", "");
 $("#fmtSel").value = store.get("kt-dig-fmt", "cmdr");
+for (const [k, v] of Object.entries(LEGAL_FMTS)) $("#legalSel").append(el("option", { value:k, textContent:v }));
+$("#legalSel").value = store.get("kt-dig-legal", "");
+const showLegal = () => $("#legalField").classList.toggle("hidden", FORMATS[$("#fmtSel").value].cmdr);
+showLegal();
 if (params.get("room")) $("#roomIn").value = params.get("room");
 $("#deckIn").value = store.get("kt-dig-deck", "");
 const decks = (() => { try { return JSON.parse(store.get("kt-dig-decks", "{}")) || {}; } catch { return {}; } })();
@@ -441,7 +533,8 @@ $("#delDeck").onclick = () => {
   delete decks[n]; store.set("kt-dig-decks", JSON.stringify(decks)); fillSaved();
 };
 $("#deckIn").addEventListener("input", () => { loaded = null; $("#deckInfo").textContent = ""; });
-$("#fmtSel").onchange = () => { if (loaded) showDeck(); };
+$("#fmtSel").onchange = () => { showLegal(); if (loaded) showDeck(); };
+$("#legalSel").onchange = () => { store.set("kt-dig-legal", $("#legalSel").value); if (loaded) showDeck(); };
 navigator.mediaDevices?.enumerateDevices?.().then(ds => ds.filter(d => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default")
   .forEach((d, i) => $("#micSel").append(el("option", { value:d.deviceId, textContent:d.label || `Microphone ${i + 1}` })))).catch(() => {});
 
@@ -450,7 +543,7 @@ async function checkDeck(){
   const text = $("#deckIn").value;
   if (loaded && loaded.text === text) return loaded;
   const parsed = parseDeck(text);
-  if (!parsed.main.length && !parsed.cmdrs.length) { $("#deckInfo").innerHTML = '<span class="bad">Paste a decklist first.</span>'; return null; }
+  if (!parsed.main.length && !parsed.cmdrs.length && !parsed.side.length) { $("#deckInfo").innerHTML = '<span class="bad">Paste a decklist first.</span>'; return null; }
   $("#deckInfo").textContent = "Looking up your cards...";
   const r = await resolveDeck(parsed);
   loaded = { ...r, text };
@@ -461,7 +554,12 @@ function showDeck(){
   const info = $("#deckInfo"); info.innerHTML = "";
   info.append(`${loaded.main.length + loaded.cmdrs.length} cards found.`);
   if (loaded.cmdrs.length) info.append(` Commander: ${loaded.cmdrs.map(id => cards.get(id)?.name).join(" and ")}.`);
+  if (loaded.side.length) info.append(` Sideboard: ${loaded.side.length}.`);
   if (loaded.missing.length) info.append(" ", el("span", { className:"bad", textContent:`Not found (left out): ${loaded.missing.slice(0, 8).join(", ")}${loaded.missing.length > 8 ? "..." : ""}` }));
+  const fmt = $("#fmtSel").value, probs = deckProblems(loaded, fmt, $("#legalSel").value);
+  if (probs.length) info.append(el("div", { className:"bad", textContent:"Deck check:" }), problemList(probs));
+  else info.append(el("div", { className:"good", textContent:`Deck check: no problems found for ${FORMATS[fmt].cmdr ? FORMATS[fmt].short : LEGAL_FMTS[$("#legalSel").value] || "60-card play"}.` }));
+  if (FORMATS[fmt].cmdr && !loaded.cmdrs.length) info.append(el("div", { className:"hint", textContent:"Colors are checked once you choose your commander (you're asked when you sit down)." }));
 }
 $("#loadDeck").onclick = () => { loaded = null; checkDeck(); };
 
@@ -473,11 +571,11 @@ function savedGame(room){ try { const s = JSON.parse(store.get(saveKey(room), "n
   if (s) {
     $("#resume").classList.remove("hidden");
     $("#resumeText").textContent = `You have a game at table ${room} as ${s.me.name} (life ${s.me.life}, ${s.me.zones.bf.length} cards on the battlefield).`;
-    $("#resumeBtn").onclick = () => sitDown(s);
+    $("#resumeBtn").onclick = () => { askAlerts(); sitDown(s); };
     $("#resumeDrop").onclick = () => { store.del(saveKey(room)); $("#resume").classList.add("hidden"); };
   }
 }
-$("#joinBtn").onclick = () => sitDown(null);
+$("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown(null); };
 $("#webcamLink").onclick = () => store.set("kt-play-choice", "webcam");
 
 /* =====================================================================
@@ -486,9 +584,10 @@ $("#webcamLink").onclick = () => store.set("kt-play-choice", "webcam");
 let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
-let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0 };
-const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1" };
-let deckIds = [], cmdrIds = [], cmdrFromDeck = [], deckName = "";
+let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", rules:{} };
+const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1",
+                   turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1" };
+let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
 const watchers = {};  // seat -> name, for people watching (seats 5 to 8)  // (commanders taken out of the decklist go back if you pick another)
 
 function blankMe(name){
@@ -503,17 +602,18 @@ function findCard(iid){ for (const [z, list] of Object.entries(me.zones)) { cons
 // What other players see of you: everything on the table, and only counts of your hand and library
 // (own: the owner's seat, for a card you control but another player owns; att: the card it's attached to)
 // (atk: the player it's attacking; blk: the attacker it's blocking; at: when it went on the stack)
-function pubCard(c){
-  if (c.fd) return { iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
+function pubCard(c, onBf = false){
+  const pt = onBf ? showPt(c) : null, ptInfo = onBf ? { pt:pt?.str || "", ptDir:pt?.dir || 0 } : {};
+  if (c.fd) return { ...ptInfo, iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
   const k = cardOf(c);
-  return { iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
+  return { ...ptInfo, iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
            own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
 }
 function pub(){
   const z = me.zones;
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
-           lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(pubCard) : null,
-           bf:z.bf.map(pubCard), gy:z.gy.map(pubCard), ex:z.ex.map(pubCard), cz:z.cz.map(pubCard), st:(z.st || []).map(pubCard), gameId:me.gameId, arrows:me.arrows || [], deck:deckName };
+           lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
+           bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -528,6 +628,7 @@ function changed(){
   render(); clearTimeout(pushTimer); pushTimer = setTimeout(pushState, 60); save();
 }
 function undo(){
+  if (rule("noUndo")) { toast("Undo is off at this table (house rule: no take-backs)."); return; }
   if (!undoStack.length) { toast("Nothing to undo."); return; }
   Object.assign(me, JSON.parse(undoStack.pop()));
   withoutUndo(changed);
@@ -536,8 +637,8 @@ function undo(){
 function pushState(){ if (me.watch) return; players[mySeat] = { ...pub(), seat:mySeat }; broadcast({ type:"state", state:pub() }); }
 function save(){
   if (!roomCode || !me || me.watch) return;
-  store.set(saveKey(roomCode), JSON.stringify({ at:Date.now(), seat:mySeat, me, deckIds, cmdrIds, cmdrFromDeck, deckName, table,
-    cardData:[...new Set(Object.values(me.zones).flat().map(c => c.id))].map(id => cards.get(id)).filter(Boolean) }));
+  store.set(saveKey(roomCode), JSON.stringify({ at:Date.now(), seat:mySeat, me, deckIds, cmdrIds, cmdrFromDeck, sideIds, deckName, table,
+    cardData:[...new Set([...Object.values(me.zones).flat().map(c => c.id), ...sideIds, ...deckIds])].map(id => cards.get(id)).filter(Boolean) }));
 }
 
 /* =====================================================================
@@ -569,10 +670,10 @@ async function sitDown(resume){
     btn.textContent = "Looking up your cards...";
     const d = await checkDeck();
     if (!d || !d.main.length) { err.textContent = "Load a decklist with at least one card Scryfall knows."; btn.disabled = false; btn.textContent = "Sit down"; return; }
-    deckIds = d.main.slice(); cmdrIds = d.cmdrs.slice(); cmdrFromDeck = d.cmdrs.slice();
+    deckIds = d.main.slice(); cmdrIds = d.cmdrs.slice(); cmdrFromDeck = d.cmdrs.slice(); sideIds = d.side.slice();
     deckName = ($("#deckName").value.trim() || $("#savedSel").value || "").slice(0, 40);
   } else {
-    deckIds = resume.deckIds; cmdrIds = resume.cmdrIds; cmdrFromDeck = resume.cmdrFromDeck || []; deckName = resume.deckName || "";
+    deckIds = resume.deckIds; cmdrIds = resume.cmdrIds; cmdrFromDeck = resume.cmdrFromDeck || []; sideIds = resume.sideIds || []; deckName = resume.deckName || "";
     for (const c of resume.cardData || []) keep(c);
   }
   roomCode = (resume ? params.get("room") : $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "")) || randomCode();
@@ -602,6 +703,7 @@ async function sitDown(resume){
   render();
   log(watch ? `You're watching table ${roomCode}.` : resume ? "You're back at the table." : `You sat down at table ${roomCode}. Share the invite link, then press Start game when everyone's here.`);
   if (!resume && !watch && FORMATS[table.fmt].cmdr) askCommander();
+  else if (!resume && !watch) checkMyDeck();
   setInterval(tick, 1000);
 }
 function seatOf(id){ const m = /-(\d)$/.exec(id); return m ? +m[1] : 0; }
@@ -671,7 +773,8 @@ function cleanPub(st){
     iid:String(c.iid || "").slice(0, 20), id:typeof c.id === "string" ? c.id.slice(0, 40) : "", name:String(c.name || "").slice(0, 150),
     img:typeof c.img === "string" && /^https:\/\/cards\.scryfall\.io\//.test(c.img) ? c.img : "", x:+c.x || 0, y:+c.y || 0, tapped:!!c.tapped,
     fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), own:clamp(+c.own || 0, 0, MAX), att:String(c.att || "").slice(0, 20),
-    atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0, ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
+    atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0,
+    ...(typeof c.pt === "string" ? { pt:c.pt.slice(0, 16), ptDir:clamp(Math.sign(+c.ptDir || 0), -1, 1) } : {}), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
   } : null).filter(Boolean);
   const num = (v, a, b) => clamp(Math.round(+v || 0), a, b);
   return { name:String(st.name || "Player").slice(0, 24), life:num(st.life, -999, 9999), poison:num(st.poison, 0, 99), energy:num(st.energy, 0, 999), exp:num(st.exp, 0, 999),
@@ -721,7 +824,8 @@ function takeTable(t){
   if (!(t.tv > table.tv || (t.tv === table.tv && (t.at || 0) > (table.at || 0)))) return;
   const before = { ...table };
   table = { tv:+t.tv || 0, at:+t.at || 0, fmt:FORMATS[t.fmt] ? t.fmt : "cmdr", started:!!t.started, gameId:String(t.gameId || "").slice(0, 30), startAt:+t.startAt || 0,
-            turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX) };
+            turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX),
+            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", rules:cleanRules(t.rules) };
   afterTable(before);
 }
 function changeTable(patch){
@@ -732,28 +836,90 @@ function changeTable(patch){
 }
 function afterTable(before){
   if (me?.watch) { render(); return; }
-  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk))) {
-    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; } attackMode = 0; withoutUndo(changed);
+  // A turn ended: arrows, combat, and "until end of turn" power/toughness changes are over
+  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot))) {
+    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; } attackMode = 0; withoutUndo(changed);
   }
   if (!table.started && before.fmt !== table.fmt && me && FORMATS[table.fmt].cmdr && !FORMATS[before.fmt].cmdr && $("#modal").classList.contains("hidden")) setTimeout(askCommander, 300);
-  if (!table.started && before.fmt !== table.fmt && me) { me.life = FORMATS[table.fmt].life; if (!FORMATS[table.fmt].cmdr) { me.zones.cz = []; } else if (!me.zones.cz.length) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })); changed(); }
-  if (table.started && table.gameId && me.gameId !== table.gameId) dealNewGame();
+  if (!table.started && before.fmt !== table.fmt && me) {
+    me.life = FORMATS[table.fmt].life; if (!FORMATS[table.fmt].cmdr) { me.zones.cz = []; } else if (!me.zones.cz.length) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 }));
+    changed(); if (!FORMATS[table.fmt].cmdr || FORMATS[before.fmt].cmdr) setTimeout(checkMyDeck, 400);  // (a switch to Commander asks for the commander first)
+  }
+  // The monarch draws at the beginning of their end step (here: when their turn passes)
+  if (table.started && before.turnSeat === mySeat && before.turnNum !== table.turnNum && table.gameId === before.gameId && table.monarch === mySeat && settings.autoDraw && me.gameId === table.gameId) {
+    withoutUndo(() => { draw(1, true); say("drew a card for being the monarch (end step)."); changed(); });
+  }
+  if (table.started && table.gameId && me.gameId !== table.gameId) { dealNewGame(); turnAlert("A new game started", "Keep or mulligan your opening hand."); }
   else if (table.turnSeat === mySeat && (before.turnSeat !== mySeat || before.turnNum !== table.turnNum) && table.turnNum > 0) startMyTurn();
   render(); save();
 }
 function presentSeats(){ return Object.keys(players).map(Number).filter(s => s === mySeat || (players[s] && !players[s].away)).sort((a, b) => a - b); }
 function nextSeat(s){ const seats = presentSeats(); const i = seats.indexOf(s); return seats[(i + 1) % seats.length] || s; }
 $("#startBtn").onclick = () => {
-  if (!table.started) { startGame(); return; }
+  if (!table.started) { rulesDialog(startGame); return; }
   // A game in progress: who won? (saved in everyone's game records), then a new game
   const seats = presentSeats(), body = el("div", {}, el("p", { className:"hint", textContent:"Everyone's cards go back into their decks. The result is saved in every player's game records (Stats)." }));
   openModal("Who won this game?", body, [...seats.map(s => ({ label:nm(s), primary:true, fn:() => { recordGame(s); startGame(); } })),
     { label:"No winner", fn:() => { recordGame(0); startGame(); } }, { label:"Cancel" }]);
 };
+/* House rules: picked before the first game (and changed any time from House rules), kept with the table so every
+   player plays by the same ones. The first group changes what the table does; the agreements are reminders for
+   everyone (the table doesn't enforce them). */
+const HOUSE = [
+  { k:"friendlyMull", label:"Friendly mulligan", hint:"A hand with 0, 1, 6 or 7 lands can be sent back for free (it doesn't count as a mulligan)." },
+  { k:"freeFirst", label:"Free first mulligan in every game", hint:"The official rules only give it with 3 or more players." },
+  { k:"firstDraw", label:"The first player draws on turn 1", hint:"Normally the first player skips that draw in a 2-player game." },
+  { k:"noUndo", label:"No take-backs", hint:"Turns off Undo for everyone." }];
+const HOUSE_NUM = [
+  { k:"life", label:"Starting life", def:() => FORMATS[table.fmt].life, max:999 },
+  { k:"cmdrDmg", label:"Commander damage that knocks a player out", def:() => 21, max:99, cmdr:true },
+  { k:"poison", label:"Poison counters that knock a player out", def:() => 10, max:99 }];
+const AGREE = [
+  { k:"proxies", label:"Proxies are fine" }, { k:"noInfinite", label:"No infinite combos" }, { k:"noExtraTurns", label:"No extra-turn spells" },
+  { k:"noMLD", label:"No mass land destruction" }, { k:"noStax", label:"No heavy stax (cards that lock everyone out of playing)" },
+  { k:"solRingT3", label:"No fast mana before turn 3 (the \"turn-3 Sol Ring\" rule)" }, { k:"noTutors", label:"No tutors (cards that search your library for any card)" }];
+function cleanRules(r){
+  r = r && typeof r === "object" ? r : {}; const out = {};
+  for (const { k } of [...HOUSE, ...AGREE]) if (r[k]) out[k] = true;
+  for (const { k, max } of HOUSE_NUM) if (+r[k] > 0) out[k] = clamp(Math.round(+r[k]), 1, max);
+  return out;
+}
+const rule = k => table.rules?.[k];
+const ruleNum = k => table.rules?.[k] || HOUSE_NUM.find(x => x.k === k).def();
+function rulesSummary(r = table.rules || {}){
+  const on = [...HOUSE, ...AGREE].filter(x => r[x.k]).map(x => x.label.split(" (")[0].toLowerCase());
+  for (const x of HOUSE_NUM) if (r[x.k] && r[x.k] !== x.def()) on.push(`${x.label.toLowerCase()}: ${r[x.k]}`);
+  return on.length ? on.join("; ") : "none (the official rules)";
+}
+function rulesDialog(onStart){
+  const r = { ...table.rules }, body = el("div");
+  const box = (x, extra = "") => {
+    const cb = el("input", { type:"checkbox", checked:!!r[x.k] }); cb.onchange = () => { if (cb.checked) r[x.k] = true; else delete r[x.k]; };
+    return el("label", { className:"rule", style:"display:flex;gap:8px;align-items:flex-start;margin:6px 0" }, cb,
+      el("span", {}, el("b", { textContent:x.label }), x.hint ? el("span", { className:"hint", textContent:` ${x.hint}` }) : null, extra));
+  };
+  body.append(el("p", { className:"hint", textContent:"Agree on these before you play (Rule 0). Everyone at the table plays by the same ones; anyone can change them later from House rules." }),
+    el("h3", { textContent:"Mulligans, draws and take-backs" }), ...HOUSE.map(x => box(x)), el("h3", { textContent:"Numbers" }));
+  for (const x of HOUSE_NUM) {
+    if (x.cmdr && !FORMATS[table.fmt].cmdr) continue;
+    const i = el("input", { type:"number", min:1, max:x.max, value:r[x.k] || x.def(), style:"width:80px", ariaLabel:x.label });
+    i.oninput = () => { const v = clamp(Math.round(+i.value || 0), 0, x.max); if (v && v !== x.def()) r[x.k] = v; else delete r[x.k]; };
+    body.append(el("label", { className:"ctrl", style:"max-width:460px;margin:6px 0" }, el("span", { textContent:x.label }), i));
+  }
+  body.append(el("h3", { textContent:"Table agreements (reminders; not enforced)" }), ...AGREE.map(x => box(x)));
+  const save = () => {
+    const rules = cleanRules(r), was = JSON.stringify(table.rules || {});
+    if (JSON.stringify(rules) !== was) { changeTable({ rules }); say(`set the house rules: ${rulesSummary(rules)}.`); }
+  };
+  if (me.watch) { openModal("House rules", el("p", { textContent:`This table's house rules: ${rulesSummary()}.` })); return; }
+  openModal("House rules", body, onStart ? [{ label:"Cancel" }, { label:"Start the game", primary:true, fn:() => { save(); onStart(); } }]
+    : [{ label:"Cancel" }, { label:"Save", primary:true, fn:save }]);
+}
+$("#rulesBtn").onclick = () => rulesDialog(null);
 function startGame(){
   const seats = presentSeats(), first = seats[rnd(seats.length) - 1];
-  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now() });
-  const msg = `A new game started. ${nm(first)} goes first (chosen at random).`; log(msg); broadcast({ type:"log", text:msg });
+  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"" });
+  const msg = `A new game started. ${nm(first)} goes first (chosen at random). House rules: ${rulesSummary()}.`; log(msg); broadcast({ type:"log", text:msg });
 }
 /* Game records: kept in each player's browser, and shown under Stats (wins per player, deck and commander, game
    length, and how often the first player wins) */
@@ -823,10 +989,39 @@ function startMyTurn_(){
   if (settings.autoUntap) for (const c of me.zones.bf) c.tapped = false;
   if (settings.autoDraw) draw(1, true);
   say(`${settings.autoUntap ? "untapped" : "started their turn"}${settings.autoDraw ? " and drew a card" : ""} (turn ${table.turnNum}).`);
+  if (table.initiative === mySeat) say("has the initiative: venture into the Undercity (upkeep).");
   changed();
+  turnAlert("Your turn", `Turn ${table.turnNum} at table ${roomCode}.`);
 }
+/* Your turn alert: when your turn starts and this tab is in the background (or minimized), a short chime, a browser
+   notification (if you allowed them) and a marked tab title. Turned off in Help. */
+let audioCtx = null;
+const alerts = [];  // (for tests)
+function chime(){
+  try {
+    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    for (const [f, d] of [[660, 0], [880, 0.16]]) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.25, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.3);
+      o.start(t + d); o.stop(t + d + 0.32);
+    }
+  } catch {}
+}
+const TITLE = document.title;
+function turnAlert(title, body){
+  if (!settings.turnAlert || me?.watch || !document.hidden) return;
+  alerts.push(title);
+  chime();
+  try { if (window.Notification?.permission === "granted") { const n = new Notification(title, { body, tag:"kt-turn" }); n.onclick = () => { window.focus(); n.close(); }; } } catch {}
+  document.title = `● ${title} · ${TITLE}`;
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = TITLE; });
+// (asked when you sit down, since the browser only asks after a click)
+function askAlerts(){ try { if (settings.turnAlert && window.Notification?.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }
 function dealNewGame(){
-  me.gameId = table.gameId; me.arrows = []; me.life = FORMATS[table.fmt].life; me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
+  me.gameId = table.gameId; me.arrows = []; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
   const isC = FORMATS[table.fmt].cmdr;
@@ -838,7 +1033,7 @@ function dealNewGame(){
 }
 // After keeping: the first player draws for their first turn, except in a two-player game
 function afterKeep(){
-  if (table.turnSeat === mySeat && table.turnNum === 1 && presentSeats().length > 2 && settings.autoDraw) { draw(1, true); say("drew for their first turn."); }
+  if (table.turnSeat === mySeat && table.turnNum === 1 && (presentSeats().length > 2 || rule("firstDraw")) && settings.autoDraw) { draw(1, true); say("drew for their first turn."); }
 }
 
 /* =====================================================================
@@ -885,7 +1080,7 @@ function move(iid, to, opt = {}){
   }
   me.zones[from].splice(f.i, 1);
   if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); }
-  if (to !== "bf") { c.tapped = false; c.ctr = {}; c.atk = 0; c.blk = ""; if (to !== "lib") c.fd = false; }
+  if (to !== "bf") { c.tapped = false; c.ctr = {}; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; if (to !== "lib") c.fd = false; }
   if (to === "st") c.at = Date.now();
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
@@ -959,7 +1154,8 @@ function takeAct_(from, a){
   else if (a.act === "ctr") {
     const t = String(a.name || "").slice(0, 20), d = clamp(Math.round(+a.d || 0), -1, 1); if (!t || !d) return;
     c.ctr[t] = Math.max(0, (c.ctr[t] || 0) + d); if (!c.ctr[t]) delete c.ctr[t]; changed();
-  } else if (["gy", "ex", "hand", "lib"].includes(a.act)) move(c.iid, a.act, { quiet:true });
+  } else if (a.act === "pt") { addPt(c, a); changed(); }
+  else if (["gy", "ex", "hand", "lib"].includes(a.act)) move(c.iid, a.act, { quiet:true });
   else if (a.act === "steal") giveCard(c.iid, from);
 }
 /* =====================================================================
@@ -968,11 +1164,7 @@ function takeAct_(from, a){
 let attackMode = 0;  // the player you're attacking while "Attack" is on: clicking your creatures toggles them
 const isCreature = c => c.fd || /\bCreature\b/.test(typeOf(cardOf(c), c.face || 0));
 const attackersAt = seat => Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === seat).map(c => ({ c, s:+s })));
-function powerOf(c){
-  const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
-  let p = parseInt(f?.power ?? k?.power, 10); if (isNaN(p)) p = c.fd ? 2 : 0;
-  return Math.max(0, p + (c.ctr?.["+1/+1"] || 0) - (c.ctr?.["-1/-1"] || 0));
-}
+function powerOf(c){ return Math.max(0, ptOf(c)?.p || 0); }
 function toggleAttack(c, seat){
   if (c.atk) { c.atk = 0; if (c.atkTapped) c.tapped = false; delete c.atkTapped; say(`took ${nameOf(c)} out of the attack.`); changed(); return; }
   if (!isCreature(c)) { toast("Only creatures can attack."); return; }
@@ -1030,6 +1222,12 @@ function takeHits(from, hits){
     }
     if (!total) return;
     me.life -= total; toast(`You took ${total} combat damage from ${nm(from)}.`);
+    const moved = {}; if (table.monarch === mySeat) moved.monarch = from; if (table.initiative === mySeat) moved.initiative = from;
+    if (Object.keys(moved).length) {
+      changeTable(moved);
+      const msg = [moved.monarch ? `${nm(from)} became the monarch` : "", moved.initiative ? `${nm(from)} took the initiative (venture into the Undercity)` : ""].filter(Boolean).join(" and ") + " (combat damage).";
+      log(msg); broadcast({ type:"log", text:msg });
+    }
     for (const c of me.zones.bf) c.blk = "";
     changed();
   });
@@ -1071,6 +1269,20 @@ function copyCard(c){
 /* =====================================================================
    Rendering
    ===================================================================== */
+/* Power and toughness as they are now: the printed numbers (2/2 face down), +1/+1 and -1/-1 counters, and changes
+   from effects ("mod": lasting, like an anthem; "eot": until end of turn, like Giant Growth). Null for a card with no
+   power and toughness that nothing has changed. dir: 1 if it's bigger than printed, -1 if smaller. */
+function ptOf(c){
+  const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
+  const bp = c.fd ? "2" : f?.power ?? k?.power, bt = c.fd ? "2" : f?.toughness ?? k?.toughness;
+  const n = (c.ctr?.["+1/+1"] || 0) - (c.ctr?.["-1/-1"] || 0);
+  const dp = n + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = n + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
+  if (bp == null && !dp && !dt && !c.mod && !c.eot) return null;
+  const p0 = parseInt(bp ?? 0, 10), t0 = parseInt(bt ?? 0, 10), sg = v => (v < 0 ? "" : "+") + v;
+  if (isNaN(p0) || isNaN(t0)) return { p:(isNaN(p0) ? 0 : p0) + dp, t:(isNaN(t0) ? 0 : t0) + dt, str:`${bp}/${bt}${dp || dt ? ` ${sg(dp)}/${sg(dt)}` : ""}`, dir:Math.sign(dp + dt) };
+  return { p:p0 + dp, t:t0 + dt, str:`${p0 + dp}/${t0 + dt}`, dir:Math.sign(dp + dt) };
+}
+const showPt = c => { const pt = ptOf(c); return pt && (isCreature(c) || pt.dir || c.mod || c.eot) ? pt : null; };
 function cardEl(c, { mine = false, zone = "", small = false } = {}){
   const e = el("div", { className:"card" + (c.tapped ? " tapped" : "") + (c.fd ? " fd" : "") + (mine ? " mine" : "") });
   e.dataset.iid = c.iid; if (zone) e.dataset.zone = zone;
@@ -1080,6 +1292,9 @@ function cardEl(c, { mine = false, zone = "", small = false } = {}){
   const cs = Object.entries(c.ctr || {}).filter(([, v]) => v);
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
+  // (another player's card carries its power/toughness as they see it; yours is worked out here)
+  const pt = typeof c.pt === "string" ? (c.pt ? { str:c.pt, dir:c.ptDir || 0 } : null) : zone === "bf" ? showPt(c) : null;
+  if (pt) e.append(el("span", { className:"pt" + (pt.dir > 0 ? " up" : pt.dir < 0 ? " down" : ""), title:"Power/toughness now", textContent:pt.str }));
   if (c.cmdr && c.tax) e.append(el("span", { className:"tax", title:"Commander tax", textContent:`+${c.tax * 2}` }));
   if (c.atk) { e.classList.add("attacking"); e.append(el("span", { className:"atk", title:`Attacking ${nm(c.atk)}`, textContent:`⚔ ${nm(c.atk)}` })); }
   if (c.blk) { e.classList.add("blocking"); e.append(el("span", { className:"atk blk", textContent:"🛡 Blocking" })); }
@@ -1152,7 +1367,7 @@ function renderOpps(){
       return b;
     };
     const cmdTaken = Object.entries(me.cmd).filter(([k, v]) => k.startsWith(s + ":") && v).reduce((a, [, v]) => a + v, 0);
-    o.append(el("div", { className:"ohead" }, pip, el("span", { className:"oname", textContent:p.name }),
+    o.append(el("div", { className:"ohead" }, pip, el("span", { className:"oname", textContent:p.name }), ...desigBadges(s),
       el("span", { className:"ocount", textContent:`Hand ${p.hand}` }), el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
       count("Graveyard", p.gy, "gy"), count("Exile", p.ex, "ex"),
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
@@ -1187,6 +1402,7 @@ function renderMine(){
   if (!z.cz.length && FORMATS[table.fmt].cmdr && !table.started) { const b = el("button", { className:"btn small", textContent:"Choose commander" }); b.onclick = askCommander; cz.append(b); }
   cz.classList.toggle("hidden", !FORMATS[table.fmt].cmdr && !z.cz.length);
   $("#lifeOut").textContent = me.life;
+  const mb_ = $("#myBadges"); mb_.innerHTML = ""; mb_.append(...desigBadges(mySeat));
   $("#handCount").textContent = `Hand ${z.hand.length}`;
   const lc = $("#landChip"); lc.textContent = `Lands played: ${me.lands}`; lc.classList.toggle("warn", me.lands > 1);
   // Poison, energy, experience, and commander damage from each other player's commander
@@ -1197,14 +1413,14 @@ function renderMine(){
     minus.onclick = () => { set(Math.max(0, get() - 1)); changed(); }; plus.onclick = () => { set(get() + 1); changed(); };
     r.append(el("span", { textContent:label }), minus, el("b", { textContent:get() }), plus); box.append(r);
   };
-  ctrl("Poison", () => me.poison, v => { me.poison = v; }, 10);
+  ctrl("Poison", () => me.poison, v => { me.poison = v; }, ruleNum("poison"));
   if (me.energy || settings.showEnergy) ctrl("Energy", () => me.energy, v => { me.energy = v; });
   if (FORMATS[table.fmt].cmdr) for (const s of presentSeats().filter(s => s !== mySeat)) for (const c of [...(players[s]?.cz || []), ...(players[s]?.bf || [])].filter(c => c.cmdr)) {
     const key = `${s}:${c.iid}`;
     ctrl(`${(c.name || "Commander").split(",")[0].slice(0, 12)}`, () => me.cmd[key] || 0, v => {
       const d = v - (me.cmd[key] || 0); me.cmd[key] = v; me.life -= d;
       if (d) say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${players[s]?.name}).`);
-    }, 21, `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
+    }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
   }
   const mb = $("#manaBox"); mb.innerHTML = "";
   for (const k of COLORS) {
@@ -1245,6 +1461,11 @@ function renderTurn(){
   $("#attackBtn").classList.toggle("hidden", !myTurn); $("#attackBtn").textContent = attackMode ? "Done attacking" : "Attack";
   $("#attackBtn").classList.toggle("primary", !!attackMode);
   $("#dmgBtn").classList.toggle("hidden", !attacking);
+  $("#sideBtn").classList.toggle("hidden", f.cmdr || !sideIds.length || !!me.watch);
+  $("#undoBtn").classList.toggle("hidden", !!rule("noUndo"));
+  const nRules = Object.keys(table.rules || {}).length; $("#rulesBtn").textContent = nRules ? `House rules (${nRules})` : "House rules";
+  const dc = $("#dayChip"); dc.className = `chip${table.day ? " " + table.day : " hidden"}`;
+  dc.textContent = table.day === "night" ? "☾ Night" : "☀ Day";
 }
 
 /* =====================================================================
@@ -1363,9 +1584,25 @@ document.addEventListener("pointerover", e => {
   else { const img = ce.querySelector("img"); src = img ? img.src.replace("/small/", "/normal/") : ""; id = findPub(iid)?.id || ""; }
   if (!src) return;
   $("#zoomImg").src = src;
+  if (e.pointerType === "mouse" && settings.hoverPop && !drag) popOut(ce, src);
   const face = mineC?.face || 0;
   cardById(id).then(c => { if (c && hoverIid === iid) $("#zoomText").textContent = textOf(c, face); });
 });
+/* Pop-out: the card you're pointing at, large, next to it (on the table, in your hand, and in "Keep this hand?") */
+function popOut(ce, src){
+  const pop = $("#pop"), img = $("#popImg"), r = ce.getBoundingClientRect();
+  const w = Math.min(340, innerWidth * 0.42), h = w * 88 / 63;
+  if (r.width >= w * 0.9) { hidePop(); return; }  // (already big)
+  if (img.getAttribute("src") !== src) img.src = src;
+  let x = r.right + 12; if (x + w > innerWidth - 8) x = r.left - w - 12; if (x < 8) x = clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8);
+  const y = clamp(r.top + r.height / 2 - h / 2, 8, Math.max(8, innerHeight - h - 8));
+  pop.style.width = w + "px"; pop.style.left = x + "px"; pop.style.top = y + "px";
+  pop.dataset.iid = ce.dataset.iid || ""; pop.classList.remove("hidden");
+}
+function hidePop(){ $("#pop").classList.add("hidden"); }
+document.addEventListener("pointerout", e => { const ce = e.target.closest?.(".card"); if (ce && !ce.contains(e.relatedTarget)) hidePop(); });
+document.addEventListener("pointerdown", hidePop, true);
+document.addEventListener("wheel", hidePop, { passive:true });
 function findPub(iid){ for (const p of Object.values(players)) for (const z of ["bf", "gy", "ex", "cz"]) { const c = p[z]?.find(x => x.iid === iid); if (c) return c; } return null; }
 
 /* Keyboard: D draw, U untap all, T tap or untap the card you're pointing at, Escape closes menus */
@@ -1411,7 +1648,8 @@ function cardMenu(iid, x, y){
     }
     if (faces(k)) items.push({ label:"Transform (flip to the other face)", fn:() => { c.face = c.face ? 0 : 1; say(`transformed ${nameOf(c)}.`); changed(); } });
     items.push({ label:c.fd ? "Turn face up" : "Turn face down", fn:() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); } });
-    items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Create a token copy", fn:() => copyCard(c) });
+    items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Power/toughness...", fn:() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }) },
+      { label:"Create a token copy", fn:() => copyCard(c) });
     const rel = related(k); if (rel.length) items.push({ label:`Create its token${rel.length > 1 ? "s" : ""}...`, fn:() => tokenDialog(rel) });
     items.push("-", { label:"Target with an arrow...", fn:() => startTargeting("arrow", iid) },
       c.att ? { label:"Unattach", fn:() => { c.att = null; c.x = clamp(c.x + 0.02, 0, 0.94); say(`unattached ${nameOf(c)}.`); changed(); } } : { label:"Attach to...", fn:() => startTargeting("attach", iid) });
@@ -1451,7 +1689,8 @@ function theirCardMenu(seat, iid, x, y){
   const items = [{ head:whose }, ...(c.fd ? [] : [{ label:"View card", fn:() => viewCard(c) }]),
     { label:c.tapped ? "Untap it" : "Tap it", fn:act("tap", { v:!c.tapped }, `${c.tapped ? "untapped" : "tapped"} ${whose}.`) },
     { label:"Put a +1/+1 counter on it", fn:act("ctr", { name:"+1/+1", d:1 }, `put a +1/+1 counter on ${whose}.`) },
-    { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) }];
+    { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) },
+    { label:"Change its power/toughness...", fn:() => ptDialog(whose, null, d => sendAct(seat, c, "pt", d, `gave ${whose} ${ptText(d)}.`)) }];
   const cs = Object.keys(c.ctr || {}); for (const k of cs) items.push({ label:`Remove a ${k} counter`, fn:act("ctr", { name:k, d:-1 }, `removed a ${k} counter from ${whose}.`) });
   items.push("-",
     { label:"Destroy it (to the graveyard)", fn:act("gy", {}, `destroyed ${whose}.`) },
@@ -1485,10 +1724,10 @@ function related(k){ return (k?.all_parts || []).filter(p => p.component === "to
    Dialogs
    ===================================================================== */
 let modalClosable = true;
-function openModal(title, body, buttons = [{ label:"Close" }], { closable = true } = {}){
-  modalClosable = closable;
+function openModal(title, body, buttons = [{ label:"Close" }], { closable = true, wide = false } = {}){
+  modalClosable = closable; hidePop();
   const m = $("#modal"); m.innerHTML = "";
-  const card = el("div", { className:"modal-card" }, el("h2", { textContent:title }), body);
+  const card = el("div", { className:"modal-card" + (wide ? " wide" : "") }, el("h2", { textContent:title }), body);
   const foot = el("div", { className:"mfoot" });
   for (const b of buttons) { const x = el("button", { className:"btn" + (b.primary ? " primary" : ""), textContent:b.label }); x.onclick = () => { if (!b.keep) closeModal(); b.fn?.(); }; foot.append(x); }
   card.append(foot); m.append(card); m.classList.remove("hidden");
@@ -1569,7 +1808,66 @@ function setCommanders(list){
   if (!table.started || me.gameId !== table.gameId) me.zones.cz = FORMATS[table.fmt].cmdr ? cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })) : [];
   if (list.length) say(`chose ${list.map(c => c.name).join(" and ")} as their commander.`);
   changed();
+  checkMyDeck();
 }
+// The deck check again at the table (the format is the table's, and the commander is known now); only you see it
+function checkMyDeck(){
+  if (!me || me.watch || !deckIds.length) return;
+  const isC = FORMATS[table.fmt].cmdr;
+  const probs = deckProblems({ main:isC ? deckIds : [...deckIds, ...cmdrFromDeck], cmdrs:isC ? cmdrIds : [], side:sideIds }, table.fmt, store.get("kt-dig-legal", ""));
+  if (!probs.length) return;
+  log(`Deck check (only you see this): ${probs.join(" ")}`);
+  toast(`Deck check: ${probs.length} problem${probs.length === 1 ? "" : "s"} with your deck. See the log.`);
+}
+/* Sideboarding (60-card games): swap cards between your deck and sideboard. From the Sideboard button (for the next
+   game), or from "Keep this hand?", which deals you a new hand from the new deck. */
+function sideboardDialog(done, cancel){
+  const deck = deckIds.slice(), side = sideIds.slice(), body = el("div");
+  const group = ids => { const m = new Map(); for (const id of ids) { const n = cards.get(id)?.name || "?"; m.set(n, [...(m.get(n) || []), id]); } return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])); };
+  const redraw = () => {
+    body.innerHTML = "";
+    const col = (title, from, to, count) => {
+      const ul = el("ul");
+      for (const [n, ids] of group(from)) {
+        const b = el("button", { className:"btn small", textContent:`${ids.length} ${n}`, title:`Move one ${n} to the ${title === "Deck" ? "sideboard" : "deck"}` });
+        b.onclick = () => { from.splice(from.indexOf(ids[0]), 1); to.push(ids[0]); redraw(); };
+        ul.append(el("li", {}, b));
+      }
+      return el("div", {}, el("h3", { textContent:`${title} (${count})` }), ul);
+    };
+    body.append(el("p", { className:"hint", textContent:"Click a card to move one copy to the other side." }),
+      el("div", { className:"sbcols" }, col("Deck", deck, side, deck.length + cmdrFromDeck.length), col("Sideboard", side, deck, side.length)));
+  };
+  redraw();
+  openModal("Sideboard", body, [{ label:"Cancel", fn:() => cancel?.() }, { label:"Done", primary:true, fn:() => {
+    const left = new Map(); for (const id of deckIds) left.set(id, (left.get(id) || 0) + 1);
+    let n = 0; for (const id of deck) { if (left.get(id)) left.set(id, left.get(id) - 1); else n++; }
+    deckIds = deck; sideIds = side;
+    if (n) say(`sideboarded (${n} card${n === 1 ? "" : "s"} swapped).`);
+    save(); done?.();
+  } }], { closable:false });
+}
+$("#sideBtn").onclick = () => sideboardDialog(() => { if (table.started && me.gameId === table.gameId) toast("Your new deck is used from the next game."); });
+
+/* The monarch, the initiative, and day and night: kept with the table, so everyone sees them. Combat damage to the
+   monarch or the player with the initiative moves it to the attacker; the monarch draws when their turn ends. */
+$("#desigBtn").onclick = e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const items = [{ head:"The monarch" },
+    table.monarch === mySeat ? { label:"You're the monarch (no one is)", fn:() => { changeTable({ monarch:0 }); say("is no longer the monarch."); } }
+      : { label:"Become the monarch", fn:() => { changeTable({ monarch:mySeat }); say("became the monarch."); } },
+    { head:"The initiative" },
+    table.initiative === mySeat ? { label:"You have it (no one does)", fn:() => { changeTable({ initiative:0 }); say("no longer has the initiative."); } }
+      : { label:"Take the initiative", fn:() => { changeTable({ initiative:mySeat }); say("took the initiative: venture into the Undercity."); } },
+    { head:"Day and night" },
+    { label:"It becomes day", fn:() => { changeTable({ day:"day" }); say("made it day."); } },
+    { label:"It becomes night", fn:() => { changeTable({ day:"night" }); say("made it night."); } }];
+  if (table.day) items.push({ label:"Stop tracking day and night", fn:() => changeTable({ day:"" }) });
+  openMenu(r.left, r.bottom + 4, items);
+};
+$("#dayChip").onclick = () => { if (me.watch) return; const d = table.day === "day" ? "night" : "day"; changeTable({ day:d }); say(`made it ${d}.`); };
+const desigBadges = s => [table.monarch === s ? el("span", { className:"badge", title:"The monarch: draws a card at the end of their turn", textContent:"👑 Monarch" }) : null,
+  table.initiative === s ? el("span", { className:"badge", title:"Has the initiative: ventures into the Undercity each upkeep", textContent:"🗝 Initiative" }) : null].filter(Boolean);
 function viewZone(title, list, zone){
   if (!list.length) { toast("Nothing there."); return; }
   const mine = !!zone;
@@ -1621,6 +1919,43 @@ function searchLib(){
   input.oninput = draw_;
   draw_();
   openModal("Search your library", el("div", {}, input, el("div", { style:"height:8px" }), list), [{ label:"Stop searching (shuffle)", fn:() => { shuffle(me.zones.lib); say("searched their library and shuffled."); changed(); } }]);
+}
+/* Changing power/toughness: "until end of turn" (Giant Growth: gone when the turn ends) or lasting (an anthem, an
+   Aura). d = { eot:[power, toughness], mod:[power, toughness] }, the change to make. */
+const ptText = d => { const sg = v => (v < 0 ? "" : "+") + v, part = (x, w) => x && (x[0] || x[1]) ? `${sg(x[0])}/${sg(x[1])}${w}` : ""; return [part(d.eot, " until end of turn"), part(d.mod, "")].filter(Boolean).join(" and ") || "no change"; };
+function addPt(c, a){
+  for (const k of ["eot", "mod"]) {
+    const v = Array.isArray(a[k]) ? a[k].map(x => clamp(Math.round(+x || 0), -99, 99)) : [0, 0];
+    if (!v[0] && !v[1]) continue;
+    const now = [(c[k]?.[0] || 0) + v[0], (c[k]?.[1] || 0) + v[1]];
+    if (now[0] || now[1]) c[k] = now; else delete c[k];
+  }
+}
+function ptDialog(title, c, done){
+  const d = { eot:[0, 0], mod:[0, 0] }, body = el("div"), preview = el("p", { className:"hint" });
+  const row = (label, k, i) => {
+    const r = el("div", { className:"ctrl", style:"max-width:300px;margin-bottom:4px" }), v = el("b");
+    const set = x => { d[k][i] += x; v.textContent = (d[k][i] > 0 ? "+" : "") + d[k][i]; show(); };
+    const m = el("button", { innerHTML:"&minus;", ariaLabel:`${label} minus 1` }), p = el("button", { textContent:"+", ariaLabel:`${label} plus 1` });
+    m.onclick = () => set(-1); p.onclick = () => set(1); set(0);
+    r.append(el("span", { textContent:label }), m, v, p); return r;
+  };
+  const show = () => {
+    if (!c) { preview.textContent = `Change: ${ptText(d)}`; return; }
+    const was = ptOf(c)?.str || "0/0", tmp = { ...c, ctr:{ ...c.ctr }, eot:c.eot && [...c.eot], mod:c.mod && [...c.mod] }; addPt(tmp, d);
+    preview.textContent = `Now ${was}; after: ${ptOf(tmp)?.str || "0/0"}`;
+  };
+  const quick = el("div", { className:"row", style:"flex-wrap:wrap;gap:6px;margin-bottom:10px" });
+  for (const [p, t] of [[1, 1], [2, 2], [3, 3], [1, 0], [-1, -1], [-2, -2], [-3, -3]]) {
+    const b = el("button", { className:"btn small", textContent:`${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t}` });
+    b.onclick = () => { closeModal(); done({ eot:[p, t], mod:[0, 0] }); }; quick.append(b);
+  }
+  body.append(el("p", { className:"hint", textContent:"Until end of turn, in one click:" }), quick,
+    el("h3", { textContent:"Until end of turn" }), row("Power", "eot", 0), row("Toughness", "eot", 1),
+    el("h3", { textContent:"Lasting (until it leaves the battlefield)" }), row("Power", "mod", 0), row("Toughness", "mod", 1), preview);
+  const btns = [{ label:"Cancel" }, { label:"OK", primary:true, fn:() => done(d) }];
+  if (c && (c.eot || c.mod)) btns.unshift({ label:"Back to printed", fn:() => { const was = { eot:(c.eot || [0, 0]).map(x => -x), mod:(c.mod || [0, 0]).map(x => -x) }; done(was); } });
+  openModal(`Power/toughness: ${title}`, body, btns);
 }
 function counterDialog(c){
   const types = ["+1/+1", "-1/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
@@ -1681,14 +2016,20 @@ function showReveal(who, list, what){
 // Opening hand: keep, or London mulligan (draw 7, then put one card on the bottom per mulligan). In multiplayer
 // Commander the first mulligan is free.
 function mulligan(n){
-  const free = FORMATS[table.fmt].cmdr && presentSeats().length > 2 ? 1 : 0, bottomCount = Math.max(0, n - free);
+  const free = (FORMATS[table.fmt].cmdr && presentSeats().length > 2) || rule("freeFirst") ? 1 : 0, bottomCount = Math.max(0, n - free);
+  const lands = me.zones.hand.filter(c => isLand(cardOf(c))).length, friendly = rule("friendlyMull") && [0, 1, 6, 7].includes(lands);
   const body = el("div");
-  body.append(el("p", { className:"hint", textContent:n ? `Mulligans so far: ${n}${free ? " (the first is free)" : ""}. If you keep, you'll put ${bottomCount} card${bottomCount === 1 ? "" : "s"} on the bottom.` : "Your opening hand." }));
+  body.append(el("p", { className:"hint", textContent:(n ? `Mulligans so far: ${n}${free ? " (the first is free)" : ""}. If you keep, you'll put ${bottomCount} card${bottomCount === 1 ? "" : "s"} on the bottom.` : "Your opening hand.") + ` Point at a card to see it large.` }));
+  if (friendly) body.append(el("p", { className:"good", textContent:`Friendly mulligan: this hand has ${lands} land${lands === 1 ? "" : "s"}, so a mulligan is free.` }));
   body.append(cardGrid(me.zones.hand, null));
-  openModal("Keep this hand?", body, [
+  const sb = !FORMATS[table.fmt].cmdr && sideIds.length && n === 0 ? [{ label:"Sideboard first", fn:() => sideboardDialog(() => {
+    me.zones.lib = shuffle([...deckIds, ...cmdrFromDeck].map(id => newCard(id))); me.zones.hand = []; draw(7, true); withoutUndo(changed); mulligan(0);
+  }, () => mulligan(0)) }] : [];
+  openModal("Keep this hand?", body, [...sb,
     { label:"Mulligan", fn:() => {
       me.zones.lib.push(...me.zones.hand.splice(0)); shuffle(me.zones.lib); draw(7, true);
-      say(`took a mulligan (${n + 1}).`); mulligan(n + 1);
+      if (friendly) { say(`took a free mulligan (friendly mulligan: ${lands} land${lands === 1 ? "" : "s"}).`); mulligan(n); }
+      else { say(`took a mulligan (${n + 1}).`); mulligan(n + 1); }
     } },
     { label:"Keep", primary:true, fn:() => {
       if (!bottomCount) { say(`kept ${me.zones.hand.length} cards.`); afterKeep(); return; }
@@ -1700,8 +2041,8 @@ function mulligan(n){
         closeModal();
         for (const iid of picked) move(iid, "lib", { bottom:true, quiet:true });
         say(`kept ${me.zones.hand.length} cards after ${n} mulligan${n === 1 ? "" : "s"}.`); afterKeep();
-      } }], { closable:false });
-    } }], { closable:false });
+      } }], { closable:false, wide:true });
+    } }], { closable:false, wide:true });
 }
 
 /* =====================================================================
@@ -1731,17 +2072,21 @@ $("#leaveBtn").onclick = () => {
   location.href = location.pathname;
 };
 $("#helpBtn").onclick = () => {
-  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana" }[key]}`, cb.checked ? "1" : "0"); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
+  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
   openModal("How to play", el("div", {},
     el("p", { innerHTML:"<b>Drag</b> cards between your hand, battlefield, library, graveyard, exile and command zone (hold Shift when dropping on the library to put it on the bottom). <b>Click</b> a card on the battlefield to tap or untap it. <b>Double-click</b> a card in hand to play it. <b>Right-click</b> (or press and hold) a card or your library for everything else: counters, transform, face down, tokens, scry, surveil, mill, search, reveal." }),
     el("p", { innerHTML:"<b>Keys:</b> D draw, U untap all, T tap the card you're pointing at." }),
     el("p", { innerHTML:"Press <b>Start game</b> when everyone's here: a random player goes first, everyone's deck is shuffled and dealt 7, and you choose to keep or mulligan. <b>Next turn</b> passes the turn. <b>New game</b> asks who won and saves it under <b>Stats</b>." }),
     el("p", { innerHTML:"<b>Casting:</b> right-click a card in hand and choose <b>Cast</b> (or drag it onto the stack bar) so everyone can respond; right-click it on the stack to <b>Resolve</b>. Other players can counter it from their screen." }),
     el("p", { innerHTML:"<b>Combat:</b> on your turn press <b>Attack</b>, click the creatures that attack (they tap unless they have vigilance), then <b>Done attacking</b>. The defending player right-clicks an attacker to block it. <b>Combat damage</b> takes unblocked damage off the defender's life (and counts commander damage); blocked creatures, trample and first strike are yours to work out." }),
+    el("p", { innerHTML:"<b>Power/toughness:</b> creatures show what they are now (counters and changes included; green is bigger than printed, red smaller). Right-click one and choose <b>Power/toughness...</b> for pump spells (until end of turn) or lasting changes. <b>Point</b> at any card to see it large." }),
+    el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
-    s("autoMana", "Tapping a land adds its mana to my mana pool")));
+    s("autoMana", "Tapping a land adds its mana to my mana pool"),
+    s("hoverPop", "Enlarge a card when I point at it"),
+    s("turnAlert", "Alert me (a chime and a notification) when my turn starts and this tab is in the background")));
 };
 function chatLine(who, text, seat){
   const li = el("li", { className:"chat" }), t = new Date();
@@ -1768,7 +2113,7 @@ function log(text, seat){
 window.addEventListener("beforeunload", () => save());
 
 // For tests: a way to reach the game state
-if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards };
+if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards, alerts };
 })();
 </script>
 </body>
