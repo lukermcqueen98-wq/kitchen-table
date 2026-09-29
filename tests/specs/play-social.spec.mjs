@@ -37,7 +37,7 @@ test("digital table: chat, watching, a dropped connection, and game records", as
   await expect(a.locator("#log li.chat").last()).toHaveText(/Sam:have fun$/);
 
   // A game: Sam watches the cards arrive
-  await a.click("#startBtn");
+  await a.click("#startBtn"); await a.locator(".modal").getByRole("button", { name:"Start the game" }).click();  // (house rules first)
   for (const p of [a, b]) await p.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();
   await expect(c.locator(".modal")).toBeHidden();
   await a.locator("#hand .card").first().dblclick();
