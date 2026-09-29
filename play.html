@@ -193,17 +193,13 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 #arrows path.link{stroke-width:2;stroke-dasharray:6 5;opacity:.8}
 body.targeting,body.targeting .card{cursor:crosshair !important}
 body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--brass)}
-/* Combat and the stack */
+/* Combat */
 .card.attacking{box-shadow:0 0 0 3px #e0765c,0 0 14px 3px rgba(224,118,92,.75)}
 .card.blocking{box-shadow:0 0 0 3px #4a86c5,0 0 14px 3px rgba(74,134,197,.75)}
 .card .atk{position:absolute;left:-2px;right:-2px;top:-15px;font-size:10px;line-height:13px;text-align:center;color:#fff;background:#b3452f;border-radius:4px;white-space:nowrap;overflow:hidden}
 .card .atk.blk{background:#2f5f94}
 #arrows path.blockline{stroke:#4a86c5;stroke-width:3;stroke-dasharray:7 4}
-#stackBar{display:flex;align-items:center;gap:10px;margin:8px 8px 0;padding:4px 10px;border:1px dashed var(--felt-edge);border-radius:10px;min-height:36px;background:rgba(0,0,0,.15)}
-#stackBar.has{border-style:solid;border-color:var(--brass)}
-#stackCards{display:flex;gap:10px;align-items:center;overflow-x:auto;padding:14px 0 4px}
-#stackCards .card{--w:66px;position:relative;flex:0 0 auto}
-#stackCards .who{position:absolute;left:0;right:0;top:-14px;font-size:10px;text-align:center;white-space:nowrap;overflow:hidden}
+#combatBar{display:flex;align-items:center;gap:10px;margin:8px 8px 0;padding:4px 10px;border:1px solid var(--brass);border-radius:10px;min-height:36px;background:rgba(0,0,0,.15)}  /* (only while creatures are attacking) */
 #combatNote{font-size:13px}
 .ghost{position:fixed;pointer-events:none;z-index:90;opacity:.9;transform:rotate(-3deg)}
 
@@ -270,7 +266,6 @@ details.term a{font-size:13px;color:var(--brass)}
   #side>*{flex:0 0 auto}
   .piles{grid-template-columns:repeat(3,44px)}
   #ctrlBox{min-width:130px}
-  #stackCards .card{--w:42px}
 }
 @media (prefers-reduced-motion:reduce){.card,#hand .card{transition:none}}
 </style>
@@ -352,7 +347,7 @@ details.term a{font-size:13px;color:var(--brass)}
   </header>
   <main id="play">
     <div id="opps"></div>
-    <div id="stackBar" data-drop="st"><span class="hint" id="stackLabel">Stack</span><div id="stackCards"></div><span id="combatNote" class="chip hidden"></span></div>
+    <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
       <div id="side">
@@ -833,7 +828,7 @@ async function sitDown(resume){
   try { history.replaceState(null, "", `?room=${roomCode}`); } catch {}
   try { localStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, ...($("#micSel").value ? { deviceId:{ exact:$("#micSel").value } } : {}) }, video:false }); }
   catch { localStream = null; }
-  if (resume) { table = { ...resume.table, tv:0 }; me = resume.me; me.arrows ||= []; me.zones.st ||= []; }
+  if (resume) { table = { ...resume.table, tv:0 }; me = resume.me; me.arrows ||= []; me.zones.st ||= []; me.zones.hand.push(...me.zones.st.splice(0)); }
   else { table.fmt = $("#fmtSel").value; me = blankMe(name); if (FORMATS[table.fmt].cmdr) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 })); }
   if (watch) { me.watch = true; document.body.classList.add("watching"); }
   else players[mySeat] = { ...pub(), seat:mySeat };
@@ -1183,15 +1178,16 @@ function afterKeep(){
    ===================================================================== */
 const ZONE_NAME = { lib:"library", hand:"hand", bf:"battlefield", gy:"graveyard", ex:"exile", cz:"command zone", st:"stack" };
 const isPermanent = c => /\b(Creature|Artifact|Enchantment|Planeswalker|Land|Battle)\b/.test(typeOf(c).split(" // ")[0]);
-// A spell on the stack resolves: permanents onto the battlefield, instants and sorceries into the graveyard
-function resolve(iid){
-  const f = findCard(iid); if (!f || f.z !== "st") return;
-  const perm = isPermanent(cardOf(f.c)) && !f.c.fd;
-  move(iid, perm ? "bf" : "gy", { quiet:true });
-  say(`resolved ${nameOf(f.c)}${perm ? "" : " (to the graveyard)"}.`);
-  // A spell that does something to other players (Cut a Deal: each opponent draws...) offers to do it now
-  const fx = !perm && !f.c.fd ? cardEffects(cardOf(f.c)) : [];
-  if (fx.length) openModal(`${nameOf(f.c)} resolved`, el("div", {}, el("p", { className:"hint", textContent:"Do what it says to the other players?" }), el("p", { style:"white-space:pre-wrap", textContent:cardText(cardOf(f.c)) })),
+// Casting from your hand or command zone: a permanent goes onto the battlefield; an instant or sorcery goes to
+// your graveyard, and one that does something to other players (Cut a Deal: each opponent draws...) offers it
+function castSpell(iid){
+  const f = findCard(iid); if (!f || !["hand", "cz"].includes(f.z)) return;
+  const perm = isPermanent(cardOf(f.c)) || f.c.fd;
+  if (perm) { move(iid, "bf"); return; }
+  move(iid, "gy", { quiet:true });
+  say(`cast ${nameOf(f.c)}.`);
+  const fx = cardEffects(cardOf(f.c));
+  if (fx.length) openModal(`${nameOf(f.c)}`, el("div", {}, el("p", { className:"hint", textContent:"Do what it says to the other players?" }), el("p", { style:"white-space:pre-wrap", textContent:cardText(cardOf(f.c)) })),
     [{ label:"Not now" }, ...fx.map(x => ({ label:x.label, primary:true, fn:x.fn }))]);
 }
 function say(text){ log(`You ${text}`); broadcast({ type:"log", text:`${me.name} ${text}` }); }
@@ -1503,7 +1499,7 @@ function drawBattlefield(box, list, opts){
 function render(){
   if (!me) return;
   if (!me.watch) players[mySeat] = { ...pub(), seat:mySeat };
-  renderOpps(); if (!me.watch) renderMine(); renderStack(); renderTurn();
+  renderOpps(); if (!me.watch) renderMine(); renderCombat(); renderTurn();
   const w = Object.values(watchers); $("#watchers").textContent = w.length ? `Watching: ${w.join(", ")}` : "";
   requestAnimationFrame(drawArrows);
 }
@@ -1615,21 +1611,11 @@ function renderMine(){
     mb.append(b);
   }
 }
-function renderStack(){
-  const box = $("#stackCards"); box.innerHTML = "";
-  const all = Object.entries(players).flatMap(([s, p]) => (p.st || []).map(c => ({ c, s:+s }))).sort((a, b) => b.c.at - a.c.at);
-  for (const [i, { c, s }] of all.entries()) {
-    const mine = s === mySeat, e = cardEl(mine ? findCard(c.iid)?.c || c : c, { mine, zone:"st", small:!mine });
-    e.dataset.seat = s;
-    const w = el("span", { className:"who", textContent:(i === 0 ? "Top: " : "") + nm(s) }); w.style.color = SEAT_HEX[s - 1]; e.append(w);
-    box.append(e);
-  }
-  $("#stackBar").classList.toggle("has", all.length > 0);
-  $("#stackLabel").textContent = all.length ? `Stack (${all.length})` : "Stack: drop a spell here to cast it";
-  // Combat: who's attacking whom
+// The combat bar, while creatures are attacking: who's attacking whom, and Take or block if it's you
+function renderCombat(){
   const attackers = Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk).map(c => ({ c, s:+s })));
   const note = $("#combatNote"), atMe = attackers.filter(a => a.c.atk === mySeat);
-  note.classList.toggle("hidden", !attackers.length);
+  $("#combatBar").classList.toggle("hidden", !attackers.length);
   note.textContent = atMe.length ? `${atMe.length} attacking you: right-click one to block ` : attackers.length ? `${attackers.length} attacking` : "";
   if (atMe.length && !me.watch) { const b = el("button", { className:"btn small primary", id:"defendBtn", textContent:"Take or block" }); b.onclick = defendDialog; note.append(b); }
 }
@@ -1741,15 +1727,12 @@ function clickCard(iid, zone, e){
 }
 document.addEventListener("dblclick", e => {
   const ce = e.target.closest?.(".card.mine"); if (!ce) return;
-  if (ce.dataset.zone === "hand" || ce.dataset.zone === "cz") move(ce.dataset.iid, "bf");
-  else if (ce.dataset.zone === "st") resolve(ce.dataset.iid);
+  if (ce.dataset.zone === "hand" || ce.dataset.zone === "cz") castSpell(ce.dataset.iid);
 });
 document.addEventListener("contextmenu", e => {
   const ce = e.target.closest?.(".card.mine");
   if (ce) { e.preventDefault(); if (ce.dataset.zone === "lib") libMenu(e.clientX, e.clientY); else cardMenu(ce.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#libPile")) { e.preventDefault(); libMenu(e.clientX, e.clientY); return; }
-  const sc = e.target.closest?.("#stackCards .card:not(.mine)");
-  if (sc) { e.preventDefault(); theirCardMenu(+sc.dataset.seat, sc.dataset.iid, e.clientX, e.clientY); return; }
   const oc = e.target.closest?.(".opp .card");
   if (oc && oc.dataset.iid) { e.preventDefault(); theirCardMenu(+oc.closest(".opp").dataset.seat, oc.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#bf")) { e.preventDefault(); openMenu(e.clientX, e.clientY, [{ label:"Untap all (U)", fn:untapAll }, { label:"Create a token...", fn:tokenDialog }]); }
@@ -1843,31 +1826,22 @@ function cardMenu(iid, x, y){
     items.push("-", to("To hand", "hand"), to("To graveyard", "gy"), to("To exile", "ex"), to("To top of library", "lib"), to("To bottom of library", "lib", { bottom:true }));
     if (c.cmdr) items.push(to("To command zone", "cz"));
     items.push({ label:"Reveal to the table", fn:() => reveal([c], "") });
-  } else if (z === "st") {
-    items.push({ label:"Resolve", fn:() => resolve(iid) }, to("Counter it (to the graveyard)", "gy"), to("Back to hand", "hand"), to("Exile", "ex"));
   } else if (z === "hand") {
-    items.push(to("Cast (put on the stack)", "st"), to("Play", "bf"), to("Play face down", "bf", { fd:true }), to("Discard", "gy"), to("Exile", "ex"), to("To top of library", "lib"), to("To bottom of library", "lib", { bottom:true }));
+    items.push(isPermanent(k) ? to("Play", "bf") : { label:"Cast it (then to the graveyard)", fn:() => castSpell(iid) }, ...(isPermanent(k) ? [] : [to("Put it on the battlefield", "bf")]), to("Play face down", "bf", { fd:true }), to("Discard", "gy"), to("Exile", "ex"), to("To top of library", "lib"), to("To bottom of library", "lib", { bottom:true }));
     items.push("-", { label:"Reveal this card", fn:() => reveal([c], "") }, { label:me.revealHand ? "Stop showing my hand" : "Show my whole hand to the table", fn:() => { me.revealHand = !me.revealHand; say(me.revealHand ? "revealed their hand." : "hid their hand again."); changed(); } });
   } else if (z === "cz") {
-    items.push(to("Cast (put on the stack)", "st"), to("Cast (to the battlefield)", "bf"), to("To hand", "hand"), { label:"Reset commander tax", fn:() => { c.tax = 0; changed(); } });
+    items.push({ label:isPermanent(k) ? "Cast (to the battlefield)" : "Cast it", fn:() => castSpell(iid) }, to("To hand", "hand"), { label:"Reset commander tax", fn:() => { c.tax = 0; changed(); } });
     if (!table.started) items.push({ label:"Change commander...", fn:askCommander });
   } else {
     items.push(to("To hand", "hand"), to("To battlefield", "bf"), to("To graveyard", "gy"), to("To exile", "ex"), to("To top of library", "lib"));
   }
-  const fx = !c.fd && ["hand", "st", "bf", "gy", "cz"].includes(z) ? cardEffects(k) : [];
+  const fx = !c.fd && ["hand", "bf", "gy", "cz"].includes(z) ? cardEffects(k) : [];
   if (fx.length) items.push("-", { head:"What it does to other players" }, ...fx);
   openMenu(x, y, items);
 }
 // Another player's card: tap it, put counters on it, destroy, exile, bounce, or take control of it
 function theirCardMenu(seat, iid, x, y){
-  if (me.watch) { const any = findPub(iid) || (players[seat]?.st || []).find(c => c.iid === iid); if (any && !any.fd) viewCard(any); return; }
-  const sc = (players[seat]?.st || []).find(x => x.iid === iid);
-  if (sc) {
-    const whose = `${nm(seat)}'s ${sc.fd ? "face-down spell" : sc.name}`, act = (a, text) => () => sendAct(seat, sc, a, {}, text);
-    openMenu(x, y, [{ head:whose }, { label:"Counter it (to the graveyard)", fn:act("gy", `countered ${whose}.`) },
-      { label:"Exile it", fn:act("ex", `exiled ${whose} from the stack.`) }, { label:"Return it to its owner's hand", fn:act("hand", `returned ${whose} to its owner's hand.`) }]);
-    return;
-  }
+  if (me.watch) { const any = findPub(iid); if (any && !any.fd) viewCard(any); return; }
   const c = (players[seat]?.bf || []).find(x => x.iid === iid);
   if (!c) { const any = findPub(iid); if (any) openMenu(x, y, [{ head:any.name || "A card" }, { label:"Look at it", fn:() => showReveal(nm(seat), [any], "") }]); return; }
   const whose = `${nm(seat)}'s ${c.fd ? "face-down card" : c.name}`, act = (a, extra, text) => () => sendAct(seat, c, a, extra, text);
@@ -2401,7 +2375,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Drag</b> cards between your hand, battlefield, library, graveyard, exile and command zone (hold Shift when dropping on the library to put it on the bottom). <b>Click</b> a card on the battlefield to tap or untap it. <b>Double-click</b> a card in hand to play it. <b>Right-click</b> (or press and hold) a card or your library for everything else: counters, transform, face down, tokens, scry, surveil, mill, search, reveal." }),
     el("p", { innerHTML:"<b>Keys:</b> D draw, U untap all, T tap the card you're pointing at." }),
     el("p", { innerHTML:"Press <b>Start game</b> when everyone's here: a random player goes first, everyone's deck is shuffled and dealt 7, and you choose to keep or mulligan. <b>Next turn</b> passes the turn. <b>New game</b> asks who won and saves it under <b>Stats</b>." }),
-    el("p", { innerHTML:"<b>Casting:</b> right-click a card in hand and choose <b>Cast</b> (or drag it onto the stack bar) so everyone can respond; right-click it on the stack to <b>Resolve</b>. Other players can counter it from their screen." }),
+    el("p", { innerHTML:"<b>Casting:</b> double-click a card in hand (or right-click, <b>Play</b> or <b>Cast it</b>): permanents go onto the battlefield, and instants and sorceries go to your graveyard. Say what you're casting so others can respond." }),
     el("p", { innerHTML:"<b>Combat:</b> on your turn press <b>Attack</b>, click the creatures that attack (they tap unless they have vigilance), then <b>Done attacking</b>. The defending player right-clicks an attacker to block it. Only the defender decides the damage: <b>Take or block</b> on the combat bar (or the attacker's <b>Combat damage</b>, which asks them) lets them block first, take what gets through (commander damage counted), or take none. Blocked fights, trample and first strike are worked out by hand." }),
     el("p", { innerHTML:"<b>Power/toughness:</b> creatures show what they are now (counters and changes included; green is bigger than printed, red smaller). Right-click one and choose <b>Power/toughness...</b> for pump spells (until end of turn) or lasting changes. <b>Point</b> at any card to see it large." }),
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),

@@ -10,7 +10,7 @@ const ktp = (page, fn, arg) => page.evaluate(fn, arg);
 // Put a card from the library straight into a zone (so the test doesn't depend on the shuffle)
 const fetchTo = (page, name, zone) => ktp(page, ([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); return c.iid; }, [name, zone]);
 
-test("digital table: undo, the stack, and combat", async () => {
+test("digital table: undo, casting, and combat", async () => {
   test.setTimeout(180000);
   const browser = await launchBrowser();
   const a = await newPlayer(browser), b = await newPlayer(browser);
@@ -37,23 +37,13 @@ test("digital table: undo, the stack, and combat", async () => {
   await a.locator("#hand .card").first().dblclick(); await expect(a.locator("#bf .card")).toHaveCount(1);
   await a.keyboard.press("Control+z"); await expect(a.locator("#bf .card")).toHaveCount(0);
 
-  // The stack: Luke casts a creature, everyone sees it; Rick counters it (it goes to Luke's graveyard)
-  const spell = await fetchTo(a, "Gamma Card", "hand");
-  await a.locator(`#hand .card[data-iid="${spell}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Cast (put on the stack)" }).click();
-  await expect(b.locator("#stackCards .card")).toHaveCount(1);
-  await expect(b.locator("#stackLabel")).toHaveText("Stack (1)");
-  await b.locator("#stackCards .card").click({ button:"right" });
-  await b.getByRole("menuitem", { name:"Counter it (to the graveyard)" }).click();
-  await expect(a.locator("#stackCards .card")).toHaveCount(0);
-  await expect(a.locator("#gyPile")).toContainText("Graveyard 1");
-  // Cast another; this time it resolves onto the battlefield
-  const bear = await fetchTo(a, "Gamma Card", "st");
-  await expect(b.locator("#stackCards .card")).toHaveCount(1);
-  await a.locator(`#stackCards .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Resolve" }).click();
+  // Casting (no stack): a creature cast from hand goes straight onto the battlefield; the combat bar only shows in combat
+  await expect(a.locator("#stackCards")).toHaveCount(0);
+  await expect(a.locator("#combatBar")).toBeHidden();
+  const bear = await fetchTo(a, "Gamma Card", "hand");
+  await a.locator(`#hand .card[data-iid="${bear}"]`).dblclick();
   await expect(a.locator(`#bf .card[data-iid="${bear}"]`)).toHaveCount(1);
-  await expect(b.locator("#stackCards .card")).toHaveCount(0);
+  await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`)).toHaveCount(1);
 
   // Combat: Luke attacks Rick with the button; the attacker is marked on both screens and taps
   const turn = await ktp(a, () => ktPlay.table.turnSeat);
