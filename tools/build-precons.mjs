@@ -26,7 +26,9 @@ async function getJson(url, tries = 3){
 /* ---------- The decks ---------- */
 // Products that aren't a whole deck (half decks, boosters, sample packs, box sets, Secret Lair drops). Every other
 // official deck is kept if it's a Commander deck (about 100 cards) or a 60-card deck (55 to 80 cards).
-const SKIP = /jumpstart|box set|secret lair|sample|halfdeck|half deck|spellbook|welcome booster|demo/i;
+// Also left out: land packs (only lands), Shandalar's computer opponents (from the 1997 video game, never sold), and
+// challenge decks (a boss deck played by rules of its own, like fighting the Hydra).
+const SKIP = /jumpstart|box set|secret lair|sample|halfdeck|half deck|spellbook|welcome booster|demo|land pack|shandalar|challenge deck/i;
 const BEGINNER = /starter|welcome|game night|intro|planeswalker deck|theme deck|challenger/i;
 async function loadDecks(){
   const dir = opt("--decks");
@@ -128,7 +130,8 @@ function describe(deck, info){
   if (deck.fmt === "cmdr") {
     const cmdrs = deck.cmdr.filter(Boolean);
     lines.push(`${colorName(colors)} Commander deck${deck.year ? ` (${deck.year})` : ""}${cmdrs.length ? `, led by ${cmdrs.map(c => c.name).join(" and ")}` : ""}.`);
-    const t = cmdrs[0]?.text?.split("\n").find(l => l.length > 12 && !/^\(|^(Partner|Choose a Background)/.test(l));
+    // (its first real ability: not a line of keywords like "Flying, vigilance", reminder text or Partner)
+    const t = cmdrs[0]?.text?.split("\n").find(l => /[.:]/.test(l) && l.length > 20 && !/^\(|^(Partner|Choose a Background)/.test(l));
     if (t) lines.push(`Commander: ${t.length > 170 ? t.slice(0, 167).replace(/\s+\S*$/, "") + "..." : t}`);
   } else lines.push(`${colorName(colors)} ${deck.type} (60-card${deck.year ? `, ${deck.year}` : ""}).`);
   // Themes (distinct cards, not copies)
@@ -141,8 +144,8 @@ function describe(deck, info){
   const top = [...tribe.entries()].filter(([t]) => !GENERIC_TYPES.has(t)).sort((a, b) => b[1] - a[1])[0];
   const tribal = top && top[1] >= Math.max(6, creatures.length * 0.3) ? ` (mostly ${plural(top[0])})` : "";
   lines.push(`${creatures.length} creatures${tribal}, ${lands} lands, average mana value ${mv.toFixed(1)}.`);
-  if (/mtgo|arena|digital/i.test(deck.type)) lines.push("First sold as a digital-only deck.");
-  if (/world championship/i.test(deck.type)) lines.push("A World Championship deck (gold-bordered in paper, so not tournament legal there).");
+  if (/mtgo|arena|digital|duel of the planeswalkers|enhanced deck|advanced deck/i.test(deck.type)) lines.push("First released as a digital-only deck.");
+  if (/world championship|pro tour/i.test(deck.type)) lines.push("A championship deck (gold-bordered in paper, so not tournament legal there).");
   if (/planechase/i.test(deck.type)) lines.push("Its planes aren't part of the deck here.");
   if (/archenemy/i.test(deck.type)) lines.push("Its schemes aren't part of the deck here.");
   if (deck.fmt === "sixty") lines.push(info.std ? "Legal in Standard." : "Not legal in Standard any more (fine for casual games).");
