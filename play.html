@@ -180,7 +180,7 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card .ctrs{position:absolute;left:2px;bottom:2px;display:flex;flex-direction:column;gap:1px;align-items:flex-start}
 .card .ctrs span{background:rgba(0,0,0,.8);border:1px solid var(--brass);color:var(--parchment);border-radius:8px;padding:0 4px;font-size:10px;line-height:14px;white-space:nowrap}
 .card .tok{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.75);font-size:9px;padding:0 3px;border-radius:4px}
-.card .tax{position:absolute;right:2px;bottom:2px;background:var(--brass);color:#1b1608;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
+.card .tax{position:absolute;left:2px;top:2px;white-space:nowrap;background:var(--brass);color:#1b1608;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
 .card .lbl{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:9px;background:rgba(0,0,0,.7);padding:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .card.theirs{box-shadow:0 0 0 2px var(--own),0 1px 3px rgba(0,0,0,.6)}
 #arrows{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:40}
@@ -1410,7 +1410,7 @@ function ptOf(c){
   return { p:p0 + dp, t:t0 + dt, str:`${p0 + dp}/${t0 + dt}`, dir:Math.sign(dp + dt) };
 }
 const showPt = c => { const pt = ptOf(c); return pt && (isCreature(c) || pt.dir || c.mod || c.eot) ? pt : null; };
-function cardEl(c, { mine = false, zone = "", small = false } = {}){
+function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const e = el("div", { className:"card" + (c.tapped ? " tapped" : "") + (c.fd ? " fd" : "") + (mine ? " mine" : "") });
   e.dataset.iid = c.iid; if (zone) e.dataset.zone = zone;
   const img = c.fd ? "" : c.img || imgOf(cardOf(c), c.face, small ? "small" : "normal");
@@ -1422,7 +1422,8 @@ function cardEl(c, { mine = false, zone = "", small = false } = {}){
   // (another player's card carries its power/toughness as they see it; yours is worked out here)
   const pt = typeof c.pt === "string" ? (c.pt ? { str:c.pt, dir:c.ptDir || 0 } : null) : zone === "bf" ? showPt(c) : null;
   if (pt) e.append(el("span", { className:"pt" + (pt.dir > 0 ? " up" : pt.dir < 0 ? " down" : ""), title:"Power/toughness now", textContent:pt.str }));
-  if (c.cmdr && c.tax) e.append(el("span", { className:"tax", title:"Commander tax", textContent:`+${c.tax * 2}` }));
+  // Commander tax: what the next cast from the command zone costs extra (shown there only, not on the battlefield)
+  if (c.cmdr && c.tax && (zone === "cz" || cz)) e.append(el("span", { className:"tax", title:`Commander tax: casting it again costs {${c.tax * 2}} more (cast ${c.tax} time${c.tax === 1 ? "" : "s"} so far)`, textContent:`Tax +${c.tax * 2}` }));
   if (c.atk) { e.classList.add("attacking"); e.append(el("span", { className:"atk", title:`Attacking ${nm(c.atk)}`, textContent:`⚔ ${nm(c.atk)}` })); }
   if (c.blk) { e.classList.add("blocking"); e.append(el("span", { className:"atk blk", textContent:"🛡 Blocking" })); }
   const own = c.owner || c.own;
@@ -1501,7 +1502,7 @@ function renderOpps(){
       cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
       p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
       el("span", { className:"olife", title:"Life", textContent:p.life })));
-    const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true }));
+    const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
     o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl));
