@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches: ["claude/**"]
-    paths: ["index.html", "tools/eval/mention-*.mjs", ".github/workflows/mention-eval.yml"]
+    paths: ["index.html", "tools/eval/mention-*.mjs", "tools/build-popular-names.mjs", ".github/workflows/mention-eval.yml"]
 
 permissions:
   contents: read
@@ -33,6 +33,8 @@ jobs:
       - name: Get every card name from Scryfall
         run: |
           curl -fsSL -H "User-Agent: KitchenTable-benchmark/1.0" -H "Accept: application/json" https://api.scryfall.com/catalog/card-names -o "$RUNNER_TEMP/names.json"
+      - name: Build the popular short names list (as the site does)
+        run: node tools/build-popular-names.mjs popular-names.json
       - name: Run the phrase sets against all of Magic
         env:
           FULL_NAMES: ${{ runner.temp }}/names.json
