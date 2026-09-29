@@ -28,13 +28,44 @@ button{cursor:pointer}
 /* Lobby and phone camera */
 .screen{min-height:100%;display:grid;place-items:center;padding:24px}
 .lobby-card{width:min(100%,480px)}
-#choose .lobby-card{width:min(100%,720px)}
-.choices{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:640px){.choices{grid-template-columns:1fr}}
-.choice{display:flex;flex-direction:column;gap:6px;text-align:left;padding:18px;border-radius:12px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
-.choice:hover,.choice:focus-visible{border-color:var(--brass)}
-.choice b{font:700 24px var(--serif)}
-.choice span{color:var(--muted);font-size:14px}
+/* First visit: two big halves, Digital Magic and Webcam Magic, each over a scene of that kind of game */
+#choose{position:fixed;inset:0;display:grid;grid-template-columns:1fr 1fr;background:#07120f}
+@media (max-width:700px){#choose{grid-template-columns:1fr;grid-template-rows:1fr 1fr}}
+.half{position:relative;overflow:hidden;border:0;padding:0;background:#0b1a17;display:grid;place-items:end center;text-align:center;isolation:isolate}
+.half+.half{border-left:2px solid var(--brass)}
+@media (max-width:700px){.half+.half{border-left:0;border-top:2px solid var(--brass)}}
+.half .scene{position:absolute;inset:0;z-index:-2;transition:transform .5s,filter .5s;filter:saturate(.9) brightness(.8)}
+.half::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(4,10,9,.15) 0%,rgba(4,10,9,.35) 45%,rgba(4,10,9,.92) 100%)}
+.half:hover .scene,.half:focus-visible .scene{transform:scale(1.04);filter:saturate(1.05) brightness(.95)}
+.half .label{display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 24px clamp(28px,8vh,80px);max-width:480px}
+.half .label b{font:700 clamp(34px,5.4vw,72px)/1 var(--serif);letter-spacing:.02em;color:var(--parchment);text-shadow:0 3px 18px rgba(0,0,0,.8)}
+.half .label small{font-size:clamp(14px,1.4vw,17px);color:#d9e2dc;text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.half .label i{font-style:normal;margin-top:6px;padding:10px 26px;border-radius:999px;background:var(--brass);color:#1b1608;font-weight:700;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.half:hover .label i,.half:focus-visible .label i{background:#e0bb5e}
+.half:focus-visible{outline:3px solid var(--brass);outline-offset:-6px}
+#chooseTitle{position:absolute;top:clamp(14px,4vh,36px);left:50%;transform:translateX(-50%);z-index:2;margin:0;font:700 clamp(22px,2.6vw,34px) var(--serif);color:var(--parchment);background:rgba(7,18,15,.82);border:1px solid var(--brass);border-radius:999px;padding:6px 22px;white-space:nowrap;pointer-events:none}
+@media (max-width:700px){#chooseTitle{top:50%;transform:translate(-50%,-50%);font-size:18px;padding:4px 14px}}
+.scene img{position:absolute;border-radius:4.75%/3.5%;box-shadow:0 4px 14px rgba(0,0,0,.6);background:#111;aspect-ratio:63/88;object-fit:cover;opacity:0;transition:opacity .6s}
+.scene img.in{opacity:1}
+/* (digital: the felt table, the other player's side up top, your battlefield, your hand) */
+.scene.dig{background:radial-gradient(ellipse at 50% 35%,#1d4038 0%,#0d201d 75%)}
+.scene.dig .strip{position:absolute;left:4%;right:4%;top:4%;height:22%;border:1px solid #2d5a50;border-radius:10px;background:rgba(0,0,0,.22)}
+.scene.dig .zone{position:absolute;left:4%;right:4%;top:30%;height:30%;border:1px solid #2d5a50;border-radius:10px;background:rgba(0,0,0,.15)}
+.scene .life{position:absolute;font:700 clamp(18px,2.4vw,34px) var(--serif);color:var(--parchment);text-shadow:0 2px 6px #000}
+.scene .pt{position:absolute;background:rgba(0,0,0,.85);border:1px solid #7fd08a;color:#aef0b6;border-radius:6px;padding:0 6px;font:700 12px/18px var(--sans)}
+.scene .stack{position:absolute;left:4%;top:27%;font-size:11px;color:var(--muted)}
+/* (webcam: everyone's camera looking down at their playmat) */
+.scene.cam{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;padding:6px;background:#050b0a}
+.ctile{position:relative;overflow:hidden;border-radius:10px;background:radial-gradient(ellipse at 40% 45%,#3b3561 0%,#221d3d 55%,#161229 100%);perspective:700px}
+.ctile:nth-child(2){background:radial-gradient(ellipse at 55% 50%,#2f5a3a 0%,#1d3b27 60%,#10241a 100%)}
+.ctile:nth-child(3){background:radial-gradient(ellipse at 50% 40%,#5a3226 0%,#3b1f18 60%,#241310 100%)}
+.ctile:nth-child(4){background:radial-gradient(ellipse at 50% 55%,#264d63 0%,#18344a 60%,#0e2030 100%)}
+.ctile .mat{position:absolute;inset:8% 6% 14%;transform:rotateX(28deg);transform-origin:50% 100%}
+.ctile .mat img{filter:contrast(.95) brightness(.92) blur(.3px)}
+.ctile .tag{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.7);border-radius:6px;padding:1px 8px;font-size:12px;color:#fff}
+.ctile .tag b{color:var(--brass);margin-left:6px}
+.ctile .cap{position:absolute;left:8px;bottom:34px;max-width:70%;background:rgba(0,0,0,.72);border-radius:8px;padding:3px 9px;font-size:12px;color:#fff;text-align:left}
+.ctile .cap u{color:#f0d27a;text-decoration:underline dotted}
 #lobby .lobby-card{width:min(100%,940px)}
 .lobby-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 36px;align-items:start}
 @media (max-width:860px){.lobby-cols{grid-template-columns:1fr}}
@@ -320,15 +351,16 @@ button.mpip{cursor:pointer}
 </head>
 <body>
 
-<section id="choose" class="screen hidden">
-  <div class="lobby-card">
-    <h1>Kitchen Table</h1>
-    <p class="lede">How do you want to play?</p>
-    <div class="choices">
-      <button class="choice" id="chooseWebcam"><b>Webcam table</b><span>Play with your real cards. Everyone points a camera at their playmat; click any card on screen to read it.</span></button>
-      <button class="choice" id="chooseDigital"><b>Digital table</b><span>No cards needed. Paste a decklist and play on a shared digital table, with voice chat.</span></button>
-    </div>
-  </div>
+<section id="choose" class="hidden" aria-label="How do you want to play?">
+  <h1 id="chooseTitle">Kitchen Table</h1>
+  <button class="half" id="chooseDigital" aria-label="Digital Magic: no cards needed. Pick a deck and play on a shared digital table, with voice chat.">
+    <div class="scene dig" id="sceneDigital" aria-hidden="true"></div>
+    <span class="label"><b>Digital Magic</b><small>No cards needed. Pick an official deck or paste your own and play on a shared digital table, with voice chat.</small><i>Play digital</i></span>
+  </button>
+  <button class="half" id="chooseWebcam" aria-label="Webcam Magic: play with your real cards. Everyone points a camera at their playmat.">
+    <div class="scene cam" id="sceneWebcam" aria-hidden="true"></div>
+    <span class="label"><b>WEBCAM Magic</b><small>Play with your real cards. Everyone points a camera at their playmat; click any card on screen to read it.</small><i>Play on webcam</i></span>
+  </button>
 </section>
 <section id="lobby" class="screen hidden">
   <div class="lobby-card">
@@ -586,6 +618,39 @@ async function boostBitrate(call){
 }
 
 if (PHONE) { runPhoneCam(); return; }
+/* The first-visit scenes: a digital table in play, and four webcams looking down at playmats, with real card pictures
+   from Scryfall (loaded a tenth of a second apart, as Scryfall asks; the card back stands in if one doesn't load) */
+function drawChooseScenes(){
+  const el = (tag, props = {}) => Object.assign(document.createElement(tag), props);
+  let delay = 0;
+  const pic = (box, name, css, { tapped = false, version = "normal" } = {}) => {
+    const img = el("img", { alt:"" }); img.style.cssText = css + (tapped ? ";transform:rotate(90deg)" : "");
+    img.onload = () => img.classList.add("in"); img.onerror = () => { img.onerror = null; img.src = "card-back.jpg"; };
+    setTimeout(() => { img.src = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=${version}`; }, delay += 110);
+    box.append(img); return img;
+  };
+  const d = $("#sceneDigital"); d.innerHTML = "";
+  d.append(el("div", { className:"strip" }), el("div", { className:"zone" }), el("div", { className:"stack", textContent:"Stack: Counterspell" }));
+  const life = (box, text, css) => { const e = el("div", { className:"life", textContent:text }); e.style.cssText = css; box.append(e); };
+  life(d, "37", "right:6%;top:15%"); life(d, "40", "right:6%;top:32%");
+  [["Serra Angel", 8], ["Command Tower", 20], ["Arcane Signet", 32], ["Swords to Plowshares", 44]].forEach(([n, x], i) => pic(d, n, `left:${x}%;top:6%;width:9.5%`, { tapped:i === 1, version:"small" }));
+  [["Llanowar Elves", 7], ["Shivan Dragon", 21], ["Sol Ring", 35], ["Forest", 50], ["Mountain", 62]].forEach(([n, x], i) => pic(d, n, `left:${x}%;top:34%;width:12%`, { tapped:i === 2 }));
+  const pt = el("div", { className:"pt", textContent:"7/6" }); pt.style.cssText = "left:27%;top:47%"; d.append(pt);
+  [["Lightning Bolt", -14], ["Counterspell", -7], ["Birds of Paradise", 0], ["Giant Growth", 7], ["Dark Ritual", 14]].forEach(([n, r], i) =>
+    pic(d, n, `left:${22 + i * 11}%;bottom:1%;width:15%;transform-origin:50% 100%;transform:rotate(${r}deg) translateY(${Math.abs(r) * 0.6}px)`));
+  const w = $("#sceneWebcam"); w.innerHTML = "";
+  const tiles = [["Luke", 40, [["Sol Ring", 10, 10], ["Llanowar Elves", 34, 6], ["Forest", 58, 12]], "I cast <u>Sol Ring</u>"],
+    ["Rick", 36, [["Lightning Bolt", 14, 8], ["Mountain", 40, 10], ["Shivan Dragon", 64, 4]], ""],
+    ["Sam", 38, [["Serra Angel", 20, 6], ["Plains", 46, 12], ["Swords to Plowshares", 70, 8]], "what does <u>Serra Angel</u> do?"],
+    ["Jo", 40, [["Counterspell", 12, 10], ["Island", 38, 6], ["Birds of Paradise", 62, 12]], ""]];
+  for (const [who, lifeN, cards, cap] of tiles) {
+    const t = el("div", { className:"ctile" }), mat = el("div", { className:"mat" }); t.append(mat);
+    cards.forEach(([n, x, y], i) => pic(mat, n, `left:${x}%;top:${y}%;width:22%;transform:rotate(${(i - 1) * 4}deg)`, { version:"small" }));
+    t.append(el("div", { className:"tag", innerHTML:`${who}<b>${lifeN}</b>` }));
+    if (cap) t.append(el("div", { className:"cap", innerHTML:`<b>${who}:</b> ${cap}` }));
+    w.append(t);
+  }
+}
 /* First visit: webcam table or digital table? The answer is remembered. An invite link (?room=) always opens the
    webcam lobby, and ?webcam opens it from the digital table's link. */
 {
@@ -595,10 +660,9 @@ if (PHONE) { runPhoneCam(); return; }
   if (params.get("room") || params.has("webcam") || choice === "webcam") $("#lobby").classList.remove("hidden");
   else if (choice === "digital") { digital(); return; }
   else {
-    $("#choose").classList.remove("hidden");
+    $("#choose").classList.remove("hidden"); drawChooseScenes();
     $("#chooseWebcam").onclick = () => { store.set("kt-play-choice", "webcam"); $("#choose").classList.add("hidden"); $("#lobby").classList.remove("hidden"); };
     $("#chooseDigital").onclick = () => { store.set("kt-play-choice", "digital"); digital(); };
-    $("#chooseWebcam").focus();
   }
 }
 

@@ -53,7 +53,8 @@ async function loadOracle(){
   let cards;
   if (file) cards = JSON.parse(fs.readFileSync(file, "utf8"));
   else {
-    const meta = await getJson("https://api.scryfall.com/bulk-data/oracle-cards");
+    const meta = (await getJson("https://api.scryfall.com/bulk-data")).data?.find(b => b.type === "oracle_cards");
+    if (!meta?.download_uri) throw new Error("Scryfall's bulk data list has no oracle cards file.");
     console.log(`Downloading Scryfall oracle cards (${Math.round(meta.size / 1e6)} MB)...`);
     cards = await getJson(meta.download_uri);
   }
