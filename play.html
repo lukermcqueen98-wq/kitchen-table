@@ -173,6 +173,13 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card.back,.card.fd{background:#1a1208 url(card-back.jpg) center/100% 100% no-repeat}
 .card.mine{cursor:grab}
 .card.dragging{opacity:.35}
+#bf,.obf{isolation:isolate}  /* (attachments sit behind their card but in front of the battlefield) */
+.card.attached{box-shadow:0 0 0 1px var(--brass),0 1px 3px rgba(0,0,0,.6)}
+.card.attached:hover{z-index:4 !important}  /* (pointing at an attachment brings it in front of its card) */
+.card .attname{position:absolute;left:0;right:0;background:rgba(0,0,0,.86);color:var(--parchment);font:600 11px/15px var(--sans);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.card .attname.top{top:0;border-radius:4px 4px 0 0}
+.card .attname.bottom{bottom:0;border-radius:0 0 4px 4px}
+.obf .card .attname{font-size:9px;line-height:12px;padding:0 3px}
 .card .pt{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.85);border:1px solid var(--muted);color:var(--parchment);border-radius:6px;padding:0 5px;font:700 12px/16px var(--sans);white-space:nowrap}
 .card .pt.up{border-color:#7fd08a;color:#aef0b6}
 .card .pt.down{border-color:var(--danger);color:#ffb3a1}
@@ -180,7 +187,7 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card .ctrs{position:absolute;left:2px;bottom:2px;display:flex;flex-direction:column;gap:1px;align-items:flex-start}
 .card .ctrs span{background:rgba(0,0,0,.8);border:1px solid var(--brass);color:var(--parchment);border-radius:8px;padding:0 4px;font-size:10px;line-height:14px;white-space:nowrap}
 .card .tok{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.75);font-size:9px;padding:0 3px;border-radius:4px}
-.card .tax{position:absolute;right:2px;bottom:2px;background:var(--brass);color:#1b1608;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
+.card .tax{position:absolute;left:2px;top:2px;white-space:nowrap;background:var(--brass);color:#1b1608;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
 .card .lbl{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:9px;background:rgba(0,0,0,.7);padding:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .card.theirs{box-shadow:0 0 0 2px var(--own),0 1px 3px rgba(0,0,0,.6)}
 #arrows{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:40}
@@ -212,6 +219,11 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .modal-card{background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:12px;padding:16px 18px;width:min(100%,860px);max-height:92vh;overflow:auto}
 .modal-card.wide{width:min(100%,1240px)}
 .modal-card .good{color:#9fd3a2}
+.termlist{max-height:60vh;overflow:auto}
+details.term{border-bottom:1px solid var(--felt-edge);padding:6px 2px}
+details.term summary{cursor:pointer;font-weight:600}
+details.term p{margin:6px 0 4px;font-size:14px}
+details.term a{font-size:13px;color:var(--brass)}
 .modal-card.wide .gcard{width:164px}
 .modal-card.wide .gcard .card{--w:164px}
 #pop{position:fixed;z-index:85;pointer-events:none;filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))}
@@ -329,10 +341,12 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
       <button class="btn small playonly" id="coinBtn">Coin</button>
       <button class="btn small playonly" id="tokenBtn">Tokens</button>
       <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
+      <button class="btn small playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
       <button class="btn small playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
       <button class="btn small hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
       <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
       <button class="btn small" id="micBtn">Mic on</button>
+      <button class="btn small" id="termsBtn" title="Magic terms and what they mean">Terms</button>
       <button class="btn small" id="statsBtn">Stats</button>
       <button class="btn small" id="helpBtn">Help</button>
       <button class="btn small" id="leaveBtn">Leave</button>
@@ -374,6 +388,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 <svg id="arrows" aria-hidden="true"><defs></defs></svg>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="terms.js"></script>
 <script>
 (() => {
 /* =====================================================================
@@ -936,6 +951,7 @@ function onMessage(s, msg){
     case "log": if (typeof msg.text === "string") log(msg.text.slice(0, 300), s); break;
     case "act": takeAct(s, msg); break;
     case "combat": takeHits(s, msg.hits); break;
+    case "effect": takeEffect(s, msg); break;
     case "combatEnd": if (me.zones.bf.some(c => c.blk)) { for (const c of me.zones.bf) c.blk = ""; withoutUndo(changed); } break;
     case "give": takeCard(s, msg.card); break;
     case "return": takeBack(s, msg.card, msg.zone, !!msg.bottom); break;
@@ -1174,6 +1190,10 @@ function resolve(iid){
   const perm = isPermanent(cardOf(f.c)) && !f.c.fd;
   move(iid, perm ? "bf" : "gy", { quiet:true });
   say(`resolved ${nameOf(f.c)}${perm ? "" : " (to the graveyard)"}.`);
+  // A spell that does something to other players (Cut a Deal: each opponent draws...) offers to do it now
+  const fx = !perm && !f.c.fd ? cardEffects(cardOf(f.c)) : [];
+  if (fx.length) openModal(`${nameOf(f.c)} resolved`, el("div", {}, el("p", { className:"hint", textContent:"Do what it says to the other players?" }), el("p", { style:"white-space:pre-wrap", textContent:cardText(cardOf(f.c)) })),
+    [{ label:"Not now" }, ...fx.map(x => ({ label:x.label, primary:true, fn:x.fn }))]);
 }
 function say(text){ log(`You ${text}`); broadcast({ type:"log", text:`${me.name} ${text}` }); }
 function draw(n = 1, quiet = false){
@@ -1410,7 +1430,7 @@ function ptOf(c){
   return { p:p0 + dp, t:t0 + dt, str:`${p0 + dp}/${t0 + dt}`, dir:Math.sign(dp + dt) };
 }
 const showPt = c => { const pt = ptOf(c); return pt && (isCreature(c) || pt.dir || c.mod || c.eot) ? pt : null; };
-function cardEl(c, { mine = false, zone = "", small = false } = {}){
+function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const e = el("div", { className:"card" + (c.tapped ? " tapped" : "") + (c.fd ? " fd" : "") + (mine ? " mine" : "") });
   e.dataset.iid = c.iid; if (zone) e.dataset.zone = zone;
   const img = c.fd ? "" : c.img || imgOf(cardOf(c), c.face, small ? "small" : "normal");
@@ -1422,7 +1442,8 @@ function cardEl(c, { mine = false, zone = "", small = false } = {}){
   // (another player's card carries its power/toughness as they see it; yours is worked out here)
   const pt = typeof c.pt === "string" ? (c.pt ? { str:c.pt, dir:c.ptDir || 0 } : null) : zone === "bf" ? showPt(c) : null;
   if (pt) e.append(el("span", { className:"pt" + (pt.dir > 0 ? " up" : pt.dir < 0 ? " down" : ""), title:"Power/toughness now", textContent:pt.str }));
-  if (c.cmdr && c.tax) e.append(el("span", { className:"tax", title:"Commander tax", textContent:`+${c.tax * 2}` }));
+  // Commander tax: what the next cast from the command zone costs extra (shown there only, not on the battlefield)
+  if (c.cmdr && c.tax && (zone === "cz" || cz)) e.append(el("span", { className:"tax", title:`Commander tax: casting it again costs {${c.tax * 2}} more (cast ${c.tax} time${c.tax === 1 ? "" : "s"} so far)`, textContent:`Tax +${c.tax * 2}` }));
   if (c.atk) { e.classList.add("attacking"); e.append(el("span", { className:"atk", title:`Attacking ${nm(c.atk)}`, textContent:`⚔ ${nm(c.atk)}` })); }
   if (c.blk) { e.classList.add("blocking"); e.append(el("span", { className:"atk blk", textContent:"🛡 Blocking" })); }
   const own = c.owner || c.own;
@@ -1436,12 +1457,18 @@ function drawBattlefield(box, list, opts){
   const hosted = c => c.att && byIid.has(c.att);
   for (const c of [...list.filter(hosted), ...list.filter(c => !hosted(c))]) {
     const e = cardEl(c, opts), host = hosted(c) ? byIid.get(c.att) : null;
+    box.append(e);
     if (host) {
-      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, up = host.y - 0.07 * n;
-      place(e, { x:host.x + 0.015 * n, y:up >= 0 ? up : host.y + 0.07 * n }); e.style.zIndex = 0; e.classList.add("attached");
+      /* An attachment peeks out from behind its card, up and to the right (a bit more for each one), with its name
+         on the part that shows; below the card instead when there's no room above. Pointing at it brings it forward. */
+      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, w = parseFloat(getComputedStyle(e).getPropertyValue("--w")) || 84;
+      const peek = 0.46 * w * n, above = host.y * (box.clientHeight || 400) >= peek;
+      e.style.left = `calc(${host.x * 100}% + ${0.16 * w * n}px)`;
+      e.style.top = `calc(${host.y * 100}% ${above ? "-" : "+"} ${peek}px)`;
+      e.style.zIndex = String(-n); e.classList.add("attached");  // (each one further back, so every name shows)
+      e.append(el("span", { className:`attname ${above ? "top" : "bottom"}`, textContent:c.fd ? "Face-down card" : c.name || nameOf(c) }));
     }
     else place(e, c);
-    box.append(e);
   }
 }
 function render(){
@@ -1501,7 +1528,7 @@ function renderOpps(){
       cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
       p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
       el("span", { className:"olife", title:"Life", textContent:p.life })));
-    const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true }));
+    const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
     o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl));
@@ -1800,6 +1827,8 @@ function cardMenu(iid, x, y){
   } else {
     items.push(to("To hand", "hand"), to("To battlefield", "bf"), to("To graveyard", "gy"), to("To exile", "ex"), to("To top of library", "lib"));
   }
+  const fx = !c.fd && ["hand", "st", "bf", "gy", "cz"].includes(z) ? cardEffects(k) : [];
+  if (fx.length) items.push("-", { head:"What it does to other players" }, ...fx);
   openMenu(x, y, items);
 }
 // Another player's card: tap it, put counters on it, destroy, exile, bounce, or take control of it
@@ -2126,6 +2155,95 @@ async function tokenDialog(rel){
   }, 350); };
 }
 $("#tokenBtn").onclick = () => tokenDialog();
+
+/* Effects on other players: "each opponent draws a card", "each player discards a card", "each opponent loses 2
+   life". Each player's own browser does what happens to them (draws, mills and life right away; discards and
+   sacrifices ask them what to choose), and it's all in the log. From a card's menu (read from its text), when a
+   spell with one resolves, or Group effects for anything else. */
+const EFFECT_VERB = { draw:["draws", "draw"], mill:["mills", "mill"], lose:["loses", "lose"], gain:["gains", "gain"], discard:["discards", "discard"], sacrifice:["sacrifices", "sacrifice"] };
+const opponents = () => presentSeats().filter(s => s !== mySeat);
+const cardText = k => [k?.oracle_text, ...(k?.card_faces || []).map(f => f.oracle_text)].filter(Boolean).join("\n");
+function effectLabel(kind, n, what = ""){
+  return kind === "lose" || kind === "gain" ? `${n} life` : kind === "sacrifice" ? `${n === 1 ? "a" : n} ${what || "permanent"}${n === 1 ? "" : "s"}` : `${n} card${n === 1 ? "" : "s"}`;
+}
+// Send an effect to players (your own share happens here); n "X" asks for the number first
+function groupEffect(kind, n, seats, card = "", what = "", then){
+  if (n === "X") { askNumber(`X = ?`, 1, v => groupEffect(kind, v, seats, card, what, then)); return; }
+  n = clamp(Math.round(+n || 0), 1, 99);
+  const who = seats.length === opponents().length && !seats.includes(mySeat) ? "each opponent" : seats.length === presentSeats().length ? "each player" : seats.map(nm).join(" and ");
+  say(`made ${who} ${EFFECT_VERB[kind][1]} ${effectLabel(kind, n, what)}${card ? ` (${card})` : ""}.`);
+  for (const s of seats) {
+    if (s === mySeat) takeEffect(mySeat, { kind, n, what, card });
+    else send(conns[s], { type:"effect", kind, n, what, card });
+  }
+  then?.(seats.filter(s => s !== mySeat).length);
+}
+function takeEffect(from, e){
+  const n = clamp(Math.round(+e.n || 0), 0, 99), kind = String(e.kind || ""), what = /^(creature|artifact|enchantment|land|planeswalker|permanent|nonland permanent)$/.test(e.what) ? e.what : "permanent";
+  if (!n || !EFFECT_VERB[kind] || me.watch) return;
+  const why = from === mySeat ? "" : ` (${nm(from)}${e.card ? `'s ${String(e.card).slice(0, 80)}` : ""})`;
+  withoutUndo(() => {
+    if (kind === "draw") { draw(n, true); say(`drew ${n === 1 ? "a card" : n + " cards"}${why}.`); }
+    else if (kind === "mill") { const k = Math.min(n, me.zones.lib.length); for (let i = 0; i < k; i++) move(me.zones.lib[0].iid, "gy", { quiet:true }); say(`milled ${k} card${k === 1 ? "" : "s"}${why}.`); }
+    else if (kind === "lose" || kind === "gain") { me.life += kind === "gain" ? n : -n; say(`${kind === "gain" ? "gained" : "lost"} ${n} life${why} (now ${me.life}).`); }
+    changed();
+  });
+  if (kind === "discard") pickCards(me.zones.hand, n, `Discard ${n === 1 ? "a card" : n + " cards"}${why}`, "Discard", picked => {
+    for (const c of picked) move(c.iid, "gy", { quiet:true });
+    say(`discarded ${picked.map(nameOf).join(", ") || "nothing (no cards)"}${why}.`);
+  }, true);
+  if (kind === "sacrifice") {
+    const ok = c => what === "permanent" ? true : what === "nonland permanent" ? !isLand(cardOf(c)) : new RegExp(`\\b${what}\\b`, "i").test(typeOf(cardOf(c)) || (c.fd && what === "creature" ? "Creature" : ""));
+    pickCards(me.zones.bf.filter(ok), n, `Sacrifice ${effectLabel("sacrifice", n, what)}${why}`, "Sacrifice", picked => {
+      for (const c of picked) move(c.iid, "gy", { quiet:true });
+      say(`sacrificed ${picked.map(nameOf).join(", ") || "nothing (none to sacrifice)"}${why}.`);
+    });
+  }
+}
+// Choose n cards from a list (or fewer if there aren't that many); random for discards
+function pickCards(list, n, title, verb, done, random = false){
+  const need = Math.min(n, list.length);
+  if (!need) { done([]); return; }
+  const picked = new Set(), g = el("div");
+  const draw_ = () => { g.innerHTML = ""; g.append(cardGrid(list, c => [[picked.has(c.iid) ? `✓ ${verb}` : verb, () => { if (picked.has(c.iid)) picked.delete(c.iid); else if (picked.size < need) picked.add(c.iid); draw_(); }]])); };
+  draw_();
+  const finish = cs => { closeModal(); withoutUndo(() => { done(cs); changed(); }); };
+  openModal(title, g, [...(random ? [{ label:"At random", keep:true, fn:() => finish(shuffle(list.slice()).slice(0, need)) }] : []),
+    { label:"Done", primary:true, keep:true, fn:() => { if (picked.size !== need) { toast(`Pick ${need}.`); return; } finish(list.filter(c => picked.has(c.iid))); } }], { closable:false, wide:true });
+}
+// What a card does to other players, read from its rules text
+const WORDNUM = { a:1, an:1, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, x:"X" };
+function cardEffects(k){
+  const t = cardText(k).toLowerCase(); if (!t) return [];
+  const out = [], name = k.name || "";
+  const who = w => w === "player" ? presentSeats() : opponents();
+  const num = w => WORDNUM[w] ?? (+w || 1);
+  const perOpp = /you draw a card for each opponent who drew/.test(t);
+  const re = /each (opponent|player|other player) (draws|mills|loses|gains|discards|sacrifices) (a|an|one|two|three|four|five|six|seven|eight|nine|ten|x|\d+)?\s*(cards?|life|creatures?|artifacts?|enchantments?|lands?|planeswalkers?|nonland permanents?|permanents?)?/g;
+  for (const m of t.matchAll(re)) {
+    const kind = { draws:"draw", mills:"mill", loses:"lose", gains:"gain", discards:"discard", sacrifices:"sacrifice" }[m[2]];
+    const n = num(m[3] || "a"), what = kind === "sacrifice" ? (m[4] || "permanent").replace(/s$/, "") : "";
+    const whoWord = m[1] === "player" ? "Each player" : "Each opponent";
+    let label = `${whoWord} ${m[2]} ${n === "X" ? "X" : effectLabel(kind, n, what)}`;
+    let then = null;
+    if (kind === "draw" && perOpp && m[1] !== "player") { label += ", then you draw 1 for each"; then = c => { if (c) { withoutUndo(() => { draw(c, true); changed(); }); say(`drew ${c === 1 ? "a card" : c + " cards"}, one for each opponent who drew (${name}).`); } }; }
+    if (out.some(x => x.label === label)) continue;
+    out.push({ label, fn:() => groupEffect(kind, n, who(m[1]), name, what, then) });
+  }
+  return out;
+}
+$("#fxBtn").onclick = () => {
+  if (!table.started) { toast("Start the game first."); return; }
+  const kind = el("select", { ariaLabel:"What happens" }, ...Object.entries({ draw:"draws cards", mill:"mills cards", lose:"loses life", gain:"gains life", discard:"discards cards", sacrifice:"sacrifices" }).map(([v, t]) => el("option", { value:v, textContent:t })));
+  const whoSel = el("select", { ariaLabel:"Who" }, el("option", { value:"opp", textContent:"Each opponent" }), el("option", { value:"all", textContent:"Each player" }),
+    ...opponents().map(s => el("option", { value:String(s), textContent:nm(s) })));
+  const what = el("select", { ariaLabel:"What they sacrifice", className:"hidden" }, ...["creature", "artifact", "enchantment", "land", "planeswalker", "nonland permanent", "permanent"].map(v => el("option", { value:v, textContent:v })));
+  const n = el("input", { type:"number", min:1, max:99, value:1, style:"width:70px", ariaLabel:"How many" });
+  kind.onchange = () => what.classList.toggle("hidden", kind.value !== "sacrifice");
+  const row = el("div", { className:"row", style:"gap:8px;flex-wrap:wrap;align-items:center" }, whoSel, kind, n, what);
+  openModal("Group effects", el("div", {}, el("p", { className:"hint", textContent:"For cards that do something to other players, like \"each opponent draws a card\" or \"each player sacrifices a creature\". Each player's own table does it, and discards and sacrifices let them choose." }), row),
+    [{ label:"Cancel" }, { label:"Do it", primary:true, fn:() => groupEffect(kind.value, n.value, whoSel.value === "opp" ? opponents() : whoSel.value === "all" ? presentSeats() : [+whoSel.value], "", what.value) }]);
+};
 function reveal(list, what){
   broadcast({ type:"reveal", cards:list.map(c => pubCard({ ...c, fd:false })), what });
   say(`revealed ${list.map(nameOf).join(", ")}${what ? " from " + what : ""}.`);
@@ -2136,9 +2254,59 @@ function viewCard(c){
   const src = own ? imgOf(k, face, "normal") : (c.img || "").replace("/small/", "/normal/");
   const text = el("div", { className:"hint", style:"white-space:pre-wrap;margin-top:8px" });
   const body = el("div", { style:"max-width:340px;margin:0 auto" }, el("img", { src, alt:c.name || nameOf(c), style:"width:100%;border-radius:4.75%/3.5%" }), text);
-  cardById(c.id).then(x => { if (x) text.textContent = textOf(x, face); });
+  const terms = el("div");
+  cardById(c.id).then(x => {
+    if (!x) return;
+    text.textContent = textOf(x, face);
+    // The Magic terms on this card, with what they mean
+    const found = termsIn(`${x.oracle_text || ""} ${(x.card_faces || []).map(f => f.oracle_text || "").join(" ")} ${(x.keywords || []).join(" ")}`);
+    if (found.length) terms.append(el("h3", { textContent:"Terms on this card" }), ...found.map(termEl));
+  });
+  body.append(terms);
   openModal(c.name || (own ? nameOf(own) : "Card"), body);
 }
+/* Magic terms (terms.js, shared with the webcam table, plus every keyword on Scryfall's lists): the Terms window
+   lists and searches them, and viewing a card shows the ones on it */
+const TERMS = new Map();
+for (const [name, def] of window.KT_KEYWORDS || []) TERMS.set(norm(name), { name, def });
+let termCatalogs = null;
+function loadTermCatalogs(){
+  return termCatalogs ||= (async () => {
+    let lists = null;
+    try { const c = JSON.parse(store.get("kt-kw", "null")); if (c && Date.now() - c.t < 7 * 864e5) lists = c.l; } catch {}
+    if (!lists) {
+      const got = await Promise.all(["keyword-abilities", "keyword-actions", "ability-words"].map(c => scry("/catalog/" + c)));
+      if (got.some(g => !Array.isArray(g?.data))) return;
+      lists = got.map(g => g.data.filter(x => typeof x === "string").slice(0, 600));
+      store.set("kt-kw", JSON.stringify({ t:Date.now(), l:lists }));
+    }
+    const what = ["A Magic keyword ability.", "A Magic keyword action.", "An ability word: it has no rules meaning of its own, it labels abilities that work alike."];
+    lists.forEach((list, j) => list.forEach(name => { const k = norm(name); if (k && !TERMS.has(k)) TERMS.set(k, { name, def:`${what[j]} See the full rules on MTG Wiki.` }); }));
+  })().catch(() => {});
+}
+function termsIn(text){
+  const t = ` ${norm(text)} `, out = [];
+  for (const [k, v] of TERMS) if (k.length > 2 && new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(s|es|ed|d|ing)?\\b`).test(t)) out.push(v);
+  return out.filter((v, i) => out.findIndex(o => o.name === v.name) === i).slice(0, 12);
+}
+function termEl(k, open = false){
+  const d = el("details", { className:"term", open }, el("summary", { textContent:k.name }), el("p", { textContent:k.def }),
+    el("a", { href:"https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")), target:"_blank", rel:"noopener", textContent:"Full rules on MTG Wiki" }));
+  return d;
+}
+$("#termsBtn").onclick = () => {
+  const search = el("input", { type:"search", placeholder:"Search terms, like trample or ward", ariaLabel:"Search Magic terms", autocomplete:"off", style:"width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)" });
+  const count = el("p", { className:"hint" }), list = el("div", { className:"termlist" });
+  const draw_ = () => {
+    const q = norm(search.value), all = [...new Map([...TERMS.values()].map(k => [k.name, k])).values()].sort((a, b) => a.name.localeCompare(b.name));
+    const shown = q ? all.filter(k => norm(k.name).includes(q) || norm(k.def).includes(q)) : all;
+    count.textContent = q ? `${shown.length} of ${all.length} terms` : `${all.length} terms. Search, or open one to read what it means.`;
+    list.innerHTML = ""; list.append(...shown.slice(0, 400).map(k => termEl(k, shown.length === 1)));
+  };
+  search.oninput = draw_; draw_();
+  loadTermCatalogs().then(() => { if (!$("#modal").classList.contains("hidden") && list.isConnected) draw_(); });
+  openModal("Magic terms", el("div", {}, search, count, list));
+};
 function showReveal(who, list, what){
   openModal(`${who} revealed${what ? " " + what : ""}`, cardGrid(list, null));
 }
@@ -2209,6 +2377,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Casting:</b> right-click a card in hand and choose <b>Cast</b> (or drag it onto the stack bar) so everyone can respond; right-click it on the stack to <b>Resolve</b>. Other players can counter it from their screen." }),
     el("p", { innerHTML:"<b>Combat:</b> on your turn press <b>Attack</b>, click the creatures that attack (they tap unless they have vigilance), then <b>Done attacking</b>. The defending player right-clicks an attacker to block it. <b>Combat damage</b> takes unblocked damage off the defender's life (and counts commander damage); blocked creatures, trample and first strike are yours to work out." }),
     el("p", { innerHTML:"<b>Power/toughness:</b> creatures show what they are now (counters and changes included; green is bigger than printed, red smaller). Right-click one and choose <b>Power/toughness...</b> for pump spells (until end of turn) or lasting changes. <b>Point</b> at any card to see it large." }),
+    el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),

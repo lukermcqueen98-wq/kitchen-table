@@ -53,8 +53,22 @@ test("digital table: picking an official deck (Commander and 60-card), with desc
   await a.fill("#nameIn", "Luke"); await a.click("#joinBtn");
   await expect(a.locator(".modal-card h2")).toHaveText("Who is your commander?");
   await expect(a.locator(".modal .chips")).toContainText("Gamma Card");
-  // Your own lists are one tab away
   await a.locator(".modal").getByRole("button", { name:"Done", exact:true }).click();
+  // Commander tax shows in the command zone (what the next cast costs extra), not on the battlefield
+  await a.locator("#czone .card").click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Cast (to the battlefield)" }).click();
+  await expect(a.locator("#bf .card")).toHaveCount(1);
+  await expect(a.locator("#bf .card .tax")).toHaveCount(0);
+  await a.locator("#bf .card").click({ button:"right" });
+  await a.getByRole("menuitem", { name:"To command zone" }).click();
+  await expect(a.locator("#czone .card .tax")).toHaveText("Tax +2");
+  // Magic terms: the Terms window lists them (the same list as the webcam table's), searchable
+  await a.click("#termsBtn");
+  await expect(a.locator(".modal-card h2")).toHaveText("Magic terms");
+  await expect(a.locator(".modal details.term").first()).toBeVisible();
+  await a.fill(".modal input[type=search]", "trample");
+  await expect(a.locator(".modal details.term[open] summary")).toHaveText("Trample");
+  await expect(a.locator(".modal details.term[open] p")).toContainText("lethal");
   expect(a.errors).toEqual([]);
   await browser.close();
 });
