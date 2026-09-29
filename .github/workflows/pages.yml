@@ -44,7 +44,7 @@ jobs:
             || rm -f site/index/cards.json site/index/cards.bin
 
       - name: Assemble the site
-        run: cp index.html play.html card-back.jpg README.md site/
+        run: cp index.html play.html terms.js card-back.jpg README.md site/
 
       # The official decks for the digital table's deck picker (MTGJSON's deck files, described from Scryfall's card
       # data). If that fails, the list published last time is kept.

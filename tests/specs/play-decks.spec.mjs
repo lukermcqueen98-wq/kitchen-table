@@ -62,6 +62,13 @@ test("digital table: picking an official deck (Commander and 60-card), with desc
   await a.locator("#bf .card").click({ button:"right" });
   await a.getByRole("menuitem", { name:"To command zone" }).click();
   await expect(a.locator("#czone .card .tax")).toHaveText("Tax +2");
+  // Magic terms: the Terms window lists them (the same list as the webcam table's), searchable
+  await a.click("#termsBtn");
+  await expect(a.locator(".modal-card h2")).toHaveText("Magic terms");
+  await expect(a.locator(".modal details.term").first()).toBeVisible();
+  await a.fill(".modal input[type=search]", "trample");
+  await expect(a.locator(".modal details.term[open] summary")).toHaveText("Trample");
+  await expect(a.locator(".modal details.term[open] p")).toContainText("lethal");
   expect(a.errors).toEqual([]);
   await browser.close();
 });
