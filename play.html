@@ -173,6 +173,13 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card.back,.card.fd{background:#1a1208 url(card-back.jpg) center/100% 100% no-repeat}
 .card.mine{cursor:grab}
 .card.dragging{opacity:.35}
+#bf,.obf{isolation:isolate}  /* (attachments sit behind their card but in front of the battlefield) */
+.card.attached{box-shadow:0 0 0 1px var(--brass),0 1px 3px rgba(0,0,0,.6)}
+.card.attached:hover{z-index:4 !important}  /* (pointing at an attachment brings it in front of its card) */
+.card .attname{position:absolute;left:0;right:0;background:rgba(0,0,0,.86);color:var(--parchment);font:600 11px/15px var(--sans);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.card .attname.top{top:0;border-radius:4px 4px 0 0}
+.card .attname.bottom{bottom:0;border-radius:0 0 4px 4px}
+.obf .card .attname{font-size:9px;line-height:12px;padding:0 3px}
 .card .pt{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.85);border:1px solid var(--muted);color:var(--parchment);border-radius:6px;padding:0 5px;font:700 12px/16px var(--sans);white-space:nowrap}
 .card .pt.up{border-color:#7fd08a;color:#aef0b6}
 .card .pt.down{border-color:var(--danger);color:#ffb3a1}
@@ -1437,12 +1444,18 @@ function drawBattlefield(box, list, opts){
   const hosted = c => c.att && byIid.has(c.att);
   for (const c of [...list.filter(hosted), ...list.filter(c => !hosted(c))]) {
     const e = cardEl(c, opts), host = hosted(c) ? byIid.get(c.att) : null;
+    box.append(e);
     if (host) {
-      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, up = host.y - 0.07 * n;
-      place(e, { x:host.x + 0.015 * n, y:up >= 0 ? up : host.y + 0.07 * n }); e.style.zIndex = 0; e.classList.add("attached");
+      /* An attachment peeks out from behind its card, up and to the right (a bit more for each one), with its name
+         on the part that shows; below the card instead when there's no room above. Pointing at it brings it forward. */
+      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, w = parseFloat(getComputedStyle(e).getPropertyValue("--w")) || 84;
+      const peek = 0.46 * w * n, above = host.y * (box.clientHeight || 400) >= peek;
+      e.style.left = `calc(${host.x * 100}% + ${0.16 * w * n}px)`;
+      e.style.top = `calc(${host.y * 100}% ${above ? "-" : "+"} ${peek}px)`;
+      e.style.zIndex = String(-n); e.classList.add("attached");  // (each one further back, so every name shows)
+      e.append(el("span", { className:`attname ${above ? "top" : "bottom"}`, textContent:c.fd ? "Face-down card" : c.name || nameOf(c) }));
     }
     else place(e, c);
-    box.append(e);
   }
 }
 function render(){
