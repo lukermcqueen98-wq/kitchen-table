@@ -94,7 +94,7 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   const wolf = await fetchTo(b, "Gamma Card", "bf");
   await b.locator(`#bf .card[data-iid="${wolf}"]`).click({ button:"right" });
   await menu(b, "Attack Luke");
-  await b.click("#dmgBtn"); await button(b, "Ask them to take it");
+  await b.click("#dmgBtn");
   await button(a, "Take 3 damage");
   await expect(a.locator("#lifeOut")).toHaveText("22");
   await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
@@ -119,6 +119,11 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   const hand = await ktp(b, () => ktPlay.me.zones.hand.length);
   await pass(b);
   await expect.poll(() => ktp(b, () => ktPlay.me.zones.hand.length)).toBe(hand + 1);
+  // Rick, the monarch, leaves the game: the monarch passes to the player whose turn it is (or the next one)
+  await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
+  await b.click("#leaveBtn");
+  await expect(a.locator("#myBadges .badge")).toHaveText("👑 Monarch", { timeout:10000 });
+  await expect(a.locator("#log")).toContainText("Rick left the game: Luke becomes the monarch.");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
