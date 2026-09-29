@@ -10,7 +10,7 @@ const hand = page => ktp(page, () => ktPlay.me.zones.hand.length);
 const fetchTo = (page, name, zone) => ktp(page, ([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); return c.iid; }, [name, zone]);
 const button = (page, name) => page.locator(".modal").getByRole("button", { name, exact:true }).click();
 
-test("digital table: effects on other players (Cut a Deal and the like), from the card, when it resolves, and Group effects", async () => {
+test("digital table: effects on other players (Cut a Deal and the like), from the card, when it's cast, and Group effects", async () => {
   test.setTimeout(180000);
   const browser = await launchBrowser();
   const a = await newPlayer(browser), b = await newPlayer(browser);
@@ -35,12 +35,10 @@ test("digital table: effects on other players (Cut a Deal and the like), from th
   await expect.poll(() => hand(a)).toBe(ha + 1);
   await expect(a.locator("#log")).toContainText("Rick drew a card (Luke's Commander's Sphere).");
 
-  // Casting it: when it resolves, the table offers to do it
+  // Casting it (a sorcery: to the graveyard): the table offers to do it
   await a.locator(`#hand .card[data-iid="${deal}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Cast (put on the stack)" }).click();
-  await a.locator(`#stackCards .card[data-iid="${deal}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Resolve" }).click();
-  await expect(a.locator(".modal-card h2")).toHaveText("Commander's Sphere resolved");
+  await a.getByRole("menuitem", { name:"Cast it (then to the graveyard)" }).click();
+  await expect(a.locator(".modal-card h2")).toHaveText("Commander's Sphere");
   await button(a, "Each opponent draws 1 card, then you draw 1 for each");
   await expect.poll(() => hand(b)).toBe(hb + 2);
 
