@@ -174,6 +174,8 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card.mine{cursor:grab}
 .card.dragging{opacity:.35}
 #bf,.obf{isolation:isolate}  /* (attachments sit behind their card but in front of the battlefield) */
+.pinged{animation:ping 2.5s ease-out}
+@keyframes ping{0%,40%{box-shadow:0 0 0 4px #ff6b4a,0 0 22px 6px rgba(255,107,74,.7)}100%{box-shadow:none}}
 .card.attached{box-shadow:0 0 0 1px var(--brass),0 1px 3px rgba(0,0,0,.6)}
 .card.attached:hover{z-index:4 !important}  /* (pointing at an attachment brings it in front of its card) */
 .card .attname{position:absolute;left:0;right:0;background:rgba(0,0,0,.86);color:var(--parchment);font:600 11px/15px var(--sans);padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
@@ -731,7 +733,7 @@ let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
 let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", rules:{} };
-const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1",
+const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
 const watchers = {};  // seat -> name, for people watching (seats 5 to 8)  // (commanders taken out of the decklist go back if you pick another)
@@ -798,7 +800,16 @@ function goOut(why = ""){
   if (me.out) return;
   me.out = true;
   say(`is out of the game${why ? ` (${why.replace(/^You're /, "").replace(/^You've /, "").replace(/^You have /, "").replace(/\.$/, "")})` : ""}.`);
-  withoutUndo(() => { for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; } changed(); });
+  /* Leaving the game takes your cards with you: cards you borrowed go back to their owners, your own cards leave
+     (kept aside here in case you come back in), and players who took control of your cards lose them */
+  for (const c of me.zones.bf.filter(c => c.owner && c.owner !== mySeat)) giveCard(c.iid, c.owner);
+  withoutUndo(() => {
+    for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; }
+    me.outZones = me.zones; me.zones = { lib:[], hand:[], bf:[], gy:[], ex:[], cz:[], st:[] }; me.arrows = [];
+    changed();
+  });
+  undoStack = [];
+  broadcast({ type:"ownerLeft" });
   // (the monarch and the initiative go to the player whose turn it is, or the next player; and your turn passes)
   const patch = {}, to = table.turnSeat && table.turnSeat !== mySeat ? table.turnSeat : nextSeat(mySeat);
   if (to !== mySeat) { if (table.monarch === mySeat) patch.monarch = to; if (table.initiative === mySeat) patch.initiative = to; }
@@ -810,7 +821,9 @@ function announceLast(){
   const left = presentSeats().filter(s => !isOut(s));
   if (left.length === 1 && presentSeats().length > 1) { const msg = `${nm(left[0])} is the last one standing. Press New game to record the win.`; log(msg); broadcast({ type:"log", text:msg }); }
 }
-function comeBack(){ if (!me.out) return; me.out = false; const w = lossReason(); outAsked = /life/.test(w) ? "life" : /poison/.test(w) ? "poison" : w ? "cmdr" : ""; say("is back in the game."); changed(); }
+function comeBack(){
+  if (!me.out) return; me.out = false;
+  if (me.outZones) { me.zones = me.outZones; delete me.outZones; } const w = lossReason(); outAsked = /life/.test(w) ? "life" : /poison/.test(w) ? "poison" : w ? "cmdr" : ""; say("is back in the game."); changed(); }
 function undo(){
   if (rule("noUndo")) { toast("Undo is off at this table (house rule: no take-backs)."); return; }
   if (!undoStack.length) { toast("Nothing to undo."); return; }
@@ -985,17 +998,27 @@ function onMessage(s, msg){
     case "state": {
       const was = players[s], st = cleanPub(msg.state); if (!st) return;
       players[s] = { ...st, seat:s };
-      if (msg.type === "hello") { if (!was || was.away) log(`${st.name} sat down.`); if (!me.watch) send(conns[s], { type:"state", state:pub() }); }
+      if (msg.type === "hello") {
+        if (!was || was.away) log(`${st.name} sat down.`);
+        if (!me.watch) { send(conns[s], { type:"state", state:pub() }); send(conns[s], { type:"records", recs:loadRecords().filter(r => r.players.some(p => p.name === st.name)).slice(-200) }); }
+      }
       if (msg.table) takeTable(msg.table);
       render(); break;
     }
     case "table": takeTable(msg.table); break;
     case "chat": if (typeof msg.text === "string" && msg.text.trim()) chatLine(players[s]?.name || watchers[s] || "Someone", msg.text.slice(0, 300), s); break;
     case "record": saveRecord(cleanRecord(msg.rec)); break;
+    case "records": { const n = mergeRecords(msg.recs, true); if (n) log(`Added ${n} of your past games from ${players[s]?.name || "another player"}'s records.`); break; }
     case "log": if (typeof msg.text === "string") log(msg.text.slice(0, 300), s); break;
     case "act": takeAct(s, msg); break;
     case "combatAsk": combatAsk(s); break;
     case "combatDone": combatDone(s); break;
+    case "ping": showPing(s, msg); break;
+    case "ownerLeft": {  // (a player left the game: their cards you control leave with them)
+      const gone = me.zones.bf.filter(c => c.owner === s);
+      if (gone.length) withoutUndo(() => { for (const c of gone) { me.zones.bf.splice(me.zones.bf.indexOf(c), 1); detachFrom(c); } log(`${gone.map(nameOf).join(", ")} left the game with ${nm(s)}.`); changed(); });
+      break;
+    }
     case "effect": takeEffect(s, msg); break;
     case "combatEnd": if (me.zones.bf.some(c => c.blk)) { for (const c of me.zones.bf) c.blk = ""; withoutUndo(changed); } break;
     case "give": takeCard(s, msg.card); break;
@@ -1063,7 +1086,8 @@ const HOUSE = [
   { k:"friendlyMull", label:"Friendly mulligan", hint:"A hand with 0, 1, 6 or 7 lands can be sent back for free (it doesn't count as a mulligan)." },
   { k:"freeFirst", label:"Free first mulligan in every game", hint:"The official rules only give it with 3 or more players." },
   { k:"firstDraw", label:"The first player draws on turn 1", hint:"Normally the first player skips that draw in a 2-player game." },
-  { k:"noUndo", label:"No take-backs", hint:"Turns off Undo for everyone." }];
+  { k:"noUndo", label:"No take-backs", hint:"Turns off Undo for everyone." },
+  { k:"noHandMax", label:"No maximum hand size", hint:"Nobody discards down to 7 at the end of their turn." }];
 const HOUSE_NUM = [
   { k:"life", label:"Starting life", def:() => FORMATS[table.fmt].life, max:999 },
   { k:"cmdrDmg", label:"Commander damage that knocks a player out", def:() => 21, max:99, cmdr:true },
@@ -1143,7 +1167,7 @@ function recordGame(winnerSeat){
 }
 $("#statsBtn").onclick = () => {
   const recs = loadRecords(), body = el("div");
-  if (!recs.length) { body.append(el("p", { className:"hint", textContent:"No games recorded yet. When a game ends, press New game and pick the winner." })); openModal("Stats", body); return; }
+  if (!recs.length) { body.append(el("p", { className:"hint", textContent:"No games recorded yet. When a game ends, press New game and pick the winner. Played on another device? Restore a backup file, or play with your group: their records of your games together come to you when you sit down." })); openModal("Stats", body, [restoreBtn(), { label:"Close", primary:true }]); return; }
   const tbl = (title, rows) => {
     if (!rows.length) return;
     body.append(el("h3", { textContent:title }));
@@ -1167,13 +1191,51 @@ $("#statsBtn").onclick = () => {
         r.players.map(p => p.name).join("; "), r.players.map(p => p.deck || "-").join("; "), r.players.map(p => p.cmdrs.join(" + ") || "-").join("; ")])];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
     const a = el("a", { href:URL.createObjectURL(new Blob([csv], { type:"text/csv" })), download:"kitchen-table-games.csv" }); a.click();
-  } }, { label:"Close", primary:true }]);
+  } }, { label:"Back up (file)", fn:() => {
+    const a = el("a", { href:URL.createObjectURL(new Blob([JSON.stringify({ kitchenTableRecords:1, records:loadRecords() })], { type:"application/json" })), download:"kitchen-table-records.json" }); a.click();
+  } }, restoreBtn(), { label:"Close", primary:true }]);
 };
+/* Records on another device: Back up saves them to a file and Restore adds a file's games (nothing is replaced).
+   And when you sit down with other players, each sends the records they have; you keep the games you played in. */
+function restoreBtn(){
+  return { label:"Restore from a file", fn:() => {
+    const i = el("input", { type:"file", accept:".json,application/json" });
+    i.onchange = async () => {
+      try {
+        const data = JSON.parse(await i.files[0].text()), list = Array.isArray(data) ? data : data?.records;
+        const n = mergeRecords(list, false); toast(`Restored ${n} game${n === 1 ? "" : "s"}.`);
+      } catch { toast("That file isn't a Kitchen Table records backup."); }
+    };
+    i.click();
+  } };
+}
+function mergeRecords(list, onlyMine){
+  if (!Array.isArray(list)) return 0;
+  const have = new Set(loadRecords().map(r => r.id)), add = [];
+  for (const raw of list.slice(0, 1000)) {
+    const r = cleanRecord(raw);
+    if (!r || !r.id || have.has(r.id)) continue;
+    if (onlyMine && !r.players.some(p => p.name === me?.name)) continue;
+    add.push(r); have.add(r.id);
+  }
+  if (add.length) store.set(RECORDS, JSON.stringify([...loadRecords(), ...add].sort((a, b) => a.at - b.at).slice(-500)));
+  return add.length;
+}
 $("#nextTurn").onclick = () => {
   if (!table.started) return;
   if (table.turnSeat !== mySeat && !confirm(`It's ${nm(table.turnSeat)}'s turn. Pass it for them?`)) return;
-  const next = nextSeat(table.turnSeat);
-  changeTable({ turnSeat:next, turnNum:table.turnNum + 1, phase:0 });
+  const pass = () => changeTable({ turnSeat:nextSeat(table.turnSeat), turnNum:table.turnNum + 1, phase:0 });
+  // Maximum hand size: ending your turn with more than 7 cards, discard down to 7 first (or keep them, for a
+  // Reliquary Tower; a house rule turns this off)
+  const extra = me.zones.hand.length - 7;
+  if (table.turnSeat === mySeat && extra > 0 && !rule("noHandMax")) {
+    pickCards(me.zones.hand, extra, `Discard ${extra} (you have ${me.zones.hand.length}, the most at the end of your turn is 7)`, "Discard", picked => {
+      for (const c of picked) move(c.iid, "gy", { quiet:true });
+      say(`discarded ${picked.map(nameOf).join(", ")} down to 7 cards.`); pass();
+    }, false, [{ label:"Keep them (no maximum hand size)", fn:pass }]);
+    return;
+  }
+  pass();
 };
 const nm = s => s === mySeat ? me.name : players[s]?.name || `Seat ${s}`;
 // Your turn begins: untap, draw (not on the very first turn of a two-player game), and reset the land count and mana
@@ -1187,6 +1249,7 @@ function startMyTurn_(){
   if (table.initiative === mySeat) say("has the initiative: venture into the Undercity (upkeep).");
   changed();
   turnAlert("Your turn", `Turn ${table.turnNum} at table ${roomCode}.`);
+  if (!document.hidden) cue("turn");
 }
 /* Your turn alert: when your turn starts and this tab is in the background (or minimized), a short chime, a browser
    notification (if you allowed them) and a marked tab title. Turned off in Help. */
@@ -1204,6 +1267,23 @@ function chime(){
     }
   } catch {}
 }
+/* Sound cues (Help to turn off): your turn, being attacked, being targeted, and chat */
+const CUES = { turn:[[660, 0], [880, 0.16]], attack:[[392, 0], [330, 0.15], [392, 0.3]], target:[[988, 0], [740, 0.12]], chat:[[1046, 0]] };
+const cues = [];  // (for tests)
+function cue(kind){
+  if (!settings.sounds || me?.watch) return;
+  cues.push(kind);
+  try {
+    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    for (const [f, d] of CUES[kind] || []) {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.18, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.25);
+      o.start(t + d); o.stop(t + d + 0.27);
+    }
+  } catch {}
+}
 const TITLE = document.title;
 function turnAlert(title, body){
   if (!settings.turnAlert || me?.watch || !document.hidden) return;
@@ -1216,7 +1296,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) docu
 // (asked when you sit down, since the browser only asks after a click)
 function askAlerts(){ try { if (settings.turnAlert && window.Notification?.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }
 function dealNewGame(){
-  me.gameId = table.gameId; me.arrows = []; me.out = false; outAsked = ""; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
+  me.gameId = table.gameId; me.arrows = []; me.out = false; delete me.outZones; outAsked = ""; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
   const isC = FORMATS[table.fmt].cmdr;
@@ -1238,15 +1318,33 @@ const ZONE_NAME = { lib:"library", hand:"hand", bf:"battlefield", gy:"graveyard"
 const isPermanent = c => /\b(Creature|Artifact|Enchantment|Planeswalker|Land|Battle)\b/.test(typeOf(c).split(" // ")[0]);
 // Casting from your hand or command zone: a permanent goes onto the battlefield; an instant or sorcery goes to
 // your graveyard, and one that does something to other players (Cut a Deal: each opponent draws...) offers it
-function castSpell(iid){
+function castSpell(iid, target){
   const f = findCard(iid); if (!f || !["hand", "cz"].includes(f.z)) return;
-  const perm = isPermanent(cardOf(f.c)) || f.c.fd;
-  if (perm) { move(iid, "bf"); return; }
+  const k = cardOf(f.c), fd = f.c.fd, text = cardText(k);
+  const aura = !fd && /\bAura\b/.test(typeOf(k)) && !/^Enchant player/im.test(text);
+  // A spell with a target (or an Aura) asks for it first: click a card or a player (see pickTarget)
+  if (target === undefined && !fd && (aura || (!isPermanent(k) && /\btarget\b/i.test(text)))) { startTargeting(aura ? "castAura" : "cast", iid); return; }
+  if (aura && target?.card) {
+    move(iid, "bf", { quiet:true });
+    const c = findCard(iid)?.c; if (c) { c.att = target.card; c.x = 0.02; c.y = 0.02; }
+    say(`cast ${nameOf(f.c)}, enchanting ${target.text}.`); ping(target); changed(); return;
+  }
+  if (isPermanent(k) || fd) { move(iid, "bf"); return; }
   move(iid, "gy", { quiet:true });
-  say(`cast ${nameOf(f.c)}.`);
-  const fx = cardEffects(cardOf(f.c));
-  if (fx.length) openModal(`${nameOf(f.c)}`, el("div", {}, el("p", { className:"hint", textContent:"Do what it says to the other players?" }), el("p", { style:"white-space:pre-wrap", textContent:cardText(cardOf(f.c)) })),
+  say(`cast ${nameOf(f.c)}${target?.text ? ` targeting ${target.text}` : ""}.`);
+  if (target) ping(target);
+  const fx = cardEffects(k);
+  if (fx.length) openModal(`${nameOf(f.c)}`, el("div", {}, el("p", { className:"hint", textContent:"Do what it says to the other players?" }), el("p", { style:"white-space:pre-wrap", textContent:text })),
     [{ label:"Not now" }, ...fx.map(x => ({ label:x.label, primary:true, fn:x.fn }))]);
+}
+// A target flashes on every screen (and chimes for the player it's aimed at)
+function ping(t){ const m = { type:"ping", iid:t.card || "", seat:t.seat || 0 }; broadcast(m); showPing(mySeat, m); }
+function showPing(from, m){
+  const iid = String(m.iid || "").slice(0, 20), seat = clamp(+m.seat || 0, 0, MAX);
+  const target = iid ? document.querySelector(`.card[data-iid="${CSS.escape(iid)}"]`) : seat === mySeat ? $("#me") : document.querySelector(`.opp[data-seat="${seat}"]`);
+  if (target) { target.classList.remove("pinged"); void target.offsetWidth; target.classList.add("pinged"); setTimeout(() => target.classList.remove("pinged"), 2600); }
+  const mine = seat === mySeat || (iid && findCard(iid));
+  if (mine && from !== mySeat) cue("target");
 }
 function say(text){ log(`You ${text}`); broadcast({ type:"log", text:`${me.name} ${text}` }); }
 function draw(n = 1, quiet = false){
@@ -1414,15 +1512,48 @@ function combatAsk(from, tries = 0){
   if ($("#modal").classList.contains("hidden")) defendDialog(); else toast(`${nm(from)} is ready for combat damage: press Take or block.`);
 }
 function incoming(){ return Object.entries(players).filter(([s]) => +s !== mySeat).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === mySeat).map(c => ({ s:+s, c }))); }
-const kwOf = c => c.fd ? [] : (cards.get(c.id)?.card_faces?.[c.face || 0]?.keywords || cards.get(c.id)?.keywords || []);
+const kwOf = c => { const k = cards.get(c.id); return c.fd ? [] : (k?.card_faces?.[c.face || 0]?.keywords || k?.keywords || []); };
 const ptParse = str => { const m = /^(-?\d+)\/(-?\d+)/.exec(str || ""); return m ? { p:Math.max(0, +m[1]), t:+m[2] } : { p:0, t:0 }; };
-const FIGHT_KW = ["Trample", "Deathtouch", "First strike", "Double strike", "Lifelink", "Indestructible"];
-// One attacker against its blockers (in blocking order): damage to you, who dies, and lifelink gains
+const FIGHT_KW = ["Flying", "Reach", "Menace", "Trample", "Deathtouch", "First strike", "Double strike", "Lifelink", "Indestructible", "Infect", "Wither"];
+const COLOR_WORDS = { white:"W", blue:"U", black:"B", red:"R", green:"G" };
+// A creature in combat: power/toughness, keywords, colors, what it has protection from, and "can't be blocked"
+function combatant(c, pt){
+  const k = cards.get(c.id), f = c.fd ? null : (k?.card_faces?.[c.face || 0] || k), text = String(f?.oracle_text ?? k?.oracle_text ?? ""), name = c.name || nameOf(c);
+  const prot = new Set();
+  for (const m of text.matchAll(/protection from ([a-z ,]+?)(?=[.\n(]|$)/gi))
+    for (const w of m[1].toLowerCase().split(/,|\band\b|\bor\b/).map(x => x.trim()).filter(Boolean)) {
+      if (COLOR_WORDS[w]) prot.add(COLOR_WORDS[w]);
+      else if (w === "everything") prot.add("all");
+      else if (w === "all colors" || w === "each color") Object.values(COLOR_WORDS).forEach(x => prot.add(x));
+      else if (/^creatures?$/.test(w)) prot.add("creatures");
+    }
+  const short = name.split(",")[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const unblockable = new RegExp(`(^|\\n)(${short}|this creature) can't be blocked\\.`, "i").test(text);
+  return { c, name, ...pt, kw:kwOf(c), colors:c.fd ? [] : (f?.colors || k?.colors || []), prot, unblockable };
+}
+const protects = (x, src) => !!x.prot && (x.prot.has("all") || x.prot.has("creatures") || (src.colors || []).some(col => x.prot.has(col)));
+// Why this creature can't block that attacker ("" if it can)
+function cantBlock(b, a){
+  if (a.unblockable) return `${a.name} can't be blocked`;
+  if (a.kw.includes("Flying") && !b.kw.includes("Flying") && !b.kw.includes("Reach")) return `${a.name} has flying`;
+  if (protects(a, b)) return `${a.name} has protection from it`;
+  return "";
+}
+/* One attacker against its blockers (in blocking order): damage and poison to you, who dies, lifelink, and -1/-1
+   counters from infect and wither. Protection prevents damage; a lone blocker on a menace creature doesn't count. */
 function fight(att, blockers){
+  for (const x of [att, ...blockers]) { x.prot ||= new Set(); x.colors ||= []; x.dmg = 0; x.dtHit = false; x.ctr = 0; }
   const has = (x, k) => x.kw.includes(k), fs = x => has(x, "First strike") || has(x, "Double strike"), rs = x => !has(x, "First strike") || has(x, "Double strike");
-  const all = [att, ...blockers]; for (const x of all) x.dmg = 0, x.dtHit = false;
+  const menaceBad = has(att, "Menace") && blockers.length === 1;
+  if (menaceBad || att.unblockable) blockers = [];
+  const all = [att, ...blockers];
   const dead = x => !has(x, "Indestructible") && (x.dmg >= x.t || x.dtHit || x.t <= 0);
-  let toYou = 0, attGain = 0, blkGain = 0;
+  const hurt = (to, from, n) => {
+    if (protects(to, from)) return 0;
+    to.dmg += n; if (has(from, "Deathtouch")) to.dtHit = true; if (has(from, "Infect") || has(from, "Wither")) to.ctr += n;
+    return n;
+  };
+  let toYou = 0, poison = 0, attGain = 0, blkGain = 0;
   for (const step of [fs, rs]) {
     if (!all.some(step)) continue;
     const alive = all.filter(x => !dead(x)), deal = [];
@@ -1441,62 +1572,84 @@ function fight(att, blockers){
       }
     }
     const back = blockers.filter(b => alive.includes(b) && step(b) && b.p > 0 && alive.includes(att)).map(b => [b, b.p]);
-    for (const [to, n] of deal) { if (to === "you") toYou += n; else { to.dmg += n; if (has(att, "Deathtouch")) to.dtHit = true; } if (has(att, "Lifelink")) attGain += n; }
-    for (const [b, n] of back) { att.dmg += n; if (has(b, "Deathtouch")) att.dtHit = true; if (has(b, "Lifelink")) blkGain += n; }
+    for (const [to, n] of deal) {
+      const d = to === "you" ? n : hurt(to, att, n);
+      if (to === "you") { if (has(att, "Infect")) poison += n; else toYou += n; }
+      if (has(att, "Lifelink")) attGain += d;
+    }
+    for (const [b, n] of back) { const d = hurt(att, b, n); if (has(b, "Lifelink")) blkGain += d; }
   }
-  return { toYou, attDies:dead(att), deadBlockers:blockers.filter(dead), attGain, blkGain };
+  return { toYou, poison, attDies:dead(att), deadBlockers:blockers.filter(dead), attGain, blkGain, menaceBad,
+           counters:all.filter(x => x.ctr && !dead(x)).map(x => [x, x.ctr]) };
 }
 async function defendDialog(){
   const list = incoming(); if (!list.length) { toast("Nobody is attacking you."); return; }
   await Promise.all(list.map(({ c }) => c.id && !cards.has(c.id) ? cardById(c.id).catch(() => null) : null));
   const body = el("div"), foot = el("p", { className:"fsum" });
-  const mineOf = b => ({ c:b, name:nameOf(b), ...(() => { const x = ptOf(b); return { p:Math.max(0, x?.p || 0), t:x?.t ?? 0 }; })(), kw:kwOf(b) });
+  const mineOf = b => { const x = ptOf(b); return combatant(b, { p:Math.max(0, x?.p || 0), t:x?.t ?? 0 }); };
+  const empty = () => ({ hits:{}, theirDead:[], myDead:[], gains:{}, myGain:0, total:0, poison:0, myCounters:[], theirCounters:[] });
   let plan = null;
   const draw_ = () => {
-    body.innerHTML = ""; plan = { hits:{}, theirDead:[], myDead:[], gains:{}, myGain:0, total:0 };
+    body.innerHTML = ""; plan = empty();
     const free = me.zones.bf.filter(b => isCreature(b) && !b.tapped && (!b.blk || !list.some(a => a.c.iid === b.blk)));
     for (const { s, c } of list) {
-      const att = { name:c.name || "creature", ...ptParse(c.pt), kw:kwOf(c) };
+      const att = combatant(c, ptParse(c.pt));
       const bl = me.zones.bf.filter(b => b.blk === c.iid).map(mineOf), r = fight(att, bl);
-      if (r.toYou) { plan.total += r.toYou; (plan.hits[s] ||= []).push({ iid:c.iid, name:att.name, amount:r.toYou, cmdr:!!c.cmdr }); }
+      const hit = (amount, poison) => (plan.hits[s] ||= []).push({ iid:c.iid, name:att.name, amount, cmdr:!!c.cmdr, poison });
+      if (r.toYou) { plan.total += r.toYou; hit(r.toYou, false); }
+      if (r.poison) { plan.poison += r.poison; hit(r.poison, true); }
       if (r.attDies) plan.theirDead.push({ s, c });
       plan.myDead.push(...r.deadBlockers.map(x => x.c));
+      for (const [x, n] of r.counters) (x === att ? plan.theirCounters.push({ s, c, n }) : plan.myCounters.push({ c:x.c, n }));
       if (r.attGain) plan.gains[s] = (plan.gains[s] || 0) + r.attGain;
       plan.myGain += r.blkGain;
+      const open = free.filter(b => !b.blk), why = open.map(b => [b, cantBlock(mineOf(b), att)]);
       const pick = el("select", { ariaLabel:`Block ${att.name} with` }, el("option", { value:"", textContent:bl.length ? "Add another blocker..." : "Block with..." }),
-        ...free.filter(b => !b.blk).map(b => el("option", { value:b.iid, textContent:`${nameOf(b)} (${ptOf(b)?.str || "?"})` })));
+        ...why.filter(([, w]) => !w).map(([b]) => el("option", { value:b.iid, textContent:`${nameOf(b)} (${ptOf(b)?.str || "?"})` })));
       pick.onchange = () => { const b = findCard(pick.value)?.c; if (b) { b.blk = c.iid; say(`blocked ${nm(s)}'s ${att.name} with ${nameOf(b)}.`); changed(); draw_(); } };
+      const cant = why.filter(([, w]) => w);
       const chips = el("div", { className:"chips" }, ...bl.map(x => { const rm = el("button", { textContent:"×", ariaLabel:`Stop blocking with ${x.name}` }); rm.onclick = () => { x.c.blk = ""; changed(); draw_(); }; return el("span", {}, `${x.name} (${x.p}/${x.t})`, rm); }));
-      const outcome = [!bl.length ? `Unblocked: ${r.toYou} to you${c.cmdr ? " (commander damage)" : ""}.` : r.toYou ? `${r.toYou} tramples over to you.` : "",
-        bl.length ? (r.attDies ? `${att.name} dies.` : `${att.name} survives.`) : "",
-        ...r.deadBlockers.map(x => `Your ${x.name} dies.`), ...bl.filter(x => !r.deadBlockers.includes(x)).map(x => `Your ${x.name} survives.`),
+      const blocked = bl.length && !r.menaceBad && !att.unblockable;
+      const outcome = [r.menaceBad ? "Menace: it needs two or more blockers, so one doesn't count." : "",
+        !blocked ? `Unblocked: ${r.poison ? `${r.poison} poison` : `${r.toYou} damage`} to you${c.cmdr ? " (commander damage)" : ""}.` : r.toYou || r.poison ? `${r.toYou || r.poison} ${r.poison ? "poison" : ""} tramples over to you.`.replace("  ", " ") : "",
+        blocked ? (r.attDies ? `${att.name} dies.` : `${att.name} survives.`) : "",
+        ...(blocked ? r.deadBlockers.map(x => `Your ${x.name} dies.`) : []), ...(blocked ? bl.filter(x => !r.deadBlockers.includes(x)).map(x => `Your ${x.name} survives.`) : []),
+        ...r.counters.map(([x, n]) => `${x === att ? att.name : `Your ${x.name}`} gets ${n} -1/-1 counter${n === 1 ? "" : "s"}.`),
         r.attGain ? `${nm(s)} gains ${r.attGain} (lifelink).` : "", r.blkGain ? `You gain ${r.blkGain} (lifelink).` : ""].filter(Boolean).join(" ");
       const img = el("img", { className:"fimg", alt:"", src:(c.img || "").replace("/small/", "/normal/") || "card-back.jpg" });
+      const tags = [...att.kw.filter(k => FIGHT_KW.includes(k)), ...(att.prot.size ? ["Protection"] : []), ...(att.unblockable ? ["Can't be blocked"] : [])];
       body.append(el("div", { className:"frow" }, img, el("div", {},
-        el("div", { className:"fname" }, `${nm(s)}'s `, el("b", { textContent:att.name }), ` ${att.p}/${att.t}`, ...att.kw.filter(k => FIGHT_KW.includes(k)).map(k => el("span", { className:"tag", textContent:k }))),
-        chips, free.filter(b => !b.blk).length ? pick : null, el("p", { className:"fout", textContent:outcome }))));
+        el("div", { className:"fname" }, `${nm(s)}'s `, el("b", { textContent:att.name }), ` ${att.p}/${att.t}`, ...tags.map(k => el("span", { className:"tag", textContent:k }))),
+        chips, why.some(([, w]) => !w) ? pick : null,
+        cant.length ? el("p", { className:"hint", textContent:`Can't block it: ${cant.map(([b, w]) => `${nameOf(b)} (${w.replace(`${att.name} `, "")})`).join(", ")}.` }) : null,
+        el("p", { className:"fout", textContent:outcome }))));
     }
-    foot.textContent = `You take ${plan.total}${plan.myGain ? ` and gain ${plan.myGain}` : ""}. ${plan.myDead.length ? `Your ${plan.myDead.map(nameOf).join(", ")} die${plan.myDead.length === 1 ? "s" : ""}. ` : ""}${plan.theirDead.length ? `Their ${plan.theirDead.map(x => x.c.name).join(", ")} die${plan.theirDead.length === 1 ? "s" : ""}.` : ""}`;
-    body.append(foot, el("p", { className:"hint", textContent:"Worked out from power/toughness, counters and changes, and trample, deathtouch, first and double strike, lifelink and indestructible. Other abilities (menace, protection, infect) are yours to account for." }));
-    const main = $("#modal .mfoot .primary"); if (main) main.textContent = plan.total ? `Take ${plan.total} damage` : "Apply (no damage to you)";
+    const take = [plan.total ? `${plan.total} damage` : "", plan.poison ? `${plan.poison} poison` : ""].filter(Boolean).join(" and ") || "no damage";
+    foot.textContent = `You take ${take}${plan.myGain ? ` and gain ${plan.myGain}` : ""}. ${plan.myDead.length ? `Your ${plan.myDead.map(nameOf).join(", ")} die${plan.myDead.length === 1 ? "s" : ""}. ` : ""}${plan.theirDead.length ? `Their ${plan.theirDead.map(x => x.c.name).join(", ")} die${plan.theirDead.length === 1 ? "s" : ""}.` : ""}`;
+    body.append(foot, el("p", { className:"hint", textContent:"Worked out from power/toughness (counters and changes included), flying and reach, menace, can't be blocked, protection from colors, trample, deathtouch, first and double strike, lifelink, indestructible, infect and wither. Anything else is yours to account for." }));
+    const main = $("#modal .mfoot .primary"); if (main) main.textContent = label();
   };
+  const label = () => plan.total || plan.poison ? `Take ${[plan.total ? `${plan.total} damage` : "", plan.poison ? `${plan.poison} poison` : ""].filter(Boolean).join(" and ")}` : "Apply (no damage to you)";
   draw_();
   openModal("Combat: you're being attacked", body, [
-    { label:"Take no damage", fn:() => resolveCombat({ hits:{}, theirDead:[], myDead:[], gains:{}, myGain:0, total:0 }, "took no combat damage.") },
-    { label:plan.total ? `Take ${plan.total} damage` : "Apply (no damage to you)", primary:true, fn:() => resolveCombat(plan) }], { wide:true });
+    { label:"Take no damage", fn:() => resolveCombat(empty(), "took no combat damage.") },
+    { label:label(), primary:true, fn:() => resolveCombat(plan) }], { wide:true });
 }
 function resolveCombat(plan, note){
-  const { hits, theirDead, myDead, gains, myGain, total } = plan;
+  const { hits, theirDead, myDead, gains, myGain, total, poison = 0, myCounters = [], theirCounters = [] } = plan;
   for (const [s, h] of Object.entries(hits)) takeHits(+s, h);
-  say(note || (total ? `took ${total} combat damage (${Object.entries(hits).map(([s, l]) => `${l.map(h => `${h.amount} from ${h.name}`).join(", ")} of ${nm(+s)}'s`).join("; ")}).` : "took no combat damage."));
+  const what = h => `${h.amount}${h.poison ? " poison" : ""} from ${h.name}`;
+  say(note || (total || poison ? `took ${[total ? `${total} combat damage` : "", poison ? `${poison} poison` : ""].filter(Boolean).join(" and ")} (${Object.entries(hits).map(([s, l]) => `${l.map(what).join(", ")} of ${nm(+s)}'s`).join("; ")}).` : "took no combat damage."));
   withoutUndo(() => {
     for (const b of myDead) move(b.iid, "gy", { quiet:true });
     if (myDead.length) say(`lost ${myDead.map(nameOf).join(", ")} in combat.`);
+    for (const { c, n } of myCounters) { c.ctr["-1/-1"] = (c.ctr["-1/-1"] || 0) + n; say(`put ${n} -1/-1 counter${n === 1 ? "" : "s"} on ${nameOf(c)} (infect or wither).`); }
     if (myGain) { me.life += myGain; say(`gained ${myGain} life (lifelink).`); }
     for (const b of me.zones.bf) b.blk = "";
     changed();
   });
   for (const { s, c } of theirDead) sendAct(s, c, "gy", {}, `killed ${nm(s)}'s ${c.name} in combat.`);
+  for (const { s, c, n } of theirCounters) for (let i = 0; i < n; i++) sendAct(s, c, "ctr", { name:"-1/-1", d:1 }, i ? "" : `put ${n} -1/-1 counter${n === 1 ? "" : "s"} on ${nm(s)}'s ${c.name} (infect or wither).`);
   for (const [s, n] of Object.entries(gains)) send(conns[s], { type:"effect", kind:"gain", n, card:"lifelink" });
   broadcast({ type:"combatDone" });
 }
@@ -1510,14 +1663,15 @@ function endCombat(){ for (const c of me.zones.bf) { c.atk = 0; delete c.atkTapp
 function takeHits(from, hits){
   if (!Array.isArray(hits)) return;
   withoutUndo(() => {
-    let total = 0;
+    let total = 0, poison = 0;  // (infect damage to a player is poison counters instead of life)
     for (const h of hits.slice(0, 40)) {
       const n = clamp(Math.round(+h?.amount || 0), 0, 999); if (!n) continue;
-      total += n;
+      if (h.poison) poison += n; else total += n;
       if (h.cmdr && typeof h.iid === "string") { const key = `${from}:${h.iid.slice(0, 20)}`; me.cmd[key] = (me.cmd[key] || 0) + n; }
     }
-    if (!total) return;
-    me.life -= total; toast(`You took ${total} combat damage from ${nm(from)}.`);
+    if (!total && !poison) return;
+    me.life -= total; me.poison += poison;
+    toast(`You took ${[total ? `${total} combat damage` : "", poison ? `${poison} poison` : ""].filter(Boolean).join(" and ")} from ${nm(from)}.`);
     const moved = {}; if (table.monarch === mySeat) moved.monarch = from; if (table.initiative === mySeat) moved.initiative = from;
     if (Object.keys(moved).length) {
       changeTable(moved);
@@ -1739,11 +1893,15 @@ function renderMine(){
     mb.append(b);
   }
 }
+let lastAtMe = 0;
 // The combat bar, while creatures are attacking: who's attacking whom, and Take or block if it's you
 function renderCombat(){
   const attackers = Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk).map(c => ({ c, s:+s })));
   const note = $("#combatNote"), atMe = attackers.filter(a => a.c.atk === mySeat);
   $("#combatBar").classList.toggle("hidden", !attackers.length);
+  for (const a of atMe) if (a.c.id && !cards.has(a.c.id)) cardById(a.c.id).catch(() => {});  // (for flying, protection and the like)
+  if (atMe.length > lastAtMe) cue("attack");
+  lastAtMe = atMe.length;
   note.textContent = atMe.length ? `${atMe.length} attacking you: right-click one to block ` : attackers.length ? `${attackers.length} attacking` : "";
   if (atMe.length && !me.watch) { const b = el("button", { className:"btn small primary", id:"defendBtn", textContent:"Take or block" }); b.onclick = defendDialog; note.append(b); }
   const mine = attackers.filter(a => a.s === mySeat);
@@ -1779,17 +1937,26 @@ let targeting = null, swallowClick = false;
 document.addEventListener("click", e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
 function startTargeting(kind, iid){
   targeting = { kind, iid }; document.body.classList.add("targeting");
-  const t = $("#toast"); t.textContent = kind === "attach" ? "Click the card to attach it to (Esc to cancel)." : kind === "block" ? "Click the attacking creature to block (Esc to cancel)." : "Click a card or a player to point at (Esc to cancel).";
+  const t = $("#toast"); t.textContent = kind === "attach" ? "Click the card to attach it to (Esc to cancel)." : kind === "block" ? "Click the attacking creature to block (Esc to cancel)."
+    : kind === "castAura" ? "Click the card to enchant (Esc to cancel)." : kind === "cast" ? "Click its target: a card, or a player's area (your own life for yourself). Click empty space for no target; Esc cancels."
+    : "Click a card or a player to point at (Esc to cancel).";
   t.classList.remove("hidden"); clearTimeout(toast.t);
 }
 function stopTargeting(){ targeting = null; document.body.classList.remove("targeting"); $("#toast").classList.add("hidden"); }
 function pickTarget(e){
   const t = targeting; stopTargeting();
-  const src = findCard(t.iid); if (!src || src.z !== "bf") return;
   const ce = e.target.closest?.(".card"), oppEl = e.target.closest?.(".opp");
   const cardIid = ce && (ce.closest("#bf") || ce.closest(".obf")) ? ce.dataset.iid : "";
   const seatOfCard = ce?.closest(".opp")?.dataset.seat ? +ce.closest(".opp").dataset.seat : mySeat;
   const targetName = cardIid ? (seatOfCard === mySeat ? nameOf(findCard(cardIid).c) : findPub(cardIid)?.name || "a card") : "";
+  if (t.kind === "cast" || t.kind === "castAura") {
+    const player = !cardIid && (oppEl || e.target.closest?.(".lifebox")) ? (oppEl ? +oppEl.dataset.seat : mySeat) : 0;
+    const target = cardIid ? { card:cardIid, text:`${seatOfCard === mySeat ? "their own" : nm(seatOfCard) + "'s"} ${targetName}` }
+      : player ? { seat:player, text:player === mySeat ? "themselves" : nm(player) } : null;
+    if (t.kind === "castAura" && !target?.card) { toast("Pick a card on the battlefield to enchant."); startTargeting("castAura", t.iid); return; }
+    castSpell(t.iid, target); return;
+  }
+  const src = findCard(t.iid); if (!src || src.z !== "bf") return;
   if (t.kind === "block") {
     const atk = cardIid && seatOfCard !== mySeat ? (players[seatOfCard]?.bf || []).find(x => x.iid === cardIid && x.atk) : null;
     if (!atk) { toast("Pick a creature that's attacking."); return; }
@@ -1961,7 +2128,7 @@ function cardMenu(iid, x, y){
     if (c.cmdr) items.push(to("To command zone", "cz"));
     items.push({ label:"Reveal to the table", fn:() => reveal([c], "") });
   } else if (z === "hand") {
-    items.push(isPermanent(k) ? to("Play", "bf") : { label:"Cast it (then to the graveyard)", fn:() => castSpell(iid) }, ...(isPermanent(k) ? [] : [to("Put it on the battlefield", "bf")]), to("Play face down", "bf", { fd:true }), to("Discard", "gy"), to("Exile", "ex"), to("To top of library", "lib"), to("To bottom of library", "lib", { bottom:true }));
+    items.push(isPermanent(k) ? { label:"Play", fn:() => castSpell(iid) } : { label:"Cast it (then to the graveyard)", fn:() => castSpell(iid) }, ...(isPermanent(k) ? [] : [to("Put it on the battlefield", "bf")]), to("Play face down", "bf", { fd:true }), to("Discard", "gy"), to("Exile", "ex"), to("To top of library", "lib"), to("To bottom of library", "lib", { bottom:true }));
     items.push("-", { label:"Reveal this card", fn:() => reveal([c], "") }, { label:me.revealHand ? "Stop showing my hand" : "Show my whole hand to the table", fn:() => { me.revealHand = !me.revealHand; say(me.revealHand ? "revealed their hand." : "hid their hand again."); changed(); } });
   } else if (z === "cz") {
     items.push({ label:isPermanent(k) ? "Cast (to the battlefield)" : "Cast it", fn:() => castSpell(iid) }, to("To hand", "hand"), { label:"Reset commander tax", fn:() => { c.tax = 0; changed(); } });
@@ -1992,7 +2159,8 @@ function theirCardMenu(seat, iid, x, y){
     { label:"Put it on top of its owner's library", fn:act("lib", {}, `put ${whose} on top of its owner's library.`) }, "-",
     { label:"Gain control of it", fn:act("steal", {}, `gained control of ${whose}.`) });
   if (c.atk === mySeat) {
-    const mine = me.zones.bf.filter(b => !b.tapped && isCreature(b));
+    const A = combatant(c, ptParse(c.pt));
+    const mine = me.zones.bf.filter(b => !b.tapped && isCreature(b) && !cantBlock(combatant(b, { p:0, t:0 }), A));
     if (mine.length) items.unshift({ head:"Block it with:" }, ...mine.slice(0, 8).map(b => ({ label:nameOf(b), fn:() => setBlock(b, c, seat) })), "-");
   }
   openMenu(x, y, items);
@@ -2335,16 +2503,22 @@ $("#tokenBtn").onclick = () => tokenDialog();
    sacrifices ask them what to choose), and it's all in the log. From a card's menu (read from its text), when a
    spell with one resolves, or Group effects for anything else. */
 const EFFECT_VERB = { draw:["draws", "draw"], mill:["mills", "mill"], lose:["loses", "lose"], gain:["gains", "gain"], discard:["discards", "discard"], sacrifice:["sacrifices", "sacrifice"] };
-const opponents = () => presentSeats().filter(s => s !== mySeat);
+const opponents = () => presentSeats().filter(s => s !== mySeat && !isOut(s));
+const livePlayers = () => presentSeats().filter(s => !isOut(s));
+// Pick one player (for "target player" and "target opponent")
+function pickPlayer(title, seats, fn){
+  if (!seats.length) { toast("There's no one to pick."); return; }
+  openModal(title, el("p", { className:"hint", textContent:"Who?" }), [{ label:"Cancel" }, ...seats.map(s => ({ label:s === mySeat ? `${me.name} (you)` : nm(s), primary:true, fn:() => fn(s) }))]);
+}
 const cardText = k => [k?.oracle_text, ...(k?.card_faces || []).map(f => f.oracle_text)].filter(Boolean).join("\n");
 function effectLabel(kind, n, what = ""){
   return kind === "lose" || kind === "gain" ? `${n} life` : kind === "sacrifice" ? `${n === 1 ? "a" : n} ${what || "permanent"}${n === 1 ? "" : "s"}` : `${n} card${n === 1 ? "" : "s"}`;
 }
 // Send an effect to players (your own share happens here); n "X" asks for the number first
-function groupEffect(kind, n, seats, card = "", what = "", then){
-  if (n === "X") { askNumber(`X = ?`, 1, v => groupEffect(kind, v, seats, card, what, then)); return; }
+function groupEffect(kind, n, seats, card = "", what = "", then, whoLabel = ""){
+  if (n === "X") { askNumber(`X = ?`, 1, v => groupEffect(kind, v, seats, card, what, then, whoLabel)); return; }
   n = clamp(Math.round(+n || 0), 1, 99);
-  const who = seats.length === opponents().length && !seats.includes(mySeat) ? "each opponent" : seats.length === presentSeats().length ? "each player" : seats.map(nm).join(" and ");
+  const who = whoLabel || (seats.length === opponents().length && !seats.includes(mySeat) ? "each opponent" : seats.length === livePlayers().length ? "each player" : seats.map(nm).join(" and "));
   say(`made ${who} ${EFFECT_VERB[kind][1]} ${effectLabel(kind, n, what)}${card ? ` (${card})` : ""}.`);
   for (const s of seats) {
     if (s === mySeat) takeEffect(mySeat, { kind, n, what, card });
@@ -2375,14 +2549,14 @@ function takeEffect(from, e){
   }
 }
 // Choose n cards from a list (or fewer if there aren't that many); random for discards
-function pickCards(list, n, title, verb, done, random = false){
+function pickCards(list, n, title, verb, done, random = false, extra = []){
   const need = Math.min(n, list.length);
   if (!need) { done([]); return; }
   const picked = new Set(), g = el("div");
   const draw_ = () => { g.innerHTML = ""; g.append(cardGrid(list, c => [[picked.has(c.iid) ? `✓ ${verb}` : verb, () => { if (picked.has(c.iid)) picked.delete(c.iid); else if (picked.size < need) picked.add(c.iid); draw_(); }]])); };
   draw_();
   const finish = cs => { closeModal(); withoutUndo(() => { done(cs); changed(); }); };
-  openModal(title, g, [...(random ? [{ label:"At random", keep:true, fn:() => finish(shuffle(list.slice()).slice(0, need)) }] : []),
+  openModal(title, g, [...extra, ...(random ? [{ label:"At random", keep:true, fn:() => finish(shuffle(list.slice()).slice(0, need)) }] : []),
     { label:"Done", primary:true, keep:true, fn:() => { if (picked.size !== need) { toast(`Pick ${need}.`); return; } finish(list.filter(c => picked.has(c.iid))); } }], { closable:false, wide:true });
 }
 // What a card does to other players, read from its rules text
@@ -2390,7 +2564,7 @@ const WORDNUM = { a:1, an:1, one:1, two:2, three:3, four:4, five:5, six:6, seven
 function cardEffects(k){
   const t = cardText(k).toLowerCase(); if (!t) return [];
   const out = [], name = k.name || "";
-  const who = w => w === "player" ? presentSeats() : opponents();
+  const who = w => w === "player" ? livePlayers() : opponents();
   const num = w => WORDNUM[w] ?? (+w || 1);
   const perOpp = /you draw a card for each opponent who drew/.test(t);
   const re = /each (opponent|player|other player) (draws|mills|loses|gains|discards|sacrifices) (a|an|one|two|three|four|five|six|seven|eight|nine|ten|x|\d+)?\s*(cards?|life|creatures?|artifacts?|enchantments?|lands?|planeswalkers?|nonland permanents?|permanents?)?/g;
@@ -2404,6 +2578,15 @@ function cardEffects(k){
     if (out.some(x => x.label === label)) continue;
     out.push({ label, fn:() => groupEffect(kind, n, who(m[1]), name, what, then) });
   }
+  // "Target player draws two cards", "target opponent loses 3 life": pick the player, then it happens to them
+  const tre = /target (opponent|player) (draws|mills|loses|gains|discards|sacrifices) (a|an|one|two|three|four|five|six|seven|eight|nine|ten|x|\d+)?\s*(cards?|life|creatures?|artifacts?|enchantments?|lands?|planeswalkers?|nonland permanents?|permanents?)?/g;
+  for (const m of t.matchAll(tre)) {
+    const kind = { draws:"draw", mills:"mill", loses:"lose", gains:"gain", discards:"discard", sacrifices:"sacrifice" }[m[2]];
+    const n = num(m[3] || "a"), what = kind === "sacrifice" ? (m[4] || "permanent").replace(/s$/, "") : "";
+    const label = `Target ${m[1]} ${m[2]} ${n === "X" ? "X" : effectLabel(kind, n, what)}...`;
+    if (out.some(x => x.label === label)) continue;
+    out.push({ label, fn:() => pickPlayer(`${name}: target ${m[1]}`, m[1] === "player" ? livePlayers() : opponents(), s => groupEffect(kind, n, [s], name, what, null, s === mySeat ? "themselves" : nm(s))) });
+  }
   return out;
 }
 $("#fxBtn").onclick = () => {
@@ -2416,7 +2599,7 @@ $("#fxBtn").onclick = () => {
   kind.onchange = () => what.classList.toggle("hidden", kind.value !== "sacrifice");
   const row = el("div", { className:"row", style:"gap:8px;flex-wrap:wrap;align-items:center" }, whoSel, kind, n, what);
   openModal("Group effects", el("div", {}, el("p", { className:"hint", textContent:"For cards that do something to other players, like \"each opponent draws a card\" or \"each player sacrifices a creature\". Each player's own table does it, and discards and sacrifices let them choose." }), row),
-    [{ label:"Cancel" }, { label:"Do it", primary:true, fn:() => groupEffect(kind.value, n.value, whoSel.value === "opp" ? opponents() : whoSel.value === "all" ? presentSeats() : [+whoSel.value], "", what.value) }]);
+    [{ label:"Cancel" }, { label:"Do it", primary:true, fn:() => groupEffect(kind.value, n.value, whoSel.value === "opp" ? opponents() : whoSel.value === "all" ? livePlayers() : [+whoSel.value], "", what.value) }]);
 };
 function reveal(list, what){
   broadcast({ type:"reveal", cards:list.map(c => pubCard({ ...c, fd:false })), what });
@@ -2559,7 +2742,7 @@ $("#leaveBtn").onclick = () => {
   setTimeout(() => { try { peer.destroy(); } catch {} location.href = location.pathname; }, 400);
 };
 $("#helpBtn").onclick = () => {
-  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
+  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop", sounds:"sounds" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
   openModal("How to play", el("div", {},
     el("p", { innerHTML:"<b>Drag</b> cards between your hand, battlefield, library, graveyard, exile and command zone (hold Shift when dropping on the library to put it on the bottom). <b>Click</b> a card on the battlefield to tap or untap it. <b>Double-click</b> a card in hand to play it. <b>Right-click</b> (or press and hold) a card or your library for everything else: counters, transform, face down, tokens, scry, surveil, mill, search, reveal." }),
     el("p", { innerHTML:"<b>Keys:</b> D draw, U untap all, T tap the card you're pointing at." }),
@@ -2575,6 +2758,7 @@ $("#helpBtn").onclick = () => {
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
     s("autoMana", "Tapping a land adds its mana to my mana pool"),
     s("hoverPop", "Enlarge a card when I point at it"),
+    s("sounds", "Sounds: my turn, being attacked, being targeted, and chat"),
     s("turnAlert", "Alert me (a chime and a notification) when my turn starts and this tab is in the background")));
 };
 function chatLine(who, text, seat){
@@ -2584,6 +2768,7 @@ function chatLine(who, text, seat){
   const ul = $("#log"); ul.append(li); while (ul.children.length > 300) ul.firstChild.remove();
   $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
   if (seat && seat !== mySeat && getComputedStyle($("#panel")).display === "none") toast(`${who}: ${text}`);
+  if (seat && seat !== mySeat) cue("chat");
 }
 $("#chatForm").onsubmit = e => {
   e.preventDefault();
@@ -2602,7 +2787,7 @@ function log(text, seat){
 window.addEventListener("beforeunload", () => save());
 
 // For tests: a way to reach the game state
-if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards, alerts, fight };
+if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards, alerts, fight, cantBlock, cues };
 })();
 </script>
 </body>

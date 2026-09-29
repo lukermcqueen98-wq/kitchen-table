@@ -8,9 +8,9 @@ import { BASE, PEER_PORT } from "./global-setup.mjs";
 
 const MODULES = path.resolve(import.meta.dirname, "..", "node_modules");
 const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js", "opencv.js":"@techstark/opencv-js/dist/opencv.js" };
-const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : k === 6 ? "Sorcery" : "Artifact", oracle_text:k === 6 ? "Each opponent draws a card, then you draw a card for each opponent who drew a card this way." : "{T}: Add {C}{C}.", mana_cost:"{2}{G/U}", scryfall_uri:"https://scryfall.com",
+const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : k === 6 ? "Sorcery" : k === 4 ? "Instant" : "Artifact", oracle_text:k === 6 ? "Each opponent draws a card, then you draw a card for each opponent who drew a card this way." : k === 4 ? "Target player draws two cards." : "{T}: Add {C}{C}.", mana_cost:"{2}{G/U}", scryfall_uri:"https://scryfall.com",
   color_identity:k === 2 ? ["G", "U"] : k === 5 ? ["B"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
-  // (Commander's Sphere stands in for Cut a Deal, a sorcery that makes each opponent draw)
+  // (Commander's Sphere stands in for Cut a Deal, a sorcery that makes each opponent draw; Rhystic Study is an instant that says "Target player draws two cards.")
   // (for the deck check: Gwenom is banned in Commander, and Sol Ring is banned in Modern and restricted in Vintage)
   legalities:{ commander:k === 5 ? "banned" : "legal", duel:"legal", modern:k === 3 ? "banned" : "legal", vintage:k === 3 ? "restricted" : "legal" },
   image_uris:{ small:`https://cards.scryfall.io/small/${k % 3}.png`, normal:`https://cards.scryfall.io/normal/${k % 3}.png`, art_crop:`https://cards.scryfall.io/art_crop/${k % 3}.png` } });

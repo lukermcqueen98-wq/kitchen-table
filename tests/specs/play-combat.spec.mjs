@@ -57,7 +57,7 @@ test("digital table: undo, casting, and combat", async () => {
   // Unblocked: Luke asks for combat damage; only Rick, the defender, decides, on his combat screen
   await a.click("#dmgBtn");
   await expect(b.locator(".modal-card h2")).toHaveText("Combat: you're being attacked");
-  await expect(b.locator(".modal .frow")).toContainText("Unblocked: 3 to you.");
+  await expect(b.locator(".modal .frow")).toContainText("Unblocked: 3 damage to you.");
   await expect(b.locator("#lifeOut")).toHaveText("20");
   await b.locator(".modal").getByRole("button", { name:"Take 3 damage" }).click();
   await expect(b.locator("#lifeOut")).toHaveText("17");
@@ -90,10 +90,10 @@ test("digital table: undo, casting, and combat", async () => {
   await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);
   await a.click("#attackBtn");
   await a.click("#dmgBtn");
-  await expect(b.locator(".modal .frow")).toContainText("Unblocked: 5 to you.");
+  await expect(b.locator(".modal .frow")).toContainText("Unblocked: 5 damage to you.");
   await b.locator(".modal select[aria-label='Block Gamma Card with']").selectOption(wall);
   await expect(b.locator(".modal .frow")).toContainText("Gamma Card survives. Your Gamma Card dies.");
-  await expect(b.locator(".modal .fsum")).toContainText("You take 0. Your Gamma Card dies.");
+  await expect(b.locator(".modal .fsum")).toContainText("You take no damage. Your Gamma Card dies.");
   await b.locator(".modal").getByRole("button", { name:"Apply (no damage to you)" }).click();
   await expect(b.locator(`#bf .card[data-iid="${wall}"]`)).toHaveCount(0);
   await expect(b.locator("#gyPile")).toContainText("Graveyard 1");
@@ -145,6 +145,16 @@ test("digital table: undo, casting, and combat", async () => {
   expect(await f(C(4, 4), C(2, 2, "Indestructible"))).toEqual([0, false, 0, 0, 0]);   // indestructible survives
   expect(await f(C(3, 3, "Lifelink"))).toEqual([3, false, 0, 3, 0]);                  // lifelink: the attacker's player gains
   expect(await f(C(4, 4), C(2, 2), C(2, 2))).toEqual([0, true, 2, 0, 0]);             // two blockers share the damage
+  expect(await f(C(2, 2, "Menace"), C(5, 5))).toEqual([2, false, 0, 0, 0]);           // menace: a lone blocker doesn't count
+  const g = (att, ...bl) => ktp(a, ([att, bl]) => { const mk = x => ({ ...x, prot:new Set(x.prot || []) }); const r = ktPlay.fight(mk(att), bl.map(mk));
+    return { toYou:r.toYou, poison:r.poison, attDies:r.attDies, dead:r.deadBlockers.length, counters:r.counters.map(([, n]) => n) }; }, [att, bl]);
+  expect(await g(C(3, 3, "Infect"))).toMatchObject({ toYou:0, poison:3 });                         // infect: poison instead of damage
+  expect(await g(C(2, 2, "Wither"), C(1, 4))).toMatchObject({ dead:0, counters:[2] });               // wither: -1/-1 counters that stay
+  expect(await g({ ...C(2, 2), prot:["R"] }, { ...C(4, 4), colors:["R"] })).toMatchObject({ attDies:false });  // protection from red
+  const cb = (b, att) => ktp(a, ([b, att]) => ktPlay.cantBlock({ ...b, prot:new Set() }, { name:"Bird", ...att, prot:new Set(att.prot || []) }), [b, att]);
+  expect(await cb(C(1, 1), C(1, 1, "Flying"))).toBe("Bird has flying");
+  expect(await cb(C(1, 1, "Reach"), C(1, 1, "Flying"))).toBe("");
+  expect(await cb({ ...C(1, 1), colors:["G"] }, { ...C(1, 1), prot:["G"] })).toBe("Bird has protection from it");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });

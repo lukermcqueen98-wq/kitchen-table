@@ -4,6 +4,8 @@ import { BASE } from "../support/global-setup.mjs";
 
 const opp = (page, name) => page.locator(".opp", { hasText:name });
 const ktp = (page, fn, arg) => page.evaluate(fn, arg);
+// (ending a turn with more than 7 cards asks for discards; these tests keep them)
+const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
 const button = (page, name) => page.locator(".modal").getByRole("button", { name, exact:true }).click();
 
 test("digital table: players who are out are skipped in turn order (0 life, or conceding)", async () => {
@@ -23,10 +25,23 @@ test("digital table: players who are out are skipped in turn order (0 life, or c
   await a.click("#startBtn"); await button(a, "Start the game");
   for (const p of pages) await button(p, "Keep");
   const turn = () => ktp(a, () => ktPlay.table.turnSeat);
-  const pass = async () => { const s = await turn(), n = await ktp(a, () => ktPlay.table.turnNum); await pages[s - 1].click("#nextTurn"); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
+  const pass = async () => { const s = await turn(), n = await ktp(a, () => ktPlay.table.turnNum); await pages[s - 1].click("#nextTurn"); await keepHand(pages[s - 1]); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
+
+  // Maximum hand size: ending his turn with 9 cards, Luke discards 2 first
+  while (await turn() !== 1) await pass();
+  await ktp(a, () => { ktPlay.draw(9 - ktPlay.me.zones.hand.length, true); });
+  const n0 = await ktp(a, () => ktPlay.table.turnNum);
+  await a.click("#nextTurn");
+  await expect(a.locator(".modal-card h2")).toHaveText("Discard 2 (you have 9, the most at the end of your turn is 7)");
+  for (const i of [0, 1]) await a.locator(".modal .gcard").nth(i).getByRole("button", { name:"Discard" }).click();
+  await button(a, "Done");
+  await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n0 + 1);
+  expect(await ktp(a, () => ktPlay.me.zones.hand.length)).toBe(7);
 
   // Sam hits 0 life on his own turn: he's asked, says he's out, and his turn passes on by itself
   while (await turn() !== 3) await pass();
+  await ktp(c, () => { const k = ktPlay.me.zones.lib.find(x => ktPlay.cards.get(x.id)?.name === "Gamma Card"); ktPlay.move(k.iid, "bf"); });
+  await expect(opp(a, "Sam").locator(".obf .card")).toHaveCount(1);
   await ktp(c, () => { ktPlay.me.life = 1; });
   await c.click("#lifeMinus");
   await expect(c.locator(".modal-card h2")).toHaveText("Are you out of this game?");
@@ -36,6 +51,7 @@ test("digital table: players who are out are skipped in turn order (0 life, or c
   for (const p of [a, b]) await expect(opp(p, "Sam").locator(".badge.out")).toHaveText("Out");
   await expect(c.locator("#myBadges")).toContainText("You're out");
   await expect(a.locator("#log")).toContainText("Sam is out of the game (at 0 life).");
+  await expect(opp(a, "Sam").locator(".obf .card")).toHaveCount(0);  // (his cards leave the game with him)
 
   // Turns go Luke, Rick, Luke, Rick... never Sam
   const seen = [];

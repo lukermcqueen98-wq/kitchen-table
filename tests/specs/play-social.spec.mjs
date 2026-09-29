@@ -65,6 +65,24 @@ test("digital table: chat, watching, a dropped connection, and game records", as
     await expect(p.locator(".modal table.stats tr", { hasText:"Gammas" })).toHaveCount(1);
     await p.locator(".modal").getByRole("button", { name:"Close", exact:true }).click();
   }
+  // Records on another device: a backup file restores them, and sitting down with the group shares them
+  const [dl] = await Promise.all([a.waitForEvent("download"), (async () => { await a.click("#statsBtn"); await a.locator(".modal").getByRole("button", { name:"Back up (file)" }).click(); })()]);
+  const backup = await dl.path();
+  const d = await newPlayer(browser);  // (a new device, at a table of its own: nothing recorded yet)
+  await join(d, "Luke", "");
+  await d.click("#statsBtn");
+  await expect(d.locator(".modal")).toContainText("No games recorded yet");
+  const [chooser] = await Promise.all([d.waitForEvent("filechooser"), d.locator(".modal").getByRole("button", { name:"Restore from a file" }).click()]);
+  await chooser.setFiles(backup);
+  await expect(d.locator("#toast")).toContainText("Restored 1 game.");
+  const e = await newPlayer(browser);  // (another new device, sitting down with Rick: his records of games with Luke come over)
+  await join(e, "Luke", room);
+  await expect(e.locator("#log")).toContainText("Added 1 of your past games", { timeout:15000 });
+  await e.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();  // (a game is on: this Luke gets a hand)
+  await e.click("#statsBtn");
+  await expect(e.locator(".modal")).toContainText("1 game recorded");
+  await e.locator(".modal").getByRole("button", { name:"Close", exact:true }).click();
+
   // On a phone: nothing scrolls sideways, and the log and chat open from the Log button
   await a.setViewportSize({ width:390, height:844 });
   expect(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
