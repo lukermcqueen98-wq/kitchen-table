@@ -64,11 +64,16 @@ test("digital table: undo, the stack, and combat", async () => {
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(1);
   await expect(b.locator("#combatNote")).toContainText("1 attacking you");
   await a.click("#attackBtn");  // done attacking
-  // Unblocked: combat damage takes Gamma Card's 3 off Rick's life
+  // Unblocked: Luke asks for combat damage; only Rick, the defender, decides, and takes Gamma Card's 3
   await a.click("#dmgBtn");
   await expect(a.locator(".modal")).toContainText("Rick takes 3");
-  await a.locator(".modal").getByRole("button", { name:"Deal the damage" }).click();
+  await expect(a.locator(".modal").getByRole("button", { name:"Deal the damage" })).toHaveCount(0);  // (the attacker can't put it on him)
+  await a.locator(".modal").getByRole("button", { name:"Ask them to take it" }).click();
+  await expect(b.locator(".modal-card h2")).toHaveText("You're being attacked (3 unblocked)");
+  await expect(b.locator("#lifeOut")).toHaveText("20");
+  await b.locator(".modal").getByRole("button", { name:"Take 3 damage" }).click();
   await expect(b.locator("#lifeOut")).toHaveText("17");
+  await expect(a.locator("#log")).toContainText("Rick took 3 combat damage");
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
 
   // Blocked: Rick blocks with his own Gamma Card from Luke's attacker's menu; no damage gets through
@@ -83,9 +88,22 @@ test("digital table: undo, the stack, and combat", async () => {
   await expect(a.locator("#arrows > path.blockline")).toHaveCount(1);
   await a.click("#dmgBtn");
   await expect(a.locator(".modal")).toContainText("is blocked by Rick's Gamma Card");
-  await a.locator(".modal").getByRole("button", { name:"Deal the damage" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Cancel" }).click();
+  // (Rick doesn't have to wait to be asked: Take or block on the combat bar)
+  await b.click("#defendBtn");
+  await expect(b.locator(".modal")).toContainText("is blocked by your Gamma Card");
+  await b.locator(".modal").getByRole("button", { name:"No damage gets through" }).click();
   await expect(b.locator(`#bf .card.blocking`)).toHaveCount(0);
+  await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(0);
   await expect(b.locator("#lifeOut")).toHaveText("17");
+  // A third attack: Rick takes none (as with a fog)
+  await ktp(a, iid => { ktPlay.me.zones.bf.find(c => c.iid === iid).tapped = false; }, bear);
+  await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Attack Rick" }).click();
+  await b.locator("#defendBtn").click();
+  await b.locator(".modal").getByRole("button", { name:"Take no damage" }).click();
+  await expect(b.locator("#lifeOut")).toHaveText("17");
+  await expect(a.locator("#log")).toContainText("Rick took no combat damage.");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });

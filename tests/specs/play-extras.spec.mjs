@@ -94,7 +94,8 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   const wolf = await fetchTo(b, "Gamma Card", "bf");
   await b.locator(`#bf .card[data-iid="${wolf}"]`).click({ button:"right" });
   await menu(b, "Attack Luke");
-  await b.click("#dmgBtn"); await button(b, "Deal the damage");
+  await b.click("#dmgBtn"); await button(b, "Ask them to take it");
+  await button(a, "Take 3 damage");
   await expect(a.locator("#lifeOut")).toHaveText("22");
   await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
   await expect(opp(a, "Rick").locator(".badge")).toHaveText("👑 Monarch");
