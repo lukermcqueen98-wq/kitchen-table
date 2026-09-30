@@ -253,6 +253,8 @@ aside section+section{margin-top:22px}
 #cardView .oracle{white-space:pre-wrap;font-size:14px;margin:0 0 8px}
 .msym{width:1em;height:1em;vertical-align:-.14em;margin:0 1px}
 #cardView h2 .cost{margin-left:8px;white-space:nowrap}
+/* (mana symbols sit in the line, in the cost and in the rules text: not full-width like the card picture) */
+#cardView img.msym{display:inline-block;width:1em;height:1em;margin:0 1px;vertical-align:-.14em}
 #cardView h2 .msym{width:.8em;height:.8em;vertical-align:-.05em}
 #cardView a{color:var(--brass)}
 #cardView .from{background:rgba(201,164,76,.15);border:1px solid var(--brass);border-radius:8px;padding:6px 10px;margin:0 0 10px;font-size:14px}
@@ -317,6 +319,8 @@ aside section+section{margin-top:22px}
 .die.out{opacity:.35}
 .die .who{font-weight:600;display:flex;align-items:center;gap:6px;max-width:120px}
 .die .who span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.die.coin.rolling svg{animation:coinflip .32s linear infinite}  /* (a coin spins edge-on instead of tumbling) */
+@keyframes coinflip{0%{transform:scaleX(1)}50%{transform:scaleX(.06)}100%{transform:scaleX(1)}}
 @keyframes tumble{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(.88)}100%{transform:rotate(360deg) scale(1)}}
 .rollstatus{font-size:17px;min-height:1.6em;margin:0 0 14px}
 #qr{display:inline-block;background:#fff;padding:12px;border-radius:10px;margin:14px 0}
@@ -357,7 +361,7 @@ button.mpip{cursor:pointer}
   header.bar .grp.game{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){
-  .life output{transition:none}.tile.enter{animation:none}.playedrow{animation:none}.whichrow{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg{animation:none}
+  .life output{transition:none}.tile.enter{animation:none}.playedrow{animation:none}.whichrow{animation:none}.tile .sel{animation:none!important;transition:none!important}.tile .sel::after{display:none}.die.rolling svg,.die.coin.rolling svg{animation:none}
 }
 </style>
 </head>
@@ -447,6 +451,7 @@ button.mpip{cursor:pointer}
           <button data-kind="d20">Roll a d20</button>
         </div>
       </details>
+      <button class="btn" id="coinBtn" type="button" title="Flip a coin (everyone sees it)">Coin</button>
     </div>
     <div class="grp mine">
       <button class="btn" id="micBtn" title="Mute or unmute your microphone">Mic on</button>
@@ -2305,7 +2310,7 @@ function dieSvg(kind, fill, ink){
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="${fill}" stroke="rgba(0,0,0,.45)" stroke-width="2">${shape}</g><text x="50" y="${y}" text-anchor="middle" font-family="Spectral, Georgia, serif" font-weight="700" font-size="${size}" fill="${ink}"></text></svg>`;
 }
 function makeDie(kind, seat, label){
-  const d = document.createElement("div"); d.className = "die";
+  const d = document.createElement("div"); d.className = "die" + (kind === "coin" ? " coin" : "");
   d.innerHTML = dieSvg(kind, SEAT_HEX[seat - 1] || "#efe6cf", SEAT_INK[seat - 1] || "#1b1608");
   const who = document.createElement("div"); who.className = "who";
   const sw = document.createElement("span"); sw.className = "pip"; sw.style.background = SEAT_HEX[seat - 1] || "#efe6cf";
@@ -2386,6 +2391,7 @@ async function playRollOff(msg){
 }
 
 document.querySelectorAll("#diceDd .menu button[data-kind]").forEach(b => b.onclick = () => { $("#diceDd").open = false; rollDice(b.dataset.kind); });
+$("#coinBtn").onclick = () => rollDice("coin");
 const KINDS = ["coin", "d4", "d6", "d8", "d10", "d12", "d20"];
 function rollDice(kind){
   if (!KINDS.includes(kind)) return;
