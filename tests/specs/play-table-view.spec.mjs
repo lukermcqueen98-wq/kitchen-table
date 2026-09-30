@@ -239,3 +239,60 @@ test("digital table: library, graveyard and exile options (Magic's usual ones), 
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: game and turn clocks, turn counts, a turn time limit, your turn standing out, and stacked basic lands", async () => {
+  test.setTimeout(120000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  // A 1-minute turn limit (a house rule), and the turn passes when it runs out
+  await a.click("#startBtn");
+  await a.fill(".modal input[aria-label='Turn time limit in minutes (0: no limit)']", "1");
+  await a.locator("label.rule", { hasText:"When the turn time limit runs out, the turn passes" }).locator("input").check();
+  await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const turn = () => ktp(a, () => ktPlay.table.turnSeat);
+  const mine = await turn() === 1 ? a : b, other = mine === a ? b : a;
+
+  // The clocks count up; the turn number and round show; the player whose turn it is sees it clearly
+  await expect(a.locator("#clocks")).toBeVisible();
+  await expect(a.locator("#turnLimit")).toHaveText("/ 1:00");
+  const t0 = await a.locator("#gameClock").textContent();
+  await expect.poll(() => a.locator("#gameClock").textContent(), { timeout:5000 }).not.toBe(t0);
+  await expect(a.locator("#turnCount")).toHaveText("1"); await expect(a.locator("#roundCount")).toHaveText("1");
+  await expect(mine.locator("#turnInfo")).toHaveClass(/mine/);
+  await expect(mine.locator("body")).toHaveClass(/myturn/);
+  await expect(other.locator("#turnInfo")).not.toHaveClass(/mine/);
+  // Time's up: the clock goes red, the table is told, and the turn passes; the next player's "Your turn" pops up
+  await ktp(mine, () => { ktPlay.table.turnAt = Date.now() - 61000; });
+  await expect(other.locator("#log")).toContainText(/Time's up for (Luke|Rick)'s turn \(1 minute\)\./);
+  await expect.poll(turn).toBe(mine === a ? 2 : 1);
+  await expect(other.locator("#turnSplash")).toHaveText("Your turn");
+  await expect(a.locator("#turnCount")).toHaveText("2");
+  await expect(opp(a, "Rick")).toContainText(/Turns [12]/);
+
+  // Basic lands of one kind stack with a count; a click taps one (and adds its mana); right-click taps several
+  const forests = await ktp(a, () => { const out = []; for (let i = 0; i < 4; i++) { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Forest"); ktPlay.move(c.iid, "bf"); out.push(c.iid); } return out; });
+  const stack = a.locator("#bf .card.landstack");
+  await expect(stack).toHaveCount(1);
+  await expect(stack.locator(".stackn")).toHaveText("×4"); await expect(stack.locator(".stackup")).toHaveText("4 untapped");
+  await expect(opp(b, "Luke").locator(".card.landstack .stackn")).toHaveText("×4");
+  const g0 = await ktp(a, () => ktPlay.me.mana.G);
+  await stack.click();
+  await expect(stack.locator(".stackup")).toHaveText("3 untapped");
+  expect(await ktp(a, () => ktPlay.me.mana.G)).toBe(g0 + 1);
+  await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Tap 2", exact:true }).click();
+  await expect(stack.locator(".stackup")).toHaveText("1 untapped");
+  expect(await ktp(a, () => ktPlay.me.mana.G)).toBe(g0 + 3);
+  await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Untap all 3", exact:true }).click();
+  await expect(stack.locator(".stackup")).toHaveText("4 untapped");
+  expect(forests.length).toBe(4);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});

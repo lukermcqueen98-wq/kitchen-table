@@ -88,12 +88,31 @@ button{cursor:pointer}
 
 /* Table: top bar, opponents, your board, hand, side panel */
 #table{height:100%;display:grid;grid-template-columns:1fr 300px;grid-template-rows:auto minmax(0,1fr) auto}
-header{grid-column:1/-1;display:flex;align-items:center;gap:8px 14px;padding:6px 12px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap}
+header{grid-column:1/-1;display:flex;flex-direction:column;border-bottom:1px solid var(--felt-edge)}
+header .topbar{display:flex;align-items:center;gap:8px 14px;padding:6px 12px;flex-wrap:wrap}
 header .title{font:700 18px var(--serif)}
 header .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-header .grp.mid{flex:1;justify-content:center}
+header .grp.mid{flex:1;justify-content:center;gap:10px}
+header .toolbar{display:flex;gap:6px 18px;align-items:center;padding:5px 12px;flex-wrap:wrap;background:rgba(0,0,0,.18);border-top:1px solid var(--felt-edge)}
+.tgroup{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.tgroup+.tgroup{padding-left:14px;border-left:1px solid var(--felt-edge)}
+.tlabel{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+.clocks{display:flex;gap:10px;align-items:center;border:1px solid var(--felt-edge);border-radius:10px;padding:2px 10px;background:rgba(0,0,0,.2)}
+.clock{display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
+.clock b{font-size:14px}
+.clabel{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+#turnClockBox.warn b{color:var(--brass)}
+#turnClockBox.over b{color:var(--danger);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+/* Whose turn: a big badge; on your turn it's gold, your board glows, and Next turn stands out */
+#turnInfo{font-weight:700;border-radius:999px;padding:3px 12px;border:1px solid var(--felt-edge);white-space:nowrap}
+#turnInfo.mine{background:var(--brass);color:#1b1608;border-color:var(--brass);font-size:16px;letter-spacing:.02em;box-shadow:0 0 0 4px rgba(201,164,76,.25);animation:myturn 2.4s ease-in-out infinite}
+@keyframes myturn{50%{box-shadow:0 0 0 7px rgba(201,164,76,.12)}}
+body.myturn #me{border-color:var(--brass);box-shadow:0 0 0 3px var(--brass),0 0 28px rgba(201,164,76,.35)}
+body.myturn #nextTurn{font-weight:700}
+#turnSplash{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:70;pointer-events:none;font:700 54px/1 var(--serif);color:#1b1608;background:var(--brass);padding:18px 40px;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:splash 1.8s ease-out forwards}
+@keyframes splash{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}25%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
 .phases{font-size:12px;color:var(--muted);white-space:nowrap}  /* (the steps of a turn, as a reminder) */
-#turnInfo{font-weight:600}
 main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 #opps{display:grid;gap:8px;padding:8px 8px 0;grid-auto-flow:column;grid-auto-columns:1fr;flex:0 0 38%;min-height:0}
 .opp{border:1px solid var(--felt-edge);border-radius:10px;display:flex;flex-direction:column;min-height:0;background:rgba(0,0,0,.15);overflow:hidden}
@@ -114,6 +133,10 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile.empty{cursor:default;opacity:.6}
 .opile .card{--w:60px}
 .pile .card.peek{outline:2px solid var(--brass)}
+.card.landstack{box-shadow:4px -4px 0 -1px #0d201d,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #0d201d,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
+.card.landstack .stackn{position:absolute;right:-6px;top:-10px;min-width:26px;padding:1px 6px;border-radius:999px;background:var(--brass);color:#1b1608;font:700 13px/1.4 var(--sans);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6);z-index:2}
+.card.landstack .stackup{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:600;background:rgba(0,0,0,.72);margin:0 4px;border-radius:5px;padding:1px 0}
+.card.landstack.tapped .stackup{transform:rotate(-90deg)}
 .opile .ph{width:60px;aspect-ratio:63/88;border:1px dashed var(--felt-edge);border-radius:4px}
 .opilelbl{font-size:12px;font-weight:600;white-space:nowrap}
 .dungeon{border:1px solid var(--brass);border-radius:10px;background:linear-gradient(180deg,rgba(60,40,20,.55),rgba(0,0,0,.35));padding:6px;display:flex;flex-direction:column;gap:4px;min-width:150px}
@@ -274,7 +297,8 @@ details.term a{font-size:13px;color:var(--brass)}
 @media (max-width:900px){
   :root{--cw:62px}
   #table{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
-  header{flex-wrap:nowrap;overflow-x:auto;padding:5px 8px;gap:6px;min-width:0}
+  header .topbar,header .toolbar{flex-wrap:nowrap;overflow-x:auto;padding:5px 8px;gap:6px;min-width:0}
+  .tlabel,.clabel{display:none}
   header .btn,#turnInfo{white-space:nowrap}
   .piles{grid-template-columns:repeat(3,minmax(0,1fr))}
   .pile{overflow:hidden;font-size:10px}
@@ -315,7 +339,7 @@ details.term a{font-size:13px;color:var(--brass)}
 @keyframes tumble{from{transform:rotate(0) scale(.9)}50%{transform:rotate(180deg) scale(1.05)}to{transform:rotate(360deg) scale(.9)}}
 @keyframes coinspin{from{transform:scaleX(1)}50%{transform:scaleX(.08)}to{transform:scaleX(1)}}
 @keyframes landed{from{transform:scale(1.35)}to{transform:scale(1)}}
-@media (prefers-reduced-motion:reduce){.card,#hand .card{transition:none}.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie svg{animation:none}}
+@media (prefers-reduced-motion:reduce){.card,#hand .card{transition:none}.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie svg{animation:none}#turnInfo.mine,#turnSplash,#turnClockBox.over b{animation:none}}
 </style>
 </head>
 <body>
@@ -365,33 +389,46 @@ details.term a{font-size:13px;color:var(--brass)}
 
 <section id="table" class="hidden">
   <header>
-    <span class="title">Kitchen Table</span>
-    <span class="grp"><span id="roomLabel" class="hint"></span><span id="watchers" class="hint"></span><button class="btn small" id="logBtn" aria-controls="panel">Log</button><button class="btn small" id="copyLink">Copy invite link</button></span>
-    <span class="grp mid">
-      <button class="btn small primary playonly" id="startBtn">Start game</button>
-      <span id="turnInfo"></span>
-      <button class="chip hidden" id="dayChip" title="Day and night: click to switch"></button>
-      <span class="phases" id="phases" title="The steps of a turn">Untap · Upkeep · Draw · Main 1 · Combat · Main 2 · End</span>
-      <button class="btn small hidden playonly" id="attackBtn">Attack</button>
-      <button class="btn small hidden playonly" id="allInBtn" title="Every untapped creature you have attacks">Attack with all</button>
-      <button class="btn small hidden playonly" id="dmgBtn" title="Ask the players you're attacking to block and take the damage">Combat damage</button>
-      <button class="btn small playonly" id="nextTurn">Next turn</button>
-    </span>
-    <span class="grp">
-      <button class="btn small playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
-      <button class="btn small playonly" id="tokenBtn">Tokens</button>
-      <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
-      <button class="btn small playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
-      <button class="btn small playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
-      <button class="btn small hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
-      <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
-      <button class="btn small" id="micBtn">Mic on</button>
-      <button class="btn small" id="termsBtn" title="Magic terms and what they mean">Terms</button>
-      <button class="btn small" id="statsBtn">Stats</button>
-      <button class="btn small" id="helpBtn">Help</button>
-      <button class="btn small playonly" id="outBtn" title="Concede: you're out of this game (the others play on)">Concede</button>
-      <button class="btn small" id="leaveBtn">Leave</button>
-    </span>
+    <!-- Top bar: where you are, whose turn it is with the clocks, and your own buttons -->
+    <div class="topbar">
+      <span class="grp"><span class="title">Kitchen Table</span><span id="roomLabel" class="hint"></span><span id="watchers" class="hint"></span><button class="btn small" id="copyLink">Copy invite link</button></span>
+      <span class="grp mid">
+        <span id="turnInfo" role="status"></span>
+        <span class="clocks" id="clocks" title="Game time, this turn's time, and turn counts">
+          <span class="clock"><span class="clabel">Game</span><b id="gameClock">0:00</b></span>
+          <span class="clock" id="turnClockBox"><span class="clabel">Turn</span><b id="turnClock">0:00</b><span id="turnLimit" class="hint"></span></span>
+          <span class="clock"><span class="clabel">Turn #</span><b id="turnCount">0</b></span>
+          <span class="clock"><span class="clabel">Round</span><b id="roundCount">0</b></span>
+        </span>
+        <button class="chip hidden" id="dayChip" title="Day and night: click to switch"></button>
+      </span>
+      <span class="grp"><button class="btn small" id="micBtn">Mic on</button><button class="btn small" id="logBtn" aria-controls="panel">Log</button><button class="btn small" id="helpBtn">Help</button><button class="btn small" id="leaveBtn">Leave</button></span>
+    </div>
+    <!-- Toolbar: grouped by what you're doing -->
+    <nav class="toolbar" aria-label="Game actions">
+      <span class="tgroup" aria-label="Your turn"><span class="tlabel">Turn</span>
+        <button class="btn small primary playonly" id="startBtn">Start game</button>
+        <button class="btn small playonly" id="nextTurn">Next turn</button>
+        <button class="btn small hidden playonly" id="attackBtn">Attack</button>
+        <button class="btn small hidden playonly" id="allInBtn" title="Every untapped creature you have attacks">Attack with all</button>
+        <button class="btn small hidden playonly" id="dmgBtn" title="Ask the players you're attacking to block and take the damage">Combat damage</button>
+        <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
+        <span class="phases" id="phases" title="The steps of a turn">Untap · Upkeep · Draw · Main 1 · Combat · Main 2 · End</span>
+      </span>
+      <span class="tgroup" aria-label="On the table"><span class="tlabel">Table</span>
+        <button class="btn small playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
+        <button class="btn small playonly" id="tokenBtn">Tokens</button>
+        <button class="btn small playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
+        <button class="btn small playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
+      </span>
+      <span class="tgroup" aria-label="The game"><span class="tlabel">Game</span>
+        <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
+        <button class="btn small hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
+        <button class="btn small" id="termsBtn" title="Magic terms and what they mean">Terms</button>
+        <button class="btn small" id="statsBtn">Stats</button>
+        <button class="btn small playonly" id="outBtn" title="Concede: you're out of this game (the others play on)">Concede</button>
+      </span>
+    </nav>
   </header>
   <main id="play">
     <div id="opps"></div>
@@ -459,7 +496,7 @@ function shuffle(a){ for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 
 function norm(t){ return String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9/]+/g, " ").trim(); }
 function el(tag, props = {}, ...kids){ const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) if (k != null) e.append(k); return e; }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-function fmtTime(ms){ const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+function fmtTime(ms){ const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = String(t % 60).padStart(2, "0"); return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`; }
 
 /* =====================================================================
    Scryfall: card data for decklists, tokens, and pictures
@@ -768,9 +805,10 @@ $("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown
 let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
-let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, rules:{} };
+let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
-                   turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1" };
+                   turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1",
+                   stackLands:store.get("kt-dig-stack", "1") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
 const watchers = {};  // seat -> name, for people watching (seats 5 to 8)  // (commanders taken out of the decklist go back if you pick another)
 
@@ -798,7 +836,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0 };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1016,7 +1054,7 @@ function cleanPub(st){
   return { name:String(st.name || "Player").slice(0, 24), life:num(st.life, -999, 9999), poison:num(st.poison, 0, 99), energy:num(st.energy, 0, 999), exp:num(st.exp, 0, 999),
            cmd:st.cmd && typeof st.cmd === "object" ? Object.fromEntries(Object.entries(st.cmd).slice(0, 12).map(([k, v]) => [String(k).slice(0, 40), num(v, 0, 999)])) : {},
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
-           dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null,
+           dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
            bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
@@ -1081,7 +1119,7 @@ function takeTable(t){
   const before = { ...table };
   table = { tv:+t.tv || 0, at:+t.at || 0, fmt:FORMATS[t.fmt] ? t.fmt : "cmdr", started:!!t.started, gameId:String(t.gameId || "").slice(0, 30), startAt:+t.startAt || 0,
             turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX),
-            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), rules:cleanRules(t.rules) };
+            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), turnAt:+t.turnAt || 0, round:clamp(+t.round || 0, 0, 9999), rules:cleanRules(t.rules) };
   afterTable(before);
 }
 function changeTable(patch){
@@ -1135,11 +1173,13 @@ const HOUSE = [
   { k:"freeFirst", label:"Free first mulligan in every game", hint:"The official rules only give it with 3 or more players." },
   { k:"firstDraw", label:"The first player draws on turn 1", hint:"Normally the first player skips that draw in a 2-player game." },
   { k:"noUndo", label:"No take-backs", hint:"Turns off Undo for everyone." },
-  { k:"noHandMax", label:"No maximum hand size", hint:"Nobody discards down to 7 at the end of their turn." }];
+  { k:"noHandMax", label:"No maximum hand size", hint:"Nobody discards down to 7 at the end of their turn." },
+  { k:"timeUpPass", label:"When the turn time limit runs out, the turn passes", hint:"Otherwise the clock just turns red and the table is told." }];
 const HOUSE_NUM = [
   { k:"life", label:"Starting life", def:() => FORMATS[table.fmt].life, max:999 },
   { k:"cmdrDmg", label:"Commander damage that knocks a player out", def:() => 21, max:99, cmdr:true },
-  { k:"poison", label:"Poison counters that knock a player out", def:() => 10, max:99 }];
+  { k:"poison", label:"Poison counters that knock a player out", def:() => 10, max:99 },
+  { k:"turnLimit", label:"Turn time limit in minutes (0: no limit)", def:() => 0, max:60, zero:true }];
 const AGREE = [
   { k:"proxies", label:"Proxies are fine" }, { k:"noInfinite", label:"No infinite combos" }, { k:"noExtraTurns", label:"No extra-turn spells" },
   { k:"noMLD", label:"No mass land destruction" }, { k:"noStax", label:"No heavy stax (cards that lock everyone out of playing)" },
@@ -1154,7 +1194,7 @@ const rule = k => table.rules?.[k];
 const ruleNum = k => table.rules?.[k] || HOUSE_NUM.find(x => x.k === k).def();
 function rulesSummary(r = table.rules || {}){
   const on = [...HOUSE, ...AGREE].filter(x => r[x.k]).map(x => x.label.split(" (")[0].toLowerCase());
-  for (const x of HOUSE_NUM) if (r[x.k] && r[x.k] !== x.def()) on.push(`${x.label.toLowerCase()}: ${r[x.k]}`);
+  for (const x of HOUSE_NUM) if (r[x.k] && r[x.k] !== x.def()) on.push(`${x.label.split(" (")[0].toLowerCase()}: ${r[x.k]}`);
   return on.length ? on.join("; ") : "none (the official rules)";
 }
 function rulesDialog(onStart){
@@ -1168,7 +1208,7 @@ function rulesDialog(onStart){
     el("h3", { textContent:"Mulligans, draws and take-backs" }), ...HOUSE.map(x => box(x)), el("h3", { textContent:"Numbers" }));
   for (const x of HOUSE_NUM) {
     if (x.cmdr && !FORMATS[table.fmt].cmdr) continue;
-    const i = el("input", { type:"number", min:1, max:x.max, value:r[x.k] || x.def(), style:"width:80px", ariaLabel:x.label });
+    const i = el("input", { type:"number", min:x.zero ? 0 : 1, max:x.max, value:r[x.k] || x.def(), style:"width:80px", ariaLabel:x.label });
     i.oninput = () => { const v = clamp(Math.round(+i.value || 0), 0, x.max); if (v && v !== x.def()) r[x.k] = v; else delete r[x.k]; };
     body.append(el("label", { className:"ctrl", style:"max-width:460px;margin:6px 0" }, el("span", { textContent:x.label }), i));
   }
@@ -1184,7 +1224,7 @@ function rulesDialog(onStart){
 $("#rulesBtn").onclick = () => rulesDialog(null);
 function startGame(){
   const seats = presentSeats(), first = seats[rnd(seats.length) - 1];
-  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"", spells:0 });
+  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"", spells:0, turnAt:Date.now(), round:1 });
   const msg = `A new game started. ${nm(first)} goes first (chosen at random). House rules: ${rulesSummary()}.`; log(msg); broadcast({ type:"log", text:msg });
 }
 /* Game records: kept in each player's browser, and shown under Stats (wins per player, deck and commander, game
@@ -1276,7 +1316,10 @@ $("#nextTurn").onclick = () => {
   // becomes day if they cast two or more)
   const pass = () => {
     const was = table.turnSeat, spells = table.spells || 0, before = table.day, day = dayAfter(before, spells);
-    changeTable({ turnSeat:nextSeat(table.turnSeat), turnNum:table.turnNum + 1, phase:0, spells:0, day });
+    const to = nextSeat(table.turnSeat);
+    // (a new round starts when the turn comes back around to the first player)
+    const pos = x => (x - (table.firstSeat || 1) + 99) % 99, round = (table.round || 1) + (pos(to) <= pos(table.turnSeat) ? 1 : 0);
+    changeTable({ turnSeat:to, turnNum:table.turnNum + 1, phase:0, spells:0, day, turnAt:Date.now(), round });
     if (day !== before) { const t = `It becomes ${day} (${nm(was)} cast ${spells === 1 ? "1 spell" : spells ? spells + " spells" : "no spells"} last turn).`; log(t); broadcast({ type:"log", text:t }); }
   };
   // Maximum hand size: ending your turn with more than 7 cards, discard down to 7 first (or keep them, for a
@@ -1303,7 +1346,33 @@ function startMyTurn_(){
   if (table.initiative === mySeat) setTimeout(() => venture("has the initiative (upkeep)"), 50);
   changed();
   turnAlert("Your turn", `Turn ${table.turnNum} at table ${roomCode}.`);
+  turnSplash();
   if (!document.hidden) cue("turn");
+}
+/* Clocks: the game's time and this turn's time, counting up, with the turn number, the round, and each player's turns
+   taken (on their panel). A house rule can set a turn time limit: the turn clock goes gold in the last 30 seconds and
+   red when time's up; the table is told, and (another house rule) the turn passes. */
+let timeUpTurn = -1;
+function tickClocks(){
+  if (!table.started || !me) return;
+  const now = Date.now(), limit = (table.rules?.turnLimit || 0) * 60000, used = now - (table.turnAt || table.startAt || now);
+  $("#gameClock").textContent = fmtTime(now - (table.startAt || now));
+  $("#turnClock").textContent = fmtTime(used);
+  $("#turnCount").textContent = table.turnNum || 0; $("#roundCount").textContent = table.round || 1;
+  $("#turnLimit").textContent = limit ? `/ ${fmtTime(limit)}` : "";
+  const box = $("#turnClockBox"), over = limit && used >= limit;
+  box.classList.toggle("over", !!over); box.classList.toggle("warn", !!limit && !over && limit - used <= 30000);
+  if (over && table.turnSeat === mySeat && timeUpTurn !== table.turnNum && !me.watch) {
+    timeUpTurn = table.turnNum;
+    const t = `Time's up for ${me.name}'s turn (${table.rules.turnLimit} minute${table.rules.turnLimit === 1 ? "" : "s"}).`; log(t); broadcast({ type:"log", text:t });
+    toast("Your turn time is up."); cue("turn");
+    if (rule("timeUpPass")) { closeModal(); closeMenu(); $("#nextTurn").click(); }
+  }
+}
+setInterval(tickClocks, 1000);
+function turnSplash(){
+  $("#turnSplash")?.remove();
+  const d = el("div", { id:"turnSplash", role:"status", textContent:"Your turn" }); document.body.append(d); setTimeout(() => d.remove(), 1900);
 }
 /* Your turn alert: when your turn starts and this tab is in the background (or minimized), a short chime, a browser
    notification (if you allowed them) and a marked tab title. Turned off in Help. */
@@ -1789,6 +1858,25 @@ function pickMana(list){
   if (!list.length) return;
   openMenu(lastPointer.x, lastPointer.y, [{ head:"Add which mana?" }, ...list.map(m => ({ label:`Add ${m}`, fn:() => { me.mana[m]++; changed(); } }))]);
 }
+function tapFromStack(name, n){
+  const g = stackOf(name), up = g.filter(c => !c.tapped).slice(0, n);
+  if (!up.length) { toast(`All your ${name}s are tapped. Right-click to untap.`); return; }
+  for (const c of up) { c.tapped = true; if (settings.autoMana) { const pm = cardOf(c)?.produced_mana || []; if (pm.length === 1 && COLORS.includes(pm[0])) me.mana[pm[0]]++; } }
+  if (up.length > 1) say(`tapped ${up.length} ${name}s.`);
+  changed();
+}
+function untapFromStack(name, n){ const down = stackOf(name).filter(c => c.tapped).slice(0, n); for (const c of down) c.tapped = false; if (down.length > 1) say(`untapped ${down.length} ${name}s.`); changed(); }
+function stackMenu(name, x, y){
+  const g = stackOf(name), up = g.filter(c => !c.tapped).length, down = g.length - up;
+  const items = [{ head:`${name} ×${g.length} (${up} untapped)` }];
+  for (const n of [1, 2, 3, 4, 5].filter(n => n <= up)) items.push({ label:`Tap ${n}`, fn:() => tapFromStack(name, n) });
+  if (up > 5) items.push({ label:"Tap how many...", fn:() => askNumber(`Tap how many ${name}s?`, 6, v => tapFromStack(name, v)) });
+  if (up > 1) items.push({ label:`Tap all ${up}`, fn:() => tapFromStack(name, up) });
+  if (down) items.push("-", { label:"Untap 1", fn:() => untapFromStack(name, 1) }, ...(down > 1 ? [{ label:`Untap all ${down}`, fn:() => untapFromStack(name, down) }] : []));
+  items.push("-", { label:"More for one of them (move, sacrifice...)...", fn:() => cardMenu(g[0].iid, x, y) },
+    { label:"Show lands one by one (stop stacking)", fn:() => { settings.stackLands = false; store.set("kt-dig-stack", "0"); render(); toast("Lands are shown one by one. Turn stacking back on in Help."); } });
+  openMenu(x, y, items);
+}
 function untapAll(){ for (const c of me.zones.bf) c.tapped = false; say("untapped everything."); changed(); }
 function shuffleLib(){ shuffle(me.zones.lib); say("shuffled their library."); changed(); }
 async function createToken(tokenCard, n = 1){
@@ -1840,10 +1928,37 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
 }
 let ctrlSeat = 0;  // (whose battlefield is being drawn, to mark cards owned by someone else)
 // Battlefield cards, attachments first (tucked behind and above the card they're attached to, and moving with it)
+/* Basic lands of the same kind stack into one pile with a count, so they take the room of one card: shown untapped
+   while any of them is, with how many are untapped. Click your stack to tap one (adding its mana); right-click to tap or
+   untap several, or all. A land with counters, attachments or in combat stays on its own. (Help turns stacking off.) */
+function landStacks(list){
+  const byIid = new Map(list.map(c => [c.iid, c])), groups = new Map();
+  if (!settings.stackLands) return groups;
+  for (const c of list) {
+    if (c.fd || c.att || c.atk || c.blk || Object.keys(c.ctr || {}).length || list.some(x => x.att === c.iid)) continue;
+    const name = c.name || nameOf(c);
+    if (!/^(Snow-Covered )?(Plains|Island|Swamp|Mountain|Forest|Wastes)$/.test(name)) continue;
+    if (!groups.has(name)) groups.set(name, []); groups.get(name).push(c);
+  }
+  for (const [k, v] of groups) if (v.length < 2) groups.delete(k);
+  return groups;
+}
+const stackOf = name => landStacks(me.zones.bf).get(name) || [];
 function drawBattlefield(box, list, opts){
   const byIid = new Map(list.map(c => [c.iid, c]));
   const hosted = c => c.att && byIid.has(c.att);
+  const stacks = landStacks(list), inStack = new Map();
+  for (const [name, g] of stacks) for (const c of g) inStack.set(c.iid, { name, g });
   for (const c of [...list.filter(hosted), ...list.filter(c => !hosted(c))]) {
+    const st = inStack.get(c.iid);
+    if (st) {
+      if (st.g[0] !== c) continue;  // (the stack is drawn once, where its first land is)
+      const up = st.g.filter(x => !x.tapped).length, e = cardEl({ ...c, tapped:!up }, opts);
+      e.classList.add("landstack"); e.dataset.stack = st.name;
+      e.title = `${st.name}: ${st.g.length} (${up} untapped).${opts?.mine ? " Click to tap one; right-click for more." : ""}`;
+      e.append(el("span", { className:"stackn", textContent:`×${st.g.length}` }), el("span", { className:"stackup", textContent:`${up} untapped` }));
+      box.append(e); place(e, c); continue;
+    }
     const e = cardEl(c, opts), host = hosted(c) ? byIid.get(c.att) : null;
     box.append(e);
     if (host) {
@@ -1917,6 +2032,7 @@ function renderOpps(){
     const cmdTaken = Object.entries(me.cmd).filter(([k, v]) => k.startsWith(s + ":") && v).reduce((a, [, v]) => a + v, 0);
     o.append(el("div", { className:"ohead" }, pip, el("span", { className:"oname", textContent:p.name }), ...desigBadges(s),
       el("span", { className:"ocount", textContent:`Hand ${p.hand}` }), el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
+      table.started ? el("span", { className:"ocount", title:"Turns they've taken this game", textContent:`Turns ${p.turns || 0}` }) : null,
       oppMana(p),
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
       cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
@@ -2013,7 +2129,13 @@ function renderTurn(){
   $("#roomLabel").textContent = `Table ${roomCode} · ${f.short}`;
   $("#startBtn").textContent = table.started ? "New game" : "Start game";
   $("#startBtn").classList.toggle("primary", !table.started);
-  $("#turnInfo").textContent = table.started && table.turnSeat ? (table.turnSeat === mySeat ? `Your turn (${table.turnNum})` : `${nm(table.turnSeat)}'s turn (${table.turnNum})`) : "Waiting to start";
+  const mine_ = table.started && table.turnSeat === mySeat;
+  $("#turnInfo").textContent = table.started && table.turnSeat ? (mine_ ? `Your turn (${table.turnNum})` : `${nm(table.turnSeat)}'s turn (${table.turnNum})`) : "Waiting to start";
+  $("#turnInfo").classList.toggle("mine", mine_);
+  $("#turnInfo").style.borderColor = table.started && !mine_ && table.turnSeat ? SEAT_HEX[table.turnSeat - 1] : "";
+  document.body.classList.toggle("myturn", mine_);
+  $("#clocks").classList.toggle("hidden", !table.started);
+  tickClocks();
   $("#nextTurn").classList.toggle("primary", table.started && table.turnSeat === mySeat);
   const myTurn = table.started && table.turnSeat === mySeat, attacking = me.zones.bf.some(c => c.atk);
   $("#attackBtn").classList.toggle("hidden", !myTurn); $("#attackBtn").textContent = attackMode ? "Done attacking" : "Attack";
@@ -2107,7 +2229,7 @@ document.addEventListener("pointerup", e => {
   const d = drag; drag = null;
   document.querySelectorAll(".drop").forEach(x => x.classList.remove("drop"));
   d.ghost?.remove(); d.el.classList.remove("dragging");
-  if (!d.moved) { clickCard(d.iid, d.zone, e); return; }
+  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) tapFromStack(d.el.dataset.stack, 1); else clickCard(d.iid, d.zone, e); return; }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
   if (to === "bf") {
@@ -2130,6 +2252,7 @@ document.addEventListener("dblclick", e => {
 });
 document.addEventListener("contextmenu", e => {
   const ce = e.target.closest?.(".card.mine");
+  if (ce?.dataset.stack && ce.dataset.zone === "bf") { e.preventDefault(); stackMenu(ce.dataset.stack, e.clientX, e.clientY); return; }
   if (ce) { e.preventDefault(); const zn = ce.dataset.zone, inPile = ce.closest(".pile");
     if (zn === "lib") libMenu(e.clientX, e.clientY); else if (inPile && zn === "gy") gyMenu(e.clientX, e.clientY); else if (inPile && zn === "ex") exMenu(e.clientX, e.clientY); else cardMenu(ce.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#libPile")) { e.preventDefault(); libMenu(e.clientX, e.clientY); return; }
@@ -3042,7 +3165,7 @@ $("#leaveBtn").onclick = () => {
   setTimeout(() => { try { peer.destroy(); } catch {} location.href = location.pathname; }, 400);
 };
 $("#helpBtn").onclick = () => {
-  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop", sounds:"sounds" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
+  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop", sounds:"sounds", stackLands:"stack" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); if (key === "stackLands") render(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
   openModal("How to play", el("div", {},
     el("p", { innerHTML:"<b>Drag</b> cards between your hand, battlefield, library, graveyard, exile and command zone (hold Shift when dropping on the library to put it on the bottom). <b>Click</b> a card on the battlefield to tap or untap it. <b>Double-click</b> a card in hand to play it. <b>Right-click</b> (or press and hold) a card or your library for everything else: counters, transform, face down, tokens, scry, surveil, mill, search, reveal." }),
     el("p", { innerHTML:"<b>Keys:</b> U untap all, T tap the card you're pointing at. (Drawing is a double-click on your library, so it can't happen by accident.)" }),
@@ -3058,6 +3181,7 @@ $("#helpBtn").onclick = () => {
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
     s("autoMana", "Tapping a land adds its mana to my mana pool"),
     s("hoverPop", "Enlarge a card when I point at it"),
+    s("stackLands", "Stack basic lands of the same kind (click a stack to tap one, right-click for more)"),
     s("sounds", "Sounds: my turn, being attacked, being targeted, and chat"),
     s("turnAlert", "Alert me (a chime and a notification) when my turn starts and this tab is in the background")));
 };
