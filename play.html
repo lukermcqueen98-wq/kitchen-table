@@ -115,6 +115,15 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile .card{--w:60px}
 .opile .ph{width:60px;aspect-ratio:63/88;border:1px dashed var(--felt-edge);border-radius:4px}
 .opilelbl{font-size:12px;font-weight:600;white-space:nowrap}
+.dungeon{border:1px solid var(--brass);border-radius:10px;background:linear-gradient(180deg,rgba(60,40,20,.55),rgba(0,0,0,.35));padding:6px;display:flex;flex-direction:column;gap:4px;min-width:150px}
+.dungeon .dhead{display:flex;justify-content:space-between;align-items:center;font:700 13px/1.2 var(--serif);color:var(--brass);gap:6px}
+.dungeon .dinit{font:600 11px/1 var(--sans);color:var(--parchment);white-space:nowrap}
+.dungeon .drow{display:flex;gap:3px;justify-content:center}
+.dungeon .droom{flex:1;text-align:center;font-size:10px;line-height:1.15;padding:3px 2px;border:1px solid var(--felt-edge);border-radius:5px;background:rgba(0,0,0,.3);color:var(--muted);cursor:help}
+.dungeon .droom.here{border-color:var(--brass);background:var(--brass);color:#1b1608;font-weight:700}
+.dungeon .dfoot{font-size:11px;color:var(--parchment);text-align:center}
+.dungeon .btn{align-self:center}
+.opiles .dungeon{width:170px}
 .omana{display:inline-flex;gap:6px;align-items:center;font-weight:700;font-size:13px;background:rgba(0,0,0,.3);border:1px solid var(--felt-edge);border-radius:12px;padding:1px 8px}
 .omana>span{display:inline-flex;align-items:center;gap:2px}
 .omana img{width:15px;height:15px}
@@ -400,6 +409,7 @@ details.term a{font-size:13px;color:var(--brass)}
         <div class="row" style="justify-content:space-between"><span id="landChip" class="chip"></span><span class="hint" id="handCount"></span></div>
         <div id="czone" data-drop="cz"></div>
         <div class="mana" id="manaBox"></div>
+        <div id="dungeonBox"></div>
       </div>
     </div>
   </main>
@@ -757,7 +767,7 @@ $("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown
 let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
-let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", rules:{} };
+let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
@@ -786,7 +796,8 @@ function pub(){
   const z = me.zones;
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
-           bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out };
+           bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 } };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1004,6 +1015,7 @@ function cleanPub(st){
   return { name:String(st.name || "Player").slice(0, 24), life:num(st.life, -999, 9999), poison:num(st.poison, 0, 99), energy:num(st.energy, 0, 999), exp:num(st.exp, 0, 999),
            cmd:st.cmd && typeof st.cmd === "object" ? Object.fromEntries(Object.entries(st.cmd).slice(0, 12).map(([k, v]) => [String(k).slice(0, 40), num(v, 0, 999)])) : {},
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
+           dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) },
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
            bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
@@ -1068,7 +1080,7 @@ function takeTable(t){
   const before = { ...table };
   table = { tv:+t.tv || 0, at:+t.at || 0, fmt:FORMATS[t.fmt] ? t.fmt : "cmdr", started:!!t.started, gameId:String(t.gameId || "").slice(0, 30), startAt:+t.startAt || 0,
             turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX),
-            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", rules:cleanRules(t.rules) };
+            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), rules:cleanRules(t.rules) };
   afterTable(before);
 }
 function changeTable(patch){
@@ -1092,6 +1104,9 @@ function afterTable(before){
   if (table.started && before.turnSeat === mySeat && before.turnNum !== table.turnNum && table.gameId === before.gameId && table.monarch === mySeat && me.gameId === table.gameId) {
     withoutUndo(() => { draw(1, true); say("drew a card for being the monarch (end step)."); changed(); });
   }
+  if (before.day !== table.day && table.gameId === before.gameId) matchDayNight();
+  // Taking the initiative (from the menu, combat damage, or a player leaving) ventures into the Undercity
+  if (table.started && table.initiative === mySeat && before.initiative !== mySeat && table.gameId === before.gameId && before.gameId) setTimeout(() => venture("took the initiative"), 50);
   if (table.started && table.gameId && me.gameId !== table.gameId) { dealNewGame(); turnAlert("A new game started", "Keep or mulligan your opening hand."); }
   else if (table.turnSeat === mySeat && (before.turnSeat !== mySeat || before.turnNum !== table.turnNum) && table.turnNum > 0) startMyTurn();
   render(); save();
@@ -1168,7 +1183,7 @@ function rulesDialog(onStart){
 $("#rulesBtn").onclick = () => rulesDialog(null);
 function startGame(){
   const seats = presentSeats(), first = seats[rnd(seats.length) - 1];
-  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"" });
+  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"", spells:0 });
   const msg = `A new game started. ${nm(first)} goes first (chosen at random). House rules: ${rulesSummary()}.`; log(msg); broadcast({ type:"log", text:msg });
 }
 /* Game records: kept in each player's browser, and shown under Stats (wins per player, deck and commander, game
@@ -1256,7 +1271,13 @@ function mergeRecords(list, onlyMine){
 $("#nextTurn").onclick = () => {
   if (!table.started) return;
   if (table.turnSeat !== mySeat && !confirm(`It's ${nm(table.turnSeat)}'s turn. Pass it for them?`)) return;
-  const pass = () => changeTable({ turnSeat:nextSeat(table.turnSeat), turnNum:table.turnNum + 1, phase:0 });
+  // (day and night: as the next turn begins, day becomes night if this turn's player cast no spells, and night
+  // becomes day if they cast two or more)
+  const pass = () => {
+    const was = table.turnSeat, spells = table.spells || 0, before = table.day, day = dayAfter(before, spells);
+    changeTable({ turnSeat:nextSeat(table.turnSeat), turnNum:table.turnNum + 1, phase:0, spells:0, day });
+    if (day !== before) { const t = `It becomes ${day} (${nm(was)} cast ${spells === 1 ? "1 spell" : spells ? spells + " spells" : "no spells"} last turn).`; log(t); broadcast({ type:"log", text:t }); }
+  };
   // Maximum hand size: ending your turn with more than 7 cards, discard down to 7 first (or keep them, for a
   // Reliquary Tower; a house rule turns this off)
   const extra = me.zones.hand.length - 7;
@@ -1278,7 +1299,7 @@ function startMyTurn_(){
   if (settings.autoUntap) for (const c of me.zones.bf) c.tapped = false;
   if (settings.autoDraw) draw(1, true);
   say(`${settings.autoUntap ? "untapped" : "started their turn"}${settings.autoDraw ? " and drew a card" : ""} (turn ${table.turnNum}).`);
-  if (table.initiative === mySeat) say("has the initiative: venture into the Undercity (upkeep).");
+  if (table.initiative === mySeat) setTimeout(() => venture("has the initiative (upkeep)"), 50);
   changed();
   turnAlert("Your turn", `Turn ${table.turnNum} at table ${roomCode}.`);
   if (!document.hidden) cue("turn");
@@ -1328,7 +1349,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) docu
 // (asked when you sit down, since the browser only asks after a click)
 function askAlerts(){ try { if (settings.turnAlert && window.Notification?.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }
 function dealNewGame(){
-  me.gameId = table.gameId; me.arrows = []; me.out = false; delete me.outZones; outAsked = ""; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
+  me.gameId = table.gameId; me.dungeon = { room:"", done:0 }; me.arrows = []; me.out = false; delete me.outZones; outAsked = ""; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
   const isC = FORMATS[table.fmt].cmdr;
@@ -1350,6 +1371,23 @@ const ZONE_NAME = { lib:"library", hand:"hand", bf:"battlefield", gy:"graveyard"
 const isPermanent = c => /\b(Creature|Artifact|Enchantment|Planeswalker|Land|Battle)\b/.test(typeOf(c).split(" // ")[0]);
 // Casting from your hand or command zone: a permanent goes onto the battlefield; an instant or sorcery goes to
 // your graveyard, and one that does something to other players (Cut a Deal: each opponent draws...) offers it
+/* Day and night (rules 726): once it's day or night it stays that way for the game. As each turn begins, day becomes
+   night if the previous turn's player cast no spells that turn, and night becomes day if they cast two or more.
+   A daybound permanent arriving when it's neither makes it day. Daybound and nightbound cards turn to match. */
+function dayAfter(day, spells){ return day === "day" && spells === 0 ? "night" : day === "night" && spells >= 2 ? "day" : day; }
+// A spell cast by the player whose turn it is (kept with the table, since that's what day and night count)
+function countSpell(){ if (table.started && table.turnSeat === mySeat) changeTable({ spells:(table.spells || 0) + 1 }); }
+function matchDayNight(){
+  if (!table.day || !me) return;
+  let n = 0;
+  for (const c of me.zones.bf) {
+    const k = cardOf(c); if (c.fd || !faces(k)) continue;
+    const t0 = k.card_faces[0]?.oracle_text || "", t1 = k.card_faces[1]?.oracle_text || "";
+    if (!/\bDaybound\b/.test(t0) || !/\bNightbound\b/.test(t1)) continue;
+    const want = table.day === "night" ? 1 : 0; if ((c.face || 0) !== want) { c.face = want; n++; }
+  }
+  if (n) { say(`turned ${n} daybound/nightbound card${n === 1 ? "" : "s"} to ${table.day === "night" ? "their night side" : "their day side"}.`); withoutUndo(changed); }
+}
 function castSpell(iid, target){
   const f = findCard(iid); if (!f || !["hand", "cz"].includes(f.z)) return;
   const k = cardOf(f.c), fd = f.c.fd, text = cardText(k);
@@ -1362,7 +1400,7 @@ function castSpell(iid, target){
     say(`cast ${nameOf(f.c)}, enchanting ${target.text}.`); ping(target); changed(); return;
   }
   if (isPermanent(k) || fd) { move(iid, "bf"); return; }
-  move(iid, "gy", { quiet:true });
+  move(iid, "gy", { quiet:true }); countSpell();
   say(`cast ${nameOf(f.c)}${target?.text ? ` targeting ${target.text}` : ""}.`);
   if (target) ping(target);
   const fx = cardEffects(k);
@@ -1424,6 +1462,9 @@ function move(iid, to, opt = {}){
     if (from === "hand" && isLand(cardOf(c)) && !c.fd) { me.lands++; if (me.lands > 1) toast(`That's land number ${me.lands} this turn.`); }
   }
   if (to === "st" && from === "cz") c.fromCz = true;
+  if ((from === "hand" || from === "cz") && (to === "bf" || to === "st") && (c.fd || !isLand(cardOf(c)))) countSpell();
+  // A daybound permanent arriving when it's neither day nor night makes it day
+  if (to === "bf" && !c.fd && !table.day && table.started && /\bDaybound\b/.test(cardText(cardOf(c)))) { changeTable({ day:"day" }); say(`made it day (${nameOf(c)} is daybound).`); }
   if (to === "lib") { if (opt.bottom) me.zones.lib.push(c); else me.zones.lib.unshift(c); }
   else me.zones[to].push(c);
   if (from !== to) {
@@ -1871,7 +1912,7 @@ function renderOpps(){
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
-    o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"))));
+    o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false))));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     box.append(o);
   }
@@ -1935,6 +1976,8 @@ function renderMine(){
     b.oncontextmenu = e => { e.preventDefault(); me.mana[k] = Math.max(0, me.mana[k] - 1); changed(); };
     mb.append(b);
   }
+  const db = $("#dungeonBox"); db.innerHTML = "";
+  const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
 }
 let lastAtMe = 0;
 // The combat bar, while creatures are attacking: who's attacking whom, and Take or block if it's you
@@ -2361,11 +2404,13 @@ $("#desigBtn").onclick = e => {
       : { label:"Become the monarch", fn:() => { changeTable({ monarch:mySeat }); say("became the monarch."); } },
     { head:"The initiative" },
     table.initiative === mySeat ? { label:"Stop having it (a correction: no one does)", fn:() => { changeTable({ initiative:0 }); say("no longer has the initiative."); } }
-      : { label:"Take the initiative", fn:() => { changeTable({ initiative:mySeat }); say("took the initiative: venture into the Undercity."); } },
+      : { label:"Take the initiative", fn:() => changeTable({ initiative:mySeat }) },
+    { label:"Venture into the Undercity (a card says to)", fn:() => venture("") },
     { head:"Day and night" },
     { label:"It becomes day", fn:() => { changeTable({ day:"day" }); say("made it day."); } },
     { label:"It becomes night", fn:() => { changeTable({ day:"night" }); say("made it night."); } }];
-  if (table.day) items.push({ label:"Stop tracking day and night", fn:() => changeTable({ day:"" }) });
+  // (once it's day or night it stays for the game; this is only to fix a mistake)
+  if (table.day) items.push({ label:"Stop tracking day and night (a correction)", fn:() => changeTable({ day:"" }) });
   openMenu(r.left, r.bottom + 4, items);
 };
 $("#dayChip").onclick = () => { if (me.watch) return; const d = table.day === "day" ? "night" : "day"; changeTable({ day:d }); say(`made it ${d}.`); };
@@ -2753,6 +2798,57 @@ function noteLife(){
   clearTimeout(lifeTimer);
   lifeTimer = setTimeout(() => { const d = me.life - lifeFrom; if (d) say(`${d > 0 ? "gained" : "lost"} ${Math.abs(d)} life (${lifeFrom} → ${me.life}).`); lifeFrom = null; }, 1500);
 }
+/* The initiative's dungeon, the Undercity (rules 725 and 309). Taking the initiative ventures into it, and so does
+   the upkeep of the player who has it; combat damage to that player (or them leaving) hands it on, and the new
+   holder ventures. Each player has their own way through: from Secret Entrance down to Throne of the Dead Three,
+   choosing where the map splits. Finishing the last room completes the dungeon; the next venture starts a new one.
+   The card shows under your mana, and next to each other player's graveyard and exile, for everyone to see. */
+const UNDERCITY = {
+  entrance:{ name:"Secret Entrance", text:"Search your library for a basic land card, reveal it, put it into your hand, then shuffle.", next:["forge", "well"], row:0 },
+  forge:{ name:"Forge", text:"Put two +1/+1 counters on target creature.", next:["trap", "arena"], row:1 },
+  well:{ name:"Lost Well", text:"Scry 2.", next:["arena", "stash"], row:1 },
+  trap:{ name:"Trap!", text:"Target player loses 5 life.", next:["archives"], row:2 },
+  arena:{ name:"Arena", text:"Goad target creature.", next:["archives", "catacombs"], row:2 },
+  stash:{ name:"Stash", text:"Create a Treasure token.", next:["catacombs"], row:2 },
+  archives:{ name:"Archives", text:"Draw a card.", next:["throne"], row:3 },
+  catacombs:{ name:"Catacombs", text:"Create a 4/1 black Skeleton creature token with menace.", next:["throne"], row:3 },
+  throne:{ name:"Throne of the Dead Three", text:"Reveal the top ten cards of your library. Put a creature card from among them onto the battlefield with three +1/+1 counters on it. It gains hexproof until your next turn. Then shuffle.", next:[], row:4 }
+};
+const UC_ROWS = [["entrance"], ["forge", "well"], ["trap", "arena", "stash"], ["archives", "catacombs"], ["throne"]];
+function venture(why){
+  if (!me || me.watch) return;
+  me.dungeon ||= { room:"", done:0 };
+  const at = me.dungeon.room, next = !at || at === "throne" ? ["entrance"] : UNDERCITY[at].next;
+  const go = room => {
+    me.dungeon.room = room; if (room === "throne") me.dungeon.done++;
+    const r = UNDERCITY[room];
+    say(`${why ? why + ": " : ""}ventured into the Undercity: ${r.name}. ${r.text}${room === "throne" ? " (The Undercity is completed.)" : ""}`);
+    changed(); roomEffect(room);
+  };
+  if (next.length === 1) { go(next[0]); return; }
+  openModal("Venture into the Undercity", el("div", {}, el("p", { className:"hint", textContent:`You're in ${UNDERCITY[at].name}. Which room next?` }),
+    ...next.map(k => el("p", {}, el("b", { textContent:UNDERCITY[k].name + ": " }), UNDERCITY[k].text))),
+    next.map(k => ({ label:UNDERCITY[k].name, primary:true, fn:() => go(k) })), { closable:false });
+}
+// A room's effect: done for you where it's simple, otherwise a reminder with what it says
+function roomEffect(room){
+  const r = UNDERCITY[room];
+  const doIt = { entrance:["Search my library", searchLib], well:["Scry 2", () => lookTop(2, "scry")], archives:["Draw a card", () => { draw(1); }],
+                 trap:["Pick the player", () => pickPlayer("Trap!: who loses 5 life?", livePlayers(), t => groupEffect("lose", 5, [t], "Trap!"))] }[room];
+  setTimeout(() => openModal(r.name, el("p", { textContent:r.text }), [{ label:doIt ? "I'll do it myself" : "OK" }, ...(doIt ? [{ label:doIt[0], primary:true, fn:doIt[1] }] : [])]), 60);
+}
+function dungeonCard(seat, d, mine){
+  const room = d?.room || "", has = table.initiative === seat;
+  if (!room && !has) return null;
+  const box = el("div", { className:"dungeon" + (mine ? " mine" : ""), role:"group", ariaLabel:`${seat === mySeat ? "Your" : nm(seat) + "'s"} Undercity${room ? ": " + UNDERCITY[room].name : ""}` });
+  box.append(el("div", { className:"dhead" }, el("span", { textContent:"Undercity" }), has ? el("span", { className:"dinit", title:"Has the initiative: ventures into the Undercity each upkeep", textContent:"🗝 Initiative" }) : null));
+  for (const row of UC_ROWS) box.append(el("div", { className:"drow" }, ...row.map(k => el("span", {
+    className:"droom" + (k === room ? " here" : ""), title:`${UNDERCITY[k].name}: ${UNDERCITY[k].text}`, textContent:UNDERCITY[k].name.replace("Throne of the Dead Three", "Throne") }))));
+  box.append(el("div", { className:"dfoot", textContent:room === "throne" ? `Completed${d.done > 1 ? ` (${d.done} times)` : ""}` : room ? `In: ${UNDERCITY[room].name}` : "Not in yet" }));
+  if (mine) { const b = el("button", { className:"btn small", textContent:"Venture", title:"Venture into the Undercity (when a card or the initiative says to)" }); b.onclick = () => venture(""); box.append(b); }
+  return box;
+}
+
 /* Dice and coins: everyone sees the roll tumble over the roller's side of the table (your battlefield on your screen,
    your panel on theirs), land on the result, then fade; the log line comes as it lands. One "Roll dice" button:
    a coin, every usual die (d3 to d100), several of one die at once ("3d6", with the total), and the planar die. */

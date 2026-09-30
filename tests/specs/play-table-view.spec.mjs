@@ -83,3 +83,83 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: the initiative's Undercity card for everyone, and day and night that follow the rules", async () => {
+  test.setTimeout(150000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
+  const turn = () => ktp(a, () => ktPlay.table.turnSeat);
+  const pass = async page => { const n = await ktp(a, () => ktPlay.table.turnNum); await page.click("#nextTurn"); await keepHand(page); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
+  if (await turn() === 1) await pass(a);  // (Rick's turn)
+
+  // Luke takes the initiative: he ventures into the Undercity (Secret Entrance), and its card shows under his mana and
+  // next to his graveyard and exile on Rick's screen
+  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"Take the initiative", exact:true }).click();
+  await expect(a.locator(".modal-card h2")).toHaveText("Secret Entrance");
+  await expect(a.locator(".modal")).toContainText("Search your library for a basic land card");
+  await button(a, "I'll do it myself");
+  await expect(a.locator("#dungeonBox .dungeon .droom.here")).toHaveText("Secret Entrance");
+  await expect(a.locator("#dungeonBox .dungeon")).toContainText("🗝 Initiative");
+  const hisCard = opp(b, "Luke").locator(".dungeon");
+  await expect(hisCard.locator(".droom.here")).toHaveText("Secret Entrance");
+  await expect(hisCard).toContainText("🗝 Initiative");
+  expect(await a.evaluate(() => { const m = document.querySelector("#manaBox").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= m.bottom; })).toBe(true);
+
+  // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
+  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
+  await expect(b.locator("#dayChip")).toHaveText("☀ Day");
+  await pass(b);
+  await expect(a.locator("#log")).toContainText("It becomes night (Rick cast no spells last turn).");
+  for (const p of [a, b]) await expect(p.locator("#dayChip")).toHaveText("☾ Night");
+
+  // Luke's upkeep with the initiative: venture again, choosing where the map splits
+  await expect(a.locator(".modal-card h2")).toHaveText("Venture into the Undercity");
+  await button(a, "Lost Well");
+  await expect(a.locator(".modal-card h2")).toHaveText("Lost Well");
+  await button(a, "I'll do it myself");
+  await expect(hisCard.locator(".droom.here")).toHaveText("Lost Well");
+
+  // Luke casts two spells this turn, so as the next turn begins it becomes day again
+  for (let i = 0; i < 2; i++) await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "hand"); ktPlay.move(c.iid, "bf"); });
+  await expect.poll(() => ktp(b, () => ktPlay.table.spells)).toBe(2);
+  await pass(a);
+  await expect(b.locator("#log")).toContainText("It becomes day (Luke cast 2 spells last turn).");
+  await expect(b.locator("#dayChip")).toHaveText("☀ Day");
+
+  // Rick hits Luke in combat: the initiative moves to Rick, and he ventures into his own Undercity
+  const wolf = await ktp(b, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
+  await b.locator(`#bf .card[data-iid="${wolf}"]`).click({ button:"right" });
+  await b.getByRole("menuitem", { name:"Attack Luke", exact:true }).click();
+  await b.click("#dmgBtn");
+  await button(a, "Take 3 damage");
+  await expect(b.locator(".modal-card h2")).toHaveText("Secret Entrance");
+  await button(b, "I'll do it myself");
+  await expect(b.locator("#dungeonBox .dungeon")).toContainText("🗝 Initiative");
+  await expect(opp(a, "Rick").locator(".dungeon .droom.here")).toHaveText("Secret Entrance");
+  // A daybound card turns to its nightbound side at night (and back by day)
+  await ktp(a, () => {
+    const face = (name, text) => ({ name, oracle_text:text, type_line:"Creature — Werewolf", image_uris:{ small:"https://cards.scryfall.io/small/0.png", normal:"https://cards.scryfall.io/normal/0.png" } });
+    ktPlay.cards.set("dayb-0000", { id:"dayb-0000", name:"Test Pup // Test Wolf", layout:"transform", type_line:"Creature — Werewolf // Creature — Werewolf",
+      card_faces:[face("Test Pup", "Daybound"), face("Test Wolf", "Nightbound")] });
+    ktPlay.me.zones.bf.push({ iid:"daybcard", id:"dayb-0000", x:0.5, y:0.5, tapped:false, fd:false, face:0, ctr:{} });
+  });
+  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes night", exact:true }).click();
+  await expect.poll(() => ktp(a, () => ktPlay.me.zones.bf.find(c => c.iid === "daybcard").face)).toBe(1);
+  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
+  await expect.poll(() => ktp(a, () => ktPlay.me.zones.bf.find(c => c.iid === "daybcard").face)).toBe(0);
+  // (Luke keeps his place in his own Undercity, without the initiative)
+  await expect(a.locator("#dungeonBox .dungeon .droom.here")).toHaveText("Lost Well");
+  await expect(a.locator("#dungeonBox .dungeon")).not.toContainText("Initiative");
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
