@@ -141,6 +141,8 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await expect(b.locator("#log li").last()).toContainText("Luke pointed");
 
   // Attaching: Luke plays another card and attaches it to his first; it tucks behind it, on both screens
+  // (two Forests would stack into one pile: Help turns stacking off)
+  await a.click("#helpBtn"); await a.locator(".modal label", { hasText:"Stack basic lands of the same kind" }).locator("input").uncheck(); await a.locator(".modal").getByRole("button", { name:"Close" }).click();
   await a.locator("#hand .card").first().dblclick();
   await expect(a.locator("#bf .card")).toHaveCount(2);
   const second = await a.locator("#bf .card").nth(1).getAttribute("data-iid");
