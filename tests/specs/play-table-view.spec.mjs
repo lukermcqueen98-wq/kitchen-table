@@ -6,7 +6,7 @@ const opp = (page, name) => page.locator(".opp", { hasText:name });
 const ktp = (page, fn, arg) => page.evaluate(fn, arg);
 const button = (page, name) => page.locator(".modal").getByRole("button", { name, exact:true }).click();
 
-test("digital table: rolls everyone sees, other players' graveyards, exile and mana, readable drop-downs, no D to draw", async () => {
+test("digital table: one Roll dice button with every die, rolls everyone sees, other players' graveyards, exile and mana, readable drop-downs, no D to draw", async () => {
   test.setTimeout(120000);
   const browser = await launchBrowser();
   const a = await newPlayer(browser), b = await newPlayer(browser);
@@ -21,7 +21,11 @@ test("digital table: rolls everyone sees, other players' graveyards, exile and m
   for (const p of [a, b]) await button(p, "Keep");
 
   // A d20: it tumbles over Luke's side on both screens, then lands on the number the log shows
-  await a.click("#d20Btn");
+  // One "Roll dice" button with every die
+  await a.click("#rollBtn");
+  for (const d of ["Flip a coin", "Roll a d3", "Roll a d4", "Roll a d6", "Roll a d8", "Roll a d10", "Roll a d12", "Roll a d20", "Roll a d100", "Several dice...", "Roll the planar die (Planechase)"])
+    await expect(a.getByRole("menuitem", { name:d, exact:true })).toBeVisible();
+  await a.getByRole("menuitem", { name:"Roll a d20", exact:true }).click();
   for (const p of [a, b]) await expect(p.locator(".rollfx")).toBeVisible();
   await expect(b.locator(".rollfx .rolllabel")).toContainText("Luke rolled a d20");
   await expect(b.locator(".rollfx.landed .rolllabel")).toHaveText(/^Luke rolled \d+$/, { timeout:5000 });
@@ -32,8 +36,22 @@ test("digital table: rolls everyone sees, other players' graveyards, exile and m
   expect(onRick).toBe(true);
   await expect(b.locator(".rollfx")).toHaveCount(0, { timeout:8000 });
   // ...and a coin
-  await b.click("#coinBtn");
+  await b.click("#rollBtn"); await b.getByRole("menuitem", { name:"Flip a coin", exact:true }).click();
   await expect(a.locator(".rollfx.landed .rolllabel")).toHaveText(/^Rick flipped (heads|tails)$/, { timeout:5000 });
+  await expect(a.locator(".rollfx")).toHaveCount(0, { timeout:8000 });
+  // Several dice at once: 3d6 shows three dice and the total
+  await b.click("#rollBtn"); await b.getByRole("menuitem", { name:"Several dice...", exact:true }).click();
+  await b.fill(".modal input[aria-label='How many']", "3"); await b.selectOption(".modal select[aria-label='Which die']", "d6");
+  await button(b, "Roll");
+  await expect(a.locator(".rollfx .rolldie")).toHaveCount(3);
+  await expect(a.locator(".rollfx.landed .rolllabel")).toHaveText(/^Rick rolled [1-6] \+ [1-6] \+ [1-6] = \d+$/, { timeout:5000 });
+  const [, x, y, z, sum] = (await a.locator(".rollfx .rolllabel").textContent()).match(/(\d) \+ (\d) \+ (\d) = (\d+)/).map(Number);
+  expect(x + y + z).toBe(sum);
+  await expect(a.locator("#log")).toContainText(`Rick rolled 3d6: ${x} + ${y} + ${z} = ${sum}.`);
+  await expect(a.locator(".rollfx")).toHaveCount(0, { timeout:8000 });
+  // The planar die
+  await b.click("#rollBtn"); await b.getByRole("menuitem", { name:"Roll the planar die (Planechase)", exact:true }).click();
+  await expect(a.locator("#log")).toContainText(/Rick rolled the planar die: (blank|chaos|planeswalk)\./, { timeout:5000 });
 
   // Luke's graveyard and exile show their top card on Rick's screen, with counts; a click shows them all
   const [g1, g2, x1] = await ktp(a, () => ktPlay.me.zones.hand.slice(0, 3).map(c => c.iid));

@@ -295,6 +295,8 @@ details.term a{font-size:13px;color:var(--brass)}
   #ctrlBox{min-width:130px}
 }
 .rollfx{position:fixed;z-index:60;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;transition:opacity .5s}
+.rolldice{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:min(90vw,560px)}
+.rolldice.many .rolldie svg{width:64px;height:64px}
 .rolldie svg{width:96px;height:96px;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6));animation:tumble .35s linear infinite}
 .rollfx.coin .rolldie svg{animation:coinspin .3s linear infinite}
 .rollfx.landed .rolldie svg{animation:landed .35s ease-out}
@@ -366,9 +368,7 @@ details.term a{font-size:13px;color:var(--brass)}
       <button class="btn small playonly" id="nextTurn">Next turn</button>
     </span>
     <span class="grp">
-      <button class="btn small playonly" id="d6Btn" title="Roll a six-sided die">d6</button>
-      <button class="btn small playonly" id="d20Btn" title="Roll a twenty-sided die">d20</button>
-      <button class="btn small playonly" id="coinBtn">Coin</button>
+      <button class="btn small playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
       <button class="btn small playonly" id="tokenBtn">Tokens</button>
       <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
       <button class="btn small playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
@@ -1037,8 +1037,9 @@ function onMessage(s, msg){
     case "records": { const n = mergeRecords(msg.recs, true); if (n) log(`Added ${n} of your past games from ${players[s]?.name || "another player"}'s records.`); break; }
     case "log": if (typeof msg.text === "string") log(msg.text.slice(0, 300), s); break;
     case "dice": {
-      const kind = ["d6", "d20", "coin"].includes(msg.kind) ? msg.kind : "";
-      if (kind) showRoll(s, kind, kind === "coin" ? (msg.value === "Heads" ? "Heads" : "Tails") : clamp(Math.round(+msg.value || 1), 1, +kind.slice(1)));
+      const kind = ["coin", "planar", ...DICE].includes(msg.kind) ? msg.kind : "";
+      const values = (Array.isArray(msg.values) ? msg.values : []).slice(0, 10).map(v => clamp(Math.round(+v || 1), 1, sidesOf(kind)));
+      if (kind && values.length) showRoll(s, kind, values);
       break;
     }
     case "act": takeAct(s, msg); break;
@@ -2753,38 +2754,77 @@ function noteLife(){
   lifeTimer = setTimeout(() => { const d = me.life - lifeFrom; if (d) say(`${d > 0 ? "gained" : "lost"} ${Math.abs(d)} life (${lifeFrom} → ${me.life}).`); lifeFrom = null; }, 1500);
 }
 /* Dice and coins: everyone sees the roll tumble over the roller's side of the table (your battlefield on your screen,
-   your panel on theirs), land on the result, then fade; the log line comes as it lands */
-const ROLL_MS = 1100;
-function roll(kind){
-  const value = kind === "coin" ? (rnd(2) === 1 ? "Heads" : "Tails") : rnd(+kind.slice(1));
-  broadcast({ type:"dice", kind, value });
-  showRoll(mySeat, kind, value);
-  setTimeout(() => say(kind === "coin" ? `flipped a coin: ${value.toLowerCase()}.` : `rolled a ${kind}: ${value}.`), ROLL_MS);
+   your panel on theirs), land on the result, then fade; the log line comes as it lands. One "Roll dice" button:
+   a coin, every usual die (d3 to d100), several of one die at once ("3d6", with the total), and the planar die. */
+const ROLL_MS = 1100, DICE = ["d3", "d4", "d6", "d8", "d10", "d12", "d20", "d100"];
+const PLANAR = ["Blank", "Blank", "Blank", "Blank", "Chaos", "Planeswalk"];  // (Planechase: 4 blank faces, chaos, planeswalk)
+const sidesOf = kind => kind === "coin" ? 2 : kind === "planar" ? 6 : +kind.slice(1);
+const faceOf = (kind, v) => kind === "coin" ? (v === 1 ? "Heads" : "Tails") : kind === "planar" ? PLANAR[v - 1] : v;
+function roll(kind, count = 1){
+  const values = Array.from({ length:count }, () => rnd(sidesOf(kind)));
+  broadcast({ type:"dice", kind, values });
+  showRoll(mySeat, kind, values);
+  setTimeout(() => say(rollText(kind, values)), ROLL_MS);
 }
-$("#d6Btn").onclick = () => roll("d6");
-$("#d20Btn").onclick = () => roll("d20");
-$("#coinBtn").onclick = () => roll("coin");
+function rollText(kind, values){
+  const faces = values.map(v => faceOf(kind, v));
+  if (kind === "coin") return values.length > 1 ? `flipped ${values.length} coins: ${faces.join(", ").toLowerCase()}.` : `flipped a coin: ${faces[0].toLowerCase()}.`;
+  if (kind === "planar") return `rolled the planar die: ${faces[0].toLowerCase()}.`;
+  if (values.length === 1) return `rolled a ${kind}: ${values[0]}.`;
+  return `rolled ${values.length}${kind}: ${values.join(" + ")} = ${values.reduce((a, b) => a + b, 0)}.`;
+}
+$("#rollBtn").onclick = e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  openMenu(r.left, r.bottom + 4, [{ head:"Roll" }, { label:"Flip a coin", fn:() => roll("coin") },
+    ...DICE.map(d => ({ label:`Roll a ${d}`, fn:() => roll(d) })),
+    "-", { label:"Several dice...", fn:severalDice }, { label:"Roll the planar die (Planechase)", fn:() => roll("planar") }]);
+};
+function severalDice(){
+  const n = el("input", { type:"number", min:1, max:10, value:2, ariaLabel:"How many" });
+  const kind = el("select", { ariaLabel:"Which die" }, el("option", { value:"coin", textContent:"coins" }), ...DICE.map(d => el("option", { value:d, textContent:d, selected:d === "d6" })));
+  const go = () => roll(kind.value, clamp(Math.round(+n.value || 1), 1, 10));
+  n.onkeydown = e => { if (e.key === "Enter") { closeModal(); go(); } };
+  openModal("Roll several dice", el("div", { className:"row" }, n, kind), [{ label:"Cancel" }, { label:"Roll", primary:true, fn:go }]);
+}
 const DIE_SHAPE = {
   coin:'<circle cx="50" cy="50" r="44"/>',
+  d3:'<polygon points="50,8 94,88 6,88"/>',
+  d4:'<polygon points="50,6 95,90 5,90"/>',
   d6:'<rect x="8" y="8" width="84" height="84" rx="14"/>',
-  d20:'<polygon points="50,4 92,28 92,72 50,96 8,72 8,28"/>'
+  d8:'<polygon points="50,4 94,50 50,96 6,50"/>',
+  d10:'<polygon points="50,4 92,40 80,86 20,86 8,40"/>',
+  d12:'<polygon points="50,4 93,32 83,84 17,84 7,32"/>',
+  d20:'<polygon points="50,4 92,28 92,72 50,96 8,72 8,28"/>',
+  d100:'<polygon points="50,4 77,12 94,35 94,65 77,88 50,96 23,88 6,65 6,35 23,12"/>',
+  planar:'<rect x="8" y="8" width="84" height="84" rx="14"/>'
 };
-function showRoll(seat, kind, value){
-  if (!DIE_SHAPE[kind]) return;
+function showRoll(seat, kind, values){
+  if (!DIE_SHAPE[kind] || !values.length) return;
   const area = seat === mySeat ? $("#bf") : $(`.opp[data-seat="${seat}"]`); if (!area) return;
   const r = area.getBoundingClientRect(), who = seat === mySeat ? "You" : players[seat]?.name || "Someone";
+  area.ownerDocument.querySelectorAll(`.rollfx[data-seat="${seat}"]`).forEach(f => f.remove());
   const fx = el("div", { className:"rollfx" + (kind === "coin" ? " coin" : ""), role:"status" });
   fx.dataset.seat = seat;
   fx.style.left = `${r.left + r.width / 2}px`; fx.style.top = `${r.top + Math.min(r.height / 2, 140)}px`;
-  const fill = SEAT_HEX[seat - 1] || "#efe6cf", ink = seat === 1 ? "#1b1608" : "#fff";
-  const die = el("div", { className:"rolldie", innerHTML:`<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="${fill}" stroke="rgba(0,0,0,.45)" stroke-width="3">${DIE_SHAPE[kind]}</g><text x="50" y="${kind === "coin" ? 58 : 61}" text-anchor="middle" font-family="Spectral, Georgia, serif" font-weight="700" font-size="${kind === "coin" ? 20 : 32}" fill="${ink}"></text></svg>` });
-  const label = el("div", { className:"rolllabel", textContent:kind === "coin" ? `${who} flipped a coin` : `${who} rolled a ${kind}` });
-  fx.append(die, label); document.body.append(fx);
-  const text = die.querySelector("text"), sides = kind === "coin" ? 0 : +kind.slice(1);
-  const iv = setInterval(() => { text.textContent = sides ? rnd(sides) : (rnd(2) === 1 ? "H" : "T"); }, 70);
+  const fill = SEAT_HEX[seat - 1] || "#efe6cf", ink = seat === 1 ? "#1b1608" : "#fff", sides = sidesOf(kind);
+  const shown = v => kind === "coin" ? (v === 1 ? "H" : "T") : kind === "planar" ? { Blank:"", Chaos:"✺", Planeswalk:"PW" }[PLANAR[v - 1]] : v;
+  const size = kind === "coin" ? 20 : kind === "d100" ? 26 : 32, y = kind === "d3" || kind === "d4" ? 72 : kind === "coin" ? 58 : 61;
+  const row = el("div", { className:"rolldice" + (values.length > 4 ? " many" : "") });
+  const texts = values.map(() => {
+    const d = el("div", { className:"rolldie", innerHTML:`<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="${fill}" stroke="rgba(0,0,0,.45)" stroke-width="3">${DIE_SHAPE[kind]}</g><text x="50" y="${y}" text-anchor="middle" font-family="Spectral, Georgia, serif" font-weight="700" font-size="${size}" fill="${ink}"></text></svg>` });
+    row.append(d); return d.querySelector("text");
+  });
+  const what = kind === "coin" ? (values.length > 1 ? `${values.length} coins` : "a coin") : kind === "planar" ? "the planar die" : values.length > 1 ? `${values.length}${kind}` : `a ${kind}`;
+  const label = el("div", { className:"rolllabel", textContent:kind === "coin" ? `${who} flipped ${what}` : `${who} rolled ${what}` });
+  fx.append(row, label); document.body.append(fx);
+  const iv = setInterval(() => texts.forEach(t => { t.textContent = shown(rnd(sides)); }), 70);
   setTimeout(() => {
-    clearInterval(iv); text.textContent = kind === "coin" ? (value === "Heads" ? "H" : "T") : value;
-    fx.classList.add("landed"); label.textContent = kind === "coin" ? `${who} flipped ${String(value).toLowerCase()}` : `${who} rolled ${value}`;
+    clearInterval(iv); texts.forEach((t, i) => { t.textContent = shown(values[i]); });
+    fx.classList.add("landed");
+    const faces = values.map(v => faceOf(kind, v));
+    label.textContent = kind === "coin" ? `${who} flipped ${faces.join(", ").toLowerCase()}`
+      : kind === "planar" ? `${who} rolled ${faces[0] === "Blank" ? "a blank" : faces[0]}`
+      : values.length > 1 ? `${who} rolled ${values.join(" + ")} = ${values.reduce((a, b) => a + b, 0)}` : `${who} rolled ${values[0]}`;
   }, ROLL_MS);
   setTimeout(() => fx.classList.add("gone"), ROLL_MS + 3500);
   setTimeout(() => fx.remove(), ROLL_MS + 4000);
