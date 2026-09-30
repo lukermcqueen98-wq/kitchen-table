@@ -126,6 +126,10 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .obody{flex:1;display:flex;min-height:0}
 .ocz{display:flex;flex-direction:column;gap:4px;padding:4px;border-right:1px solid var(--felt-edge)}
 .obf{flex:1;position:relative;min-height:0}
+.matgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.matpick{display:flex;flex-direction:column;gap:4px;align-items:stretch;border:1px solid var(--felt-edge);border-radius:10px;padding:6px;background:rgba(0,0,0,.2);cursor:pointer;font-size:12px}
+.matpick.on,.matpick:hover,.matpick:focus-visible{border-color:var(--brass)}
+.matsw{display:block;height:60px;border-radius:6px}
 .obf .card{--w:64px}
 .opiles{display:flex;flex-direction:row;align-items:flex-start;gap:6px;padding:6px;border-left:1px solid var(--felt-edge);overflow:auto}
 .opile{border:1px solid var(--felt-edge);border-radius:8px;background:rgba(0,0,0,.25);padding:4px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
@@ -214,6 +218,8 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 #log li{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05)}
 #log .t{color:var(--muted);margin-right:6px;font-variant-numeric:tabular-nums}
 #log .who{font-weight:600}
+#log .clink{color:var(--brass);text-decoration:underline dotted;text-underline-offset:2px;cursor:pointer}
+#log .clink:hover,#log .clink:focus-visible{text-decoration-style:solid}
 
 /* Cards */
 .card{position:absolute;width:var(--w);aspect-ratio:63/88;border-radius:4.75%/3.5%;background:#111 center/cover no-repeat;box-shadow:0 1px 3px rgba(0,0,0,.6);user-select:none;touch-action:none;transition:transform .12s}
@@ -427,6 +433,7 @@ details.term a{font-size:13px;color:var(--brass)}
       <span class="tgroup" aria-label="The game"><span class="tlabel">Game</span>
         <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
         <button class="btn small hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
+        <button class="btn small" id="matBtn" title="Pick a playmat for your side of the table (everyone sees it)">Playmat</button>
         <button class="btn small" id="termsBtn" title="Magic terms and what they mean">Terms</button>
         <button class="btn small" id="statsBtn">Stats</button>
         <button class="btn small playonly" id="outBtn" title="Concede: you're out of this game (the others play on)">Concede</button>
@@ -1070,7 +1077,7 @@ function onMessage(s, msg){
       if (typeof msg.watch === "string") {  // someone watching: not a player
         if (!watchers[s]) log(`${msg.watch.slice(0, 24) || "Someone"} is watching.`);
         watchers[s] = msg.watch.slice(0, 24) || "Someone";
-        if (!me.watch) send(conns[s], { type:"state", state:pub() });
+        if (!me.watch) { send(conns[s], { type:"state", state:pub() }); sendMat(conns[s]); }
         if (msg.table) takeTable(msg.table);
         render(); break;
       }
@@ -1080,12 +1087,13 @@ function onMessage(s, msg){
       players[s] = { ...st, seat:s };
       if (msg.type === "hello") {
         if (!was || was.away) log(`${st.name} sat down.`);
-        if (!me.watch) { send(conns[s], { type:"state", state:pub() }); send(conns[s], { type:"records", recs:loadRecords().filter(r => r.players.some(p => p.name === st.name)).slice(-200) }); }
+        if (!me.watch) { sendMat(conns[s]); send(conns[s], { type:"state", state:pub() }); send(conns[s], { type:"records", recs:loadRecords().filter(r => r.players.some(p => p.name === st.name)).slice(-200) }); }
       }
       if (msg.table) takeTable(msg.table);
       render(); break;
     }
     case "table": takeTable(msg.table); break;
+    case "mat": { const m = cleanMat(msg.mat); if (m) mats[s] = m; else delete mats[s]; render(); break; }
     case "chat": if (typeof msg.text === "string" && msg.text.trim()) chatLine(players[s]?.name || watchers[s] || "Someone", msg.text.slice(0, 300), s); break;
     case "record": saveRecord(cleanRecord(msg.rec)); break;
     case "records": { const n = mergeRecords(msg.recs, true); if (n) log(`Added ${n} of your past games from ${players[s]?.name || "another player"}'s records.`); break; }
@@ -2031,7 +2039,7 @@ function drawBattlefield(box, list, opts){
 function render(){
   if (!me) return;
   if (!me.watch) players[mySeat] = { ...pub(), seat:mySeat };
-  renderOpps(); if (!me.watch) renderMine(); renderCombat(); renderTurn();
+  renderOpps(); if (!me.watch) renderMine(); renderCombat(); renderTurn(); relinkLog(); applyMats();
   const w = Object.values(watchers); $("#watchers").textContent = w.length ? `Watching: ${w.join(", ")}` : "";
   requestAnimationFrame(drawArrows);
 }
@@ -2324,6 +2332,14 @@ $("#gyPile").onclick = e => { if (!e.target.closest(".card")) viewZone("Your gra
 $("#exPile").onclick = e => { if (!e.target.closest(".card")) viewZone("Your exile", me.zones.ex, "ex"); };
 // Point at any card to see it large, with its rules text
 document.addEventListener("pointerover", e => {
+  // (a card named in the log or chat)
+  const cl = e.target.closest?.(".clink");
+  if (cl) {
+    hoverIid = null; const src = cl.dataset.img, id = cl.dataset.cid;
+    if (src) { $("#zoomImg").src = src; if (e.pointerType === "mouse" && settings.hoverPop && !drag) popOut(cl, src); }
+    cardById(id).then(c => { if (c) $("#zoomText").textContent = textOf(c, 0); });
+    return;
+  }
   const ce = e.target.closest?.(".card"); if (!ce || ce.classList.contains("ghost")) return;
   hoverIid = ce.dataset.iid || null;
   const iid = ce.dataset.iid, mineC = iid && findCard(iid)?.c;
@@ -2348,7 +2364,7 @@ function popOut(ce, src){
   pop.dataset.iid = ce.dataset.iid || ""; pop.classList.remove("hidden");
 }
 function hidePop(){ $("#pop").classList.add("hidden"); }
-document.addEventListener("pointerout", e => { const ce = e.target.closest?.(".card"); if (ce && !ce.contains(e.relatedTarget)) hidePop(); });
+document.addEventListener("pointerout", e => { const ce = e.target.closest?.(".card, .clink"); if (ce && !ce.contains(e.relatedTarget)) hidePop(); });
 document.addEventListener("pointerdown", hidePop, true);
 document.addEventListener("wheel", hidePop, { passive:true });
 function findPub(iid){ for (const p of Object.values(players)) for (const z of ["bf", "gy", "ex", "cz"]) { const c = p[z]?.find(x => x.iid === iid); if (c) return c; } return null; }
@@ -3250,7 +3266,8 @@ $("#helpBtn").onclick = () => {
 function chatLine(who, text, seat){
   const li = el("li", { className:"chat" }), t = new Date();
   li.append(el("span", { className:"t", textContent:t.toTimeString().slice(0, 5) }));
-  const w = el("b", { textContent:who + ":" }); if (seat) w.style.color = SEAT_HEX[(seat - 1) % 4]; li.append(w, text);
+  const w = el("b", { textContent:who + ":" }); if (seat) w.style.color = SEAT_HEX[(seat - 1) % 4]; li.append(w);
+  li.dataset.raw = String(text); li.dataset.pre = li.childNodes.length; li.append(...linkCards(String(text)));
   const ul = $("#log"); ul.append(li); while (ul.children.length > 300) ul.firstChild.remove();
   $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
   if (seat && seat !== mySeat && getComputedStyle($("#panel")).display === "none") toast(`${who}: ${text}`);
@@ -3266,9 +3283,114 @@ function log(text, seat){
   const li = el("li"), t = new Date();
   li.append(el("span", { className:"t", textContent:t.toTimeString().slice(0, 5) }));
   if (seat) { const w = el("span", { className:"who" }); w.style.color = SEAT_HEX[seat - 1]; w.textContent = ""; li.append(w); }
-  li.append(text);
+  if (typeof text === "string") { li.dataset.raw = text; li.dataset.pre = li.childNodes.length; }
+  li.append(...(typeof text === "string" ? linkCards(text) : [text]));
   const ul = $("#log"); ul.append(li); while (ul.children.length > 300) ul.firstChild.remove();
   $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
+}
+/* Playmats: each player picks one for their side of the table, and everyone sees it (behind your battlefield, and
+   behind your area on the other players' screens). Built-in mats, a picture from an https link, or a picture from
+   your computer (made smaller first, so it's quick to send). Saved in this browser for next time. */
+const MATS = {
+  felt:{ name:"Felt (plain)", css:"" },
+  forest:{ name:"Forest", css:"radial-gradient(ellipse at 30% 20%,rgba(120,180,90,.35),transparent 60%),radial-gradient(ellipse at 80% 90%,rgba(40,90,40,.5),transparent 55%),linear-gradient(160deg,#1d3a22,#0f2415)" },
+  island:{ name:"Island", css:"radial-gradient(ellipse at 70% 10%,rgba(140,190,240,.35),transparent 55%),radial-gradient(ellipse at 20% 100%,rgba(20,60,120,.6),transparent 60%),linear-gradient(170deg,#173a5c,#0b1f36)" },
+  swamp:{ name:"Swamp", css:"radial-gradient(ellipse at 50% 0%,rgba(150,110,170,.28),transparent 55%),radial-gradient(ellipse at 10% 90%,rgba(40,20,50,.7),transparent 60%),linear-gradient(170deg,#2a1f30,#120c16)" },
+  mountain:{ name:"Mountain", css:"radial-gradient(ellipse at 80% 20%,rgba(240,140,80,.3),transparent 55%),radial-gradient(ellipse at 20% 100%,rgba(90,25,15,.6),transparent 60%),linear-gradient(165deg,#4a1d14,#1f0c08)" },
+  plains:{ name:"Plains", css:"radial-gradient(ellipse at 50% 0%,rgba(255,240,190,.35),transparent 60%),linear-gradient(170deg,#6b5a35,#2f2716)" },
+  stars:{ name:"Starfield", css:"radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(1px 1px at 75% 80%,#fff,transparent),radial-gradient(1px 1px at 90% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 90%,#ddf,transparent),radial-gradient(ellipse at 60% 40%,rgba(90,60,160,.35),transparent 60%),linear-gradient(#070814,#0d1030)" },
+  wood:{ name:"Wood", css:"repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,transparent 2px 38px),repeating-linear-gradient(90deg,rgba(255,220,170,.05) 0 1px,transparent 1px 13px),linear-gradient(180deg,#5a3a22,#3a2414)" },
+  parchment:{ name:"Parchment", css:"radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(80,50,20,.45)),linear-gradient(170deg,#8a7650,#5b4c30)" }
+};
+const mats = {};  // seat -> { kind:"preset", v } or { kind:"img", v } (https link or small data: picture)
+let myMat = (() => { try { return cleanMat(JSON.parse(store.get("kt-dig-mat", "null"))); } catch { return null; } })();
+function cleanMat(m){
+  if (!m || typeof m !== "object") return null;
+  if (m.kind === "preset" && MATS[m.v] && m.v !== "felt") return { kind:"preset", v:m.v };
+  if (m.kind === "img" && typeof m.v === "string" && (/^https:\/\/[^\s"'()<>\\]{1,500}$/.test(m.v) || (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(m.v) && m.v.length < 400000))) return { kind:"img", v:m.v };
+  return null;
+}
+const matCss = m => !m ? "" : m.kind === "preset" ? MATS[m.v].css : `linear-gradient(rgba(0,0,0,.25),rgba(0,0,0,.25)),url("${m.v}") center/cover no-repeat`;
+function sendMat(conn){ if (conn && !me?.watch) send(conn, { type:"mat", mat:myMat }); }
+function applyMats(){
+  const mine = $("#bf"); if (mine) { mine.style.background = matCss(myMat); mine.classList.toggle("mat", !!myMat); }
+  for (const o of document.querySelectorAll(".opp")) { const b = o.querySelector(".obody"), m = mats[+o.dataset.seat]; if (b) { b.style.background = matCss(m); b.classList.toggle("mat", !!m); } }
+}
+function setMat(m){
+  myMat = cleanMat(m); store.set("kt-dig-mat", JSON.stringify(myMat));
+  broadcast({ type:"mat", mat:myMat }); applyMats();
+  say(myMat ? `put down a new playmat${myMat.kind === "preset" ? ` (${MATS[myMat.v].name})` : ""}.` : "went back to the plain felt.");
+}
+$("#matBtn").onclick = () => {
+  const grid = el("div", { className:"matgrid" });
+  for (const [k, x] of Object.entries(MATS)) {
+    const b = el("button", { type:"button", className:"matpick" + ((myMat?.kind === "preset" && myMat.v === k) || (!myMat && k === "felt") ? " on" : ""), title:x.name, ariaLabel:`Playmat: ${x.name}` },
+      el("span", { className:"matsw" }), el("span", { textContent:x.name }));
+    b.firstChild.style.background = x.css || "radial-gradient(ellipse at 50% 30%,var(--felt),var(--felt-deep))";
+    b.onclick = () => { closeModal(); setMat(k === "felt" ? null : { kind:"preset", v:k }); };
+    grid.append(b);
+  }
+  const url = el("input", { type:"url", placeholder:"https://... a picture link", ariaLabel:"Picture link", style:"flex:1;min-width:200px" });
+  const useUrl = el("button", { className:"btn small", textContent:"Use this picture" });
+  useUrl.onclick = () => { const m = cleanMat({ kind:"img", v:url.value.trim() }); if (!m) { toast("That needs to be an https:// link to a picture."); return; } closeModal(); setMat(m); };
+  const file = el("input", { type:"file", accept:"image/*", className:"hidden" });
+  const upload = el("button", { className:"btn small", textContent:"Picture from my computer..." }); upload.onclick = () => file.click();
+  file.onchange = async () => {
+    const f = file.files[0]; if (!f) return;
+    try {
+      const img = await createImageBitmap(f), scale = Math.min(1, 1100 / Math.max(img.width, img.height));
+      const cv = el("canvas", { width:Math.round(img.width * scale), height:Math.round(img.height * scale) });
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      let q = 0.72, data = cv.toDataURL("image/jpeg", q); while (data.length > 380000 && q > 0.3) { q -= 0.1; data = cv.toDataURL("image/jpeg", q); }
+      closeModal(); setMat({ kind:"img", v:data });
+    } catch { toast("That picture couldn't be read."); }
+  };
+  openModal("Your playmat", el("div", {}, el("p", { className:"hint", textContent:"It goes behind your battlefield, and everyone at the table sees it behind your side." }), grid,
+    el("h3", { textContent:"Or a picture" }), el("div", { className:"row", style:"flex-wrap:wrap;gap:6px" }, url, useUrl, upload, file)), [{ label:"Close" }], { wide:true });
+};
+
+/* Card names in the log and chat are links: point at one to see it (large, and in the card view above the log), click
+   to open it. The names known are your cards and every card anyone has on the table or in a graveyard or exile. */
+let nameIdx = { key:"", re:null, map:new Map() };
+function knownNames(){
+  const map = new Map();
+  for (const k of cards.values()) {
+    if (!k?.name) continue;
+    if (!map.has(k.name)) map.set(k.name, { id:k.id, img:imgOf(k, 0, "normal") });
+    (k.card_faces || []).forEach((f, i) => { if (f.name && !map.has(f.name)) map.set(f.name, { id:k.id, img:imgOf(k, i, "normal") }); });
+  }
+  for (const p of Object.values(players)) for (const z of ["bf", "gy", "ex", "cz", "st", "handShown", "libTop"])
+    for (const c of [].concat(p?.[z] || [])) if (c?.name && c.id && !c.fd && !map.has(c.name)) map.set(c.name, { id:c.id, img:(c.img || "").replace("/small/", "/normal/") });
+  return map;
+}
+// (a line can arrive before the table update that shows the card it names: when more cards are known, recent lines
+// are linked again)
+let relinkKey = "";
+function relinkLog(){
+  const key = [...knownNames().keys()].join("|"); if (key === relinkKey) return; relinkKey = key;
+  for (const li of [...document.querySelectorAll("#log li[data-raw]")].slice(-80)) {
+    const pre = +li.dataset.pre || 0; while (li.childNodes.length > pre) li.lastChild.remove();
+    li.append(...linkCards(li.dataset.raw));
+  }
+}
+function linkCards(text){
+  const map = knownNames(), key = [...map.keys()].join("|");
+  if (key !== nameIdx.key) {
+    const names = [...map.keys()].filter(n => n.length >= 3).sort((a, b) => b.length - a.length).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    nameIdx = { key, map, re:names.length ? new RegExp(`(?<![\\w'’])(${names.join("|")})(?![\\w'’])`, "g") : null };
+  }
+  if (!nameIdx.re) return [text];
+  const out = []; let at = 0;
+  for (const m of text.matchAll(nameIdx.re)) {
+    const info = nameIdx.map.get(m[0]); if (!info) continue;
+    if (m.index > at) out.push(text.slice(at, m.index));
+    const a = el("a", { className:"clink", href:"#", textContent:m[0], title:`${m[0]}: click to see the card` });
+    a.dataset.cid = info.id; a.dataset.img = info.img || "";
+    a.onclick = e => { e.preventDefault(); viewCard({ id:info.id, name:m[0], img:info.img }); };
+    out.push(a); at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return out;
 }
 window.addEventListener("beforeunload", () => save());
 
