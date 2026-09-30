@@ -163,3 +163,79 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: library, graveyard and exile options (Magic's usual ones), for your own and other players'", async () => {
+  test.setTimeout(150000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "28 Gamma Card\n2 Commander's Sphere\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const menu = async (page, pile, item) => { await page.locator(pile).click({ button:"right" }); await page.getByRole("menuitem", { name:item, exact:true }).click(); };
+  const zone = (page, z) => ktp(page, z => ktPlay.me.zones[z].map(c => ({ iid:c.iid, name:ktPlay.cards.get(c.id)?.name, fd:!!c.fd })), z);
+  // (put the library in a known order: Forest, Forest, Gamma Card, then the rest)
+  const order = () => ktp(a, () => { const L = ktPlay.me.zones.lib, isF = c => ktPlay.cards.get(c.id)?.name === "Forest";
+    const f = L.filter(isF).slice(0, 2), g = L.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.me.zones.lib = [...f, g, ...L.filter(c => !f.includes(c) && c !== g)]; });
+
+  // Library: exile the top card face down; put the top card on the bottom
+  await order();
+  await menu(a, "#libPile", "Exile the top card face down");
+  expect((await zone(a, "ex")).map(c => c.fd)).toEqual([true]);
+  const top = (await zone(a, "lib"))[0].iid;
+  await menu(a, "#libPile", "Put the top card on the bottom");
+  expect((await zone(a, "lib")).at(-1).iid).toBe(top);
+  // Reveal until a creature card: Gamma Card is found and goes to Luke's hand; the Forest before it goes to the bottom
+  await order();
+  await menu(a, "#libPile", "Reveal cards until... (cascade and the like)");
+  await a.selectOption(".modal select[aria-label='Until']", "creature"); await button(a, "Reveal");
+  await expect(a.locator(".modal-card h2")).toHaveText("Revealed 3: Gamma Card");
+  await expect(b.locator("#log")).toContainText("Luke revealed Forest, Forest, Gamma Card from the top of their library.");
+  await expect(b.locator(".modal-card h2")).toHaveText("Luke revealed the top of their library"); await button(b, "Close");
+  const hand = (await zone(a, "hand")).length;
+  await button(a, "Put it into your hand");
+  expect((await zone(a, "hand")).length).toBe(hand + 1);
+  expect((await zone(a, "lib")).slice(-2).map(c => c.name)).toEqual(["Forest", "Forest"]);
+  // Playing with the top card revealed: Rick sees it next to Luke's graveyard
+  await menu(a, "#libPile", "Play with the top card revealed (everyone sees it)");
+  await expect(opp(b, "Luke").locator(".opile", { hasText:"Library top" })).toHaveCount(1);
+  await menu(a, "#libPile", "Stop playing with the top card revealed");
+  await expect(opp(b, "Luke").locator(".opile", { hasText:"Library top" })).toHaveCount(0);
+
+  // Graveyard: flashback casts a sorcery from it and exiles it after
+  const sphere = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Commander's Sphere"); ktPlay.move(c.iid, "gy"); return c.iid; });
+  await a.locator("#gyPile").click();
+  await a.locator(".modal .gcard", { hasText:"" }).first().getByRole("button", { name:"Cast (flashback: then exile)" }).click();
+  await expect(a.locator("#log")).toContainText("You cast Commander's Sphere.");
+  await button(a, "Not now");
+  expect((await zone(a, "ex")).map(c => c.iid)).toContain(sphere);
+  // ...exile the whole graveyard
+  await ktp(a, () => { for (let i = 0; i < 3; i++) ktPlay.move(ktPlay.me.zones.lib[0].iid, "gy"); });
+  const exBefore = (await zone(a, "ex")).length;
+  await menu(a, "#gyPile", "Exile your whole graveyard");
+  expect((await zone(a, "gy")).length).toBe(0);
+  expect((await zone(a, "ex")).length).toBe(exBefore + 3);
+  // Exile: suspend's time counters
+  await a.locator("#exPile").click();
+  await a.locator(".modal .gcard").first().getByRole("button", { name:"Time counter + (0)" }).click();
+  await expect(a.locator(".modal .gcard").first().getByRole("button", { name:"Time counter + (1)" })).toBeVisible();
+  await button(a, "Close");
+
+  // Another player's graveyard: Rick reanimates Luke's Gamma Card onto his own battlefield, then exiles the rest
+  const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "gy"); ktPlay.move(ktPlay.me.zones.lib[0].iid, "gy"); return c.iid; });
+  await expect(opp(b, "Luke").locator(".opile").first()).toContainText("Graveyard 2");
+  await opp(b, "Luke").locator(".opile", { hasText:"Graveyard" }).click();
+  await b.locator(".modal .gcard", { has:b.locator(`.card[data-iid="${gamma}"]`) }).getByRole("button", { name:"Onto my battlefield" }).click();
+  await expect.poll(() => ktp(b, g => ktPlay.me.zones.bf.some(c => c.iid === g && c.owner === 1), gamma)).toBe(true);
+  await opp(b, "Luke").locator(".opile", { hasText:"Graveyard" }).click();
+  await button(b, "Exile their whole graveyard");
+  await expect.poll(async () => (await zone(a, "gy")).length).toBe(0);
+  await expect(a.locator("#log")).toContainText("Rick exiled your graveyard (1 card).");
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});

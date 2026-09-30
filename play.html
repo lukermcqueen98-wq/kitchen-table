@@ -113,6 +113,7 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile:hover,.opile:focus-visible{border-color:var(--brass)}
 .opile.empty{cursor:default;opacity:.6}
 .opile .card{--w:60px}
+.pile .card.peek{outline:2px solid var(--brass)}
 .opile .ph{width:60px;aspect-ratio:63/88;border:1px dashed var(--felt-edge);border-radius:4px}
 .opilelbl{font-size:12px;font-weight:600;white-space:nowrap}
 .dungeon{border:1px solid var(--brass);border-radius:10px;background:linear-gradient(180deg,rgba(60,40,20,.55),rgba(0,0,0,.35));padding:6px;display:flex;flex-direction:column;gap:4px;min-width:150px}
@@ -797,7 +798,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 } };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1015,7 +1016,7 @@ function cleanPub(st){
   return { name:String(st.name || "Player").slice(0, 24), life:num(st.life, -999, 9999), poison:num(st.poison, 0, 99), energy:num(st.energy, 0, 999), exp:num(st.exp, 0, 999),
            cmd:st.cmd && typeof st.cmd === "object" ? Object.fromEntries(Object.entries(st.cmd).slice(0, 12).map(([k, v]) => [String(k).slice(0, 40), num(v, 0, 999)])) : {},
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
-           dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) },
+           dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null,
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
            bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
@@ -1389,7 +1390,8 @@ function matchDayNight(){
   if (n) { say(`turned ${n} daybound/nightbound card${n === 1 ? "" : "s"} to ${table.day === "night" ? "their night side" : "their day side"}.`); withoutUndo(changed); }
 }
 function castSpell(iid, target){
-  const f = findCard(iid); if (!f || !["hand", "cz"].includes(f.z)) return;
+  const f = findCard(iid); if (!f || !["hand", "cz", "gy", "ex", "lib"].includes(f.z)) return;
+  const fromElsewhere = !["hand", "cz"].includes(f.z);  // (flashback, escape, foretell, the top of the library...)
   const k = cardOf(f.c), fd = f.c.fd, text = cardText(k);
   const aura = !fd && /\bAura\b/.test(typeOf(k)) && !/^Enchant player/im.test(text);
   // A spell with a target (or an Aura) asks for it first: click a card or a player (see pickTarget)
@@ -1399,8 +1401,10 @@ function castSpell(iid, target){
     const c = findCard(iid)?.c; if (c) { c.att = target.card; c.x = 0.02; c.y = 0.02; }
     say(`cast ${nameOf(f.c)}, enchanting ${target.text}.`); ping(target); changed(); return;
   }
-  if (isPermanent(k) || fd) { move(iid, "bf"); return; }
-  move(iid, "gy", { quiet:true }); countSpell();
+  if (isPermanent(k) || fd) { move(iid, "bf", { quiet:fromElsewhere }); if (fromElsewhere) { if (!isLand(k) || fd) countSpell(); say(`${isLand(k) && !fd ? "played" : "cast"} ${nameOf(f.c)} from their ${ZONE_NAME[f.z]}.`); } return; }
+  // (an instant or sorcery goes to the graveyard; one cast with flashback or jump-start is exiled instead)
+  const after = f.c.afterCast || "gy"; delete f.c.afterCast;
+  move(iid, after, { quiet:true }); countSpell();
   say(`cast ${nameOf(f.c)}${target?.text ? ` targeting ${target.text}` : ""}.`);
   if (target) ping(target);
   const fx = cardEffects(k);
@@ -1518,8 +1522,16 @@ function takeBack(from, raw, zone, bottom){
 /* What other players can do to your cards (a manual table: everyone's trusted, and every action is in the log) */
 function takeAct(from, a){ withoutUndo(() => takeAct_(from, a)); }
 function takeAct_(from, a){
-  const f = findCard(String(a.iid || "")); if (!f || !["bf", "st"].includes(f.z)) return;
+  if (a.act === "exileGy") { const n = me.zones.gy.length; for (const c of [...me.zones.gy]) move(c.iid, "ex", { quiet:true }); if (n) log(`${nm(from)} exiled your graveyard (${n} card${n === 1 ? "" : "s"}).`); return; }
+  const f = findCard(String(a.iid || "")); if (!f || !["bf", "st", "gy", "ex"].includes(f.z)) return;
   const c = f.c;
+  // (a card in your graveyard or exile: another player can exile it, put it in your hand, graveyard or library, or
+  // put it onto their battlefield, like Reanimate on your creature)
+  if (f.z === "gy" || f.z === "ex") {
+    if (["gy", "ex", "hand", "lib"].includes(a.act) && a.act !== f.z) move(c.iid, a.act, { quiet:true, bottom:!!a.bottom });
+    else if (a.act === "steal") { move(c.iid, "bf", { quiet:true }); giveCard(c.iid, from); }
+    return;
+  }
   if (f.z === "st" && !["gy", "ex", "hand"].includes(a.act)) return;  // (a spell on the stack can only be countered or bounced)
   if (a.act === "tap") { c.tapped = !!a.v; changed(); }
   else if (a.act === "ctr") {
@@ -1891,13 +1903,15 @@ function renderOpps(){
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
     const pip = el("span", { className:"pip" }); pip.style.background = SEAT_HEX[s - 1];
+    // The top of their library, while they play with it revealed (Future Sight, Courser of Kruphix...)
+    const libTopOf = p => { const b = el("div", { className:"opile", title:`The top card of ${p.name}'s library (revealed)` }); const e = cardEl(p.libTop, { small:true }); e.style.position = "relative"; b.append(e, el("span", { className:"opilelbl", textContent:"Library top" })); return b; };
     // Their graveyard and exile: the top card of each, big enough to read, with the count; click to see them all
     const pileOf = (list, zone) => {
       const b = el("button", { type:"button", className:"opile" + (list.length ? "" : " empty"), title:list.length ? `${p.name}'s ${ZONE_NAME[zone]}: click to see all ${list.length}` : `${p.name}'s ${ZONE_NAME[zone]} is empty` });
       const top = list[list.length - 1];
       if (top) { const e = cardEl(top, { small:true }); e.style.position = "relative"; b.append(e); } else b.append(el("div", { className:"ph" }));
       b.append(el("span", { className:"opilelbl", textContent:`${ZONE_NAME[zone].replace(/^./, x => x.toUpperCase())} ${list.length}` }));
-      if (list.length) b.onclick = () => viewZone(`${p.name}'s ${ZONE_NAME[zone]}`, list, null);
+      if (list.length) b.onclick = () => viewZone(`${p.name}'s ${ZONE_NAME[zone]}`, list, null, s);
       return b;
     };
     const cmdTaken = Object.entries(me.cmd).filter(([k, v]) => k.startsWith(s + ":") && v).reduce((a, [, v]) => a + v, 0);
@@ -1912,7 +1926,7 @@ function renderOpps(){
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
-    o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false))));
+    o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false))));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     box.append(o);
   }
@@ -1934,7 +1948,8 @@ function renderMine(){
   const pile = (id, list, label, back) => {
     const p = $(id); p.innerHTML = "";
     const top = list[list.length - 1];
-    if (back && list.length) { const b = el("div", { className:"card back mine" }); b.dataset.zone = "lib"; if (list[0]) b.dataset.iid = list[0].iid; p.append(b); }
+    if (back && list.length && (me.topRevealed || me.topPeek)) { const t = cardEl(list[0], { mine:true, zone:"lib" }); t.classList.add("peek"); t.title = me.topRevealed ? "The top card (revealed to everyone)" : "The top card (only you see it)"; p.append(t); }
+    else if (back && list.length) { const b = el("div", { className:"card back mine" }); b.dataset.zone = "lib"; if (list[0]) b.dataset.iid = list[0].iid; p.append(b); }
     else if (!back && top) p.append(cardEl(top, { mine:true, zone:id === "#gyPile" ? "gy" : "ex" }));
     else p.append(el("div", { className:"ph" }));
     p.append(`${label} ${list.length}`);
@@ -2115,8 +2130,11 @@ document.addEventListener("dblclick", e => {
 });
 document.addEventListener("contextmenu", e => {
   const ce = e.target.closest?.(".card.mine");
-  if (ce) { e.preventDefault(); if (ce.dataset.zone === "lib") libMenu(e.clientX, e.clientY); else cardMenu(ce.dataset.iid, e.clientX, e.clientY); return; }
+  if (ce) { e.preventDefault(); const zn = ce.dataset.zone, inPile = ce.closest(".pile");
+    if (zn === "lib") libMenu(e.clientX, e.clientY); else if (inPile && zn === "gy") gyMenu(e.clientX, e.clientY); else if (inPile && zn === "ex") exMenu(e.clientX, e.clientY); else cardMenu(ce.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#libPile")) { e.preventDefault(); libMenu(e.clientX, e.clientY); return; }
+  if (e.target.closest?.("#gyPile")) { e.preventDefault(); gyMenu(e.clientX, e.clientY); return; }
+  if (e.target.closest?.("#exPile")) { e.preventDefault(); exMenu(e.clientX, e.clientY); return; }
   const oc = e.target.closest?.(".opp .card");
   if (oc && oc.dataset.iid) { e.preventDefault(); theirCardMenu(+oc.closest(".opp").dataset.seat, oc.dataset.iid, e.clientX, e.clientY); return; }
   if (e.target.closest?.("#bf")) { e.preventDefault(); openMenu(e.clientX, e.clientY, [{ label:"Untap all (U)", fn:untapAll }, { label:"Create a token...", fn:tokenDialog }]); }
@@ -2261,8 +2279,66 @@ function libMenu(x, y){
     { label:"Mill...", fn:() => askNumber("Mill how many?", 1, v => { const k = Math.min(v, me.zones.lib.length); for (let i = 0; i < k; i++) move(me.zones.lib[0].iid, "gy", { quiet:true }); say(`milled ${k} card${k === 1 ? "" : "s"}.`); }) },
     { label:"Search your library...", fn:searchLib }, "-",
     { label:"Reveal the top card", fn:() => me.zones.lib[0] && reveal([me.zones.lib[0]], "the top of their library") },
+    { label:"Reveal the top cards...", fn:() => askNumber("Reveal how many?", 3, v => reveal(me.zones.lib.slice(0, v), "the top of their library")) },
+    { label:"Reveal cards until... (cascade and the like)", fn:revealUntil }, "-",
+    { label:"Play or cast the top card", fn:() => me.zones.lib[0] && castSpell(me.zones.lib[0].iid) },
+    { label:"Play the top card face down", fn:() => me.zones.lib[0] && move(me.zones.lib[0].iid, "bf", { fd:true }) },
     { label:"Exile the top card", fn:() => me.zones.lib[0] && move(me.zones.lib[0].iid, "ex") },
-    { label:"Play the top card face down", fn:() => me.zones.lib[0] && move(me.zones.lib[0].iid, "bf", { fd:true }) }]);
+    { label:"Exile the top card face down", fn:() => { const c = me.zones.lib[0]; if (!c) return; move(c.iid, "ex", { quiet:true }); c.fd = true; say("exiled the top card of their library face down."); changed(); } },
+    { label:"Exile the top cards...", fn:() => askNumber("Exile how many?", 2, v => { const k = Math.min(v, me.zones.lib.length); for (let i = 0; i < k; i++) move(me.zones.lib[0].iid, "ex", { quiet:true }); say(`exiled the top ${k} card${k === 1 ? "" : "s"} of their library.`); }) },
+    { label:"Put the top card on the bottom", fn:() => { if (me.zones.lib.length < 2) return; me.zones.lib.push(me.zones.lib.shift()); say("put the top card of their library on the bottom."); changed(); } }, "-",
+    { label:me.topRevealed ? "Stop playing with the top card revealed" : "Play with the top card revealed (everyone sees it)", fn:() => { me.topRevealed = !me.topRevealed; say(me.topRevealed ? "is playing with the top card of their library revealed." : "stopped revealing the top card of their library."); changed(); } },
+    { label:me.topPeek ? "Stop looking at the top card" : "Look at the top card any time (only you)", fn:() => { me.topPeek = !me.topPeek; changed(); } },
+    { label:"Shuffle your hand into your library", fn:() => { const n = me.zones.hand.length; for (const c of [...me.zones.hand]) move(c.iid, "lib", { quiet:true }); shuffle(me.zones.lib); say(`shuffled their hand (${n} card${n === 1 ? "" : "s"}) into their library.`); changed(); } },
+    { label:"Shuffle your graveyard into your library", fn:shuffleGyIn }]);
+}
+function shuffleGyIn(){ const n = me.zones.gy.length; for (const c of [...me.zones.gy]) move(c.iid, "lib", { quiet:true }); shuffle(me.zones.lib); say(`shuffled their graveyard (${n} card${n === 1 ? "" : "s"}) into their library.`); changed(); }
+// Your graveyard and exile, right-clicked
+function gyMenu(x, y){
+  const n = me.zones.gy.length;
+  openMenu(x, y, [{ head:`Graveyard (${n})` }, { label:"See it (cast, return, reanimate...)", fn:() => viewZone("Your graveyard", me.zones.gy, "gy") },
+    { label:"Exile cards from it (delve, escape)...", fn:() => askNumber("Exile how many?", 1, v => pickCards(me.zones.gy, v, "Exile which?", "Exile", cs => { for (const c of cs) move(c.iid, "ex", { quiet:true }); say(`exiled ${cs.map(nameOf).join(", ")} from their graveyard.`); })) },
+    { label:"Exile your whole graveyard", fn:() => { for (const c of [...me.zones.gy]) move(c.iid, "ex", { quiet:true }); say(`exiled their graveyard (${n} card${n === 1 ? "" : "s"}).`); changed(); } },
+    { label:"Shuffle it into your library", fn:shuffleGyIn },
+    { label:"Return a card at random to your hand", fn:() => { const c = me.zones.gy[rnd(n) - 1]; if (c) move(c.iid, "hand"); } }]);
+}
+function exMenu(x, y){
+  openMenu(x, y, [{ head:`Exile (${me.zones.ex.length})` }, { label:"See it (cast, play, time counters...)", fn:() => viewZone("Your exile", me.zones.ex, "ex") },
+    { label:"Put all of it into your graveyard", fn:() => { for (const c of [...me.zones.ex]) move(c.iid, "gy", { quiet:true }); say("put their exiled cards into their graveyard."); changed(); } }]);
+}
+/* Reveal cards from the top of your library until one matches (cascade, Hermit Druid, Polymorph...): the one found can
+   be cast, put onto the battlefield or into your hand; the rest go to the bottom in a random order, the graveyard or exile */
+function revealUntil(){
+  const TESTS = { nonland:["a nonland card", k => !isLand(k)], creature:["a creature card", k => /\bCreature\b/.test(typeOf(k))], land:["a land card", k => isLand(k)],
+    spell:["an instant or sorcery card", k => /\b(Instant|Sorcery)\b/.test(typeOf(k))], artifact:["an artifact card", k => /\bArtifact\b/.test(typeOf(k))],
+    cascade:["a nonland card with lower mana value (cascade)", null] };
+  const kind = el("select", { ariaLabel:"Until" }, ...Object.entries(TESTS).map(([v, [t]]) => el("option", { value:v, textContent:t })));
+  const mv = el("input", { type:"number", min:0, max:20, value:4, ariaLabel:"Mana value of the cascading spell", className:"hidden" });
+  const mvLbl = el("span", { className:"hint hidden", textContent:"less than" });
+  kind.onchange = () => { mv.classList.toggle("hidden", kind.value !== "cascade"); mvLbl.classList.toggle("hidden", kind.value !== "cascade"); };
+  openModal("Reveal cards until you reveal...", el("div", { className:"row" }, kind, mvLbl, mv), [{ label:"Cancel" }, { label:"Reveal", primary:true, fn:() => {
+    const lim = clamp(Math.round(+mv.value || 0), 0, 99);
+    const test = kind.value === "cascade" ? k => !isLand(k) && (+k?.cmc || 0) < lim : TESTS[kind.value][1];
+    const lib = me.zones.lib, i = lib.findIndex(c => test(cardOf(c)));
+    const shown = i < 0 ? lib.slice() : lib.slice(0, i + 1), hit = i < 0 ? null : lib[i], rest = shown.filter(c => c !== hit);
+    if (!shown.length) { toast("Your library is empty."); return; }
+    reveal(shown, "the top of their library");
+    const where = el("select", { ariaLabel:"The rest go" }, el("option", { value:"bottom", textContent:"on the bottom of your library, in a random order" }),
+      el("option", { value:"gy", textContent:"into your graveyard" }), el("option", { value:"ex", textContent:"into exile" }));
+    const restGo = () => {
+      if (where.value === "bottom") { for (const c of shuffle(rest.slice())) { move(c.iid, "lib", { quiet:true, bottom:true }); } }
+      else for (const c of rest) move(c.iid, where.value, { quiet:true });
+      if (rest.length) say(`put the other ${rest.length} revealed card${rest.length === 1 ? "" : "s"} ${where.value === "bottom" ? "on the bottom of their library in a random order" : where.value === "gy" ? "into their graveyard" : "into exile"}.`);
+      changed();
+    };
+    const body = el("div", {}, el("p", { className:"hint", textContent:hit ? `Found ${nameOf(hit)}.` : "No card matched: every card was revealed." }),
+      cardGrid(shown, null), el("div", { className:"row" }, el("span", { textContent:"The rest go " }), where));
+    openModal(hit ? `Revealed ${shown.length}: ${nameOf(hit)}` : `Revealed ${shown.length}`, body, hit ? [
+      { label:"Leave it with the rest", fn:() => { rest.push(hit); restGo(); } },
+      { label:"Put it into your hand", fn:() => { move(hit.iid, "hand", { quiet:true }); say(`put ${nameOf(hit)} into their hand.`); restGo(); } },
+      { label:"Put it onto the battlefield", fn:() => { move(hit.iid, "bf"); restGo(); } },
+      { label:"Cast it", primary:true, fn:() => { restGo(); castSpell(hit.iid); } }] : [{ label:"OK", primary:true, fn:restGo }], { wide:true });
+  } }]);
 }
 function related(k){ return (k?.all_parts || []).filter(p => p.component === "token" || (p.component === "combo_piece" && /Emblem|Token/.test(p.type_line || ""))); }
 
@@ -2416,14 +2492,28 @@ $("#desigBtn").onclick = e => {
 $("#dayChip").onclick = () => { if (me.watch) return; const d = table.day === "day" ? "night" : "day"; changeTable({ day:d }); say(`made it ${d}.`); };
 const desigBadges = s => [table.monarch === s ? el("span", { className:"badge", title:"The monarch: draws a card at the end of their turn", textContent:"👑 Monarch" }) : null,
   table.initiative === s ? el("span", { className:"badge", title:"Has the initiative: ventures into the Undercity each upkeep", textContent:"🗝 Initiative" }) : null].filter(Boolean);
-function viewZone(title, list, zone){
+function viewZone(title, list, zone, seat = 0){
   if (!list.length) { toast("Nothing there."); return; }
   const mine = !!zone;
-  const acts = mine ? () => [["Hand", c => { move(c.iid, "hand"); refresh(); }], ["Battlefield", c => { move(c.iid, "bf"); refresh(); }],
+  const spell = c => !isPermanent(cardOf(c));
+  const acts = mine ? c => [
+    ...(zone === "gy" ? (spell(c) ? [["Cast (flashback: then exile)", c => { c.afterCast = "ex"; closeModal(); castSpell(c.iid); }], ["Cast (escape...)", c => { closeModal(); castSpell(c.iid); }]]
+      : [["Cast (escape, unearth...)", c => { closeModal(); castSpell(c.iid); }]]) : []),
+    ...(zone === "ex" ? [["Cast or play it", c => { closeModal(); castSpell(c.iid); }], [c.fd ? "Turn face up" : "Turn face down", c => { c.fd = !c.fd; say(c.fd ? "turned an exiled card face down." : `turned ${nameOf(c)} face up in exile.`); changed(); refresh(); }],
+      [`Time counter + (${c.ctr?.time || 0})`, c => { c.ctr = { ...c.ctr, time:(c.ctr?.time || 0) + 1 }; changed(); refresh(); }],
+      ...(c.ctr?.time ? [["Time counter −", c => { c.ctr.time--; if (!c.ctr.time) delete c.ctr.time; say(`removed a time counter from ${nameOf(c)} (${c.ctr.time || 0} left).`); changed(); refresh(); }]] : [])] : []),
+    ["Hand", c => { move(c.iid, "hand"); refresh(); }], ["Battlefield", c => { move(c.iid, "bf"); refresh(); }],
     ...(zone !== "gy" ? [["Graveyard", c => { move(c.iid, "gy"); refresh(); }]] : []), ...(zone !== "ex" ? [["Exile", c => { move(c.iid, "ex"); refresh(); }]] : []),
-    ["Library top", c => { move(c.iid, "lib"); refresh(); }]] : null;
+    ["Library top", c => { move(c.iid, "lib"); refresh(); }], ["Library bottom", c => { move(c.iid, "lib", { bottom:true }); refresh(); }]]
+    // (another player's graveyard or exile: exile a card from it, reanimate it onto your battlefield, or return it)
+    : seat && !me.watch ? c => {
+      const whose = `${nm(seat)}'s ${c.name}`, act = (a, t) => () => { sendAct(seat, c, a, {}, t); closeModal(); };
+      return [...(title.includes("graveyard") ? [["Exile it", act("ex", `exiled ${whose} from their graveyard.`)]] : [["Into their graveyard", act("gy", `put ${whose} into their graveyard.`)]]),
+        ["Onto my battlefield", act("steal", `put ${whose} onto their own battlefield.`)], ["Into their hand", act("hand", `put ${whose} into its owner's hand.`)]];
+    } : null;
   function refresh(){ if (me.zones[zone].length) viewZone(title, me.zones[zone], zone); else closeModal(); }
-  openModal(`${title} (${list.length})`, cardGrid([...list].reverse(), acts));
+  const extra = seat && !mine && !me.watch && title.includes("graveyard") ? [{ label:"Exile their whole graveyard", fn:() => { send(conns[seat], { type:"act", act:"exileGy" }); say(`exiled ${nm(seat)}'s graveyard.`); } }] : [];
+  openModal(`${title} (${list.length})`, cardGrid([...list].reverse(), acts), [...extra, { label:"Close" }], { wide:true });
 }
 function lookTop(n, mode){
   const top = me.zones.lib.slice(0, Math.min(n, me.zones.lib.length)); if (!top.length) return;
