@@ -296,3 +296,57 @@ test("digital table: game and turn clocks, turn counts, a turn time limit, your 
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: combat helpers (by hand): exert, goad, attack someone else, ninjutsu, Fog, extra combat", async () => {
+  test.setTimeout(120000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
+  if (await ktp(a, () => ktPlay.table.turnSeat) !== 1) { await b.click("#nextTurn"); await keepHand(b); await expect.poll(() => ktp(a, () => ktPlay.table.turnSeat)).toBe(1); }
+  const fetch = page => ktp(page, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
+  const g1 = await fetch(a), g2 = await fetch(a);
+  await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "hand"); });
+  const card = (page, iid) => page.locator(`#bf .card[data-iid="${iid}"]`);
+  const menu = async (page, loc, item) => { await loc.click({ button:"right" }); await page.getByRole("menuitem", { name:item, exact:true }).click(); };
+
+  // Attack, then exert the attacker: Rick sees the marker
+  await menu(a, card(a, g1), "Attack Rick");
+  await menu(a, card(a, g1), "Exert it (it won't untap next time)");
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${g1}"] .marks`)).toHaveText("Exerted");
+  // Rick goads Luke's other creature
+  await menu(b, opp(b, "Luke").locator(`.card[data-iid="${g2}"]`), "Goad it (it attacks each combat if able, and not you)");
+  await expect(card(a, g2).locator(".marks")).toHaveText("Goaded");
+  // A creature put into the attack (it entered tapped and attacking)
+  await a.click("#combatBtn"); await a.getByRole("menuitem", { name:"Put a creature into the attack (it entered tapped and attacking)...", exact:true }).click();
+  await a.locator(".modal .gcard", { has:a.locator(`.card[data-iid="${g2}"]`) }).getByRole("button", { name:"Pick" }).click(); await button(a, "Done");
+  await expect.poll(() => ktp(a, g => { const c = ktPlay.me.zones.bf.find(c => c.iid === g); return [c.atk, c.tapped]; }, g2)).toEqual([2, true]);
+  // Ninjutsu: an unblocked attacker back to hand, a card from hand in tapped and attacking
+  await a.click("#combatBtn"); await a.getByRole("menuitem", { name:"Ninjutsu (return an unblocked attacker, put a card from your hand in attacking)...", exact:true }).click();
+  await a.locator(".modal .gcard", { has:a.locator(`.card[data-iid="${g1}"]`) }).getByRole("button", { name:"Return" }).click(); await button(a, "Done");
+  await a.locator(".modal .gcard").first().getByRole("button", { name:"Ninjutsu" }).click(); await button(a, "Done");
+  await expect(a.locator("#log")).toContainText("You used ninjutsu: returned Gamma Card to their hand and put Gamma Card onto the battlefield tapped and attacking Rick.");
+  expect(await ktp(a, g => ktPlay.me.zones.hand.some(c => c.iid === g), g1)).toBe(true);
+  // A Fog: Rick takes no combat damage this turn
+  await a.click("#combatBtn"); await a.getByRole("menuitem", { name:"Fog: prevent all combat damage this turn", exact:true }).click();
+  const life = await ktp(b, () => ktPlay.me.life);
+  await a.click("#dmgBtn");
+  await expect(b.locator(".modal-card h2")).toBeVisible();
+  await b.locator(".modal").getByRole("button", { name:/^Take/ }).first().click();
+  await b.waitForTimeout(500);
+  expect(await ktp(b, () => ktPlay.me.life)).toBe(life);
+  // An extra combat: the attackers untap and can attack again
+  await a.click("#combatBtn"); await a.getByRole("menuitem", { name:"Extra combat: untap the creatures that attacked and attack again", exact:true }).click();
+  expect(await ktp(a, () => ktPlay.me.zones.bf.filter(c => c.atk).length)).toBe(0);
+  await expect(a.locator("#log")).toContainText("You got an additional combat phase");
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});

@@ -133,6 +133,8 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile.empty{cursor:default;opacity:.6}
 .opile .card{--w:60px}
 .pile .card.peek{outline:2px solid var(--brass)}
+.card .marks{position:absolute;left:2px;right:2px;top:22%;display:flex;flex-direction:column;gap:2px;align-items:center;pointer-events:none}
+.card .marks span{font-size:9px;font-weight:700;background:rgba(224,118,92,.92);color:#fff;border-radius:4px;padding:0 4px;white-space:nowrap}
 .card.landstack{box-shadow:4px -4px 0 -1px #0d201d,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #0d201d,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
 .card.landstack .stackn{position:absolute;right:-6px;top:-10px;min-width:26px;padding:1px 6px;border-radius:999px;background:var(--brass);color:#1b1608;font:700 13px/1.4 var(--sans);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6);z-index:2}
 .card.landstack .stackup{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:600;background:rgba(0,0,0,.72);margin:0 4px;border-radius:5px;padding:1px 0}
@@ -412,6 +414,7 @@ details.term a{font-size:13px;color:var(--brass)}
         <button class="btn small hidden playonly" id="attackBtn">Attack</button>
         <button class="btn small hidden playonly" id="allInBtn" title="Every untapped creature you have attacks">Attack with all</button>
         <button class="btn small hidden playonly" id="dmgBtn" title="Ask the players you're attacking to block and take the damage">Combat damage</button>
+        <button class="btn small playonly" id="combatBtn" title="Combat helpers: add a creature to the attack, ninjutsu, exert, prevent damage, extra combats..." aria-haspopup="menu">Combat...</button>
         <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
         <span class="phases" id="phases" title="The steps of a turn">Untap · Upkeep · Draw · Main 1 · Combat · Main 2 · End</span>
       </span>
@@ -805,7 +808,7 @@ $("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown
 let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
-let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
+let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, fog:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1",
                    stackLands:store.get("kt-dig-stack", "1") === "1" };
@@ -1119,7 +1122,7 @@ function takeTable(t){
   const before = { ...table };
   table = { tv:+t.tv || 0, at:+t.at || 0, fmt:FORMATS[t.fmt] ? t.fmt : "cmdr", started:!!t.started, gameId:String(t.gameId || "").slice(0, 30), startAt:+t.startAt || 0,
             turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX),
-            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), turnAt:+t.turnAt || 0, round:clamp(+t.round || 0, 0, 9999), rules:cleanRules(t.rules) };
+            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), turnAt:+t.turnAt || 0, round:clamp(+t.round || 0, 0, 9999), fog:clamp(+t.fog || 0, 0, 99999), rules:cleanRules(t.rules) };
   afterTable(before);
 }
 function changeTable(patch){
@@ -1131,8 +1134,8 @@ function changeTable(patch){
 function afterTable(before){
   if (me?.watch) { render(); return; }
   // A turn ended: arrows, combat, and "until end of turn" power/toughness changes are over
-  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot))) {
-    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; } attackMode = 0; withoutUndo(changed);
+  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot || c.ctr?.[MARK.noDmg]))) {
+    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; if (c.ctr) delete c.ctr[MARK.noDmg]; } attackMode = 0; withoutUndo(changed);
   }
   if (!table.started && before.fmt !== table.fmt && me && FORMATS[table.fmt].cmdr && !FORMATS[before.fmt].cmdr && $("#modal").classList.contains("hidden")) setTimeout(askCommander, 300);
   if (!table.started && before.fmt !== table.fmt && me) {
@@ -1340,7 +1343,8 @@ function startMyTurn(){ withoutUndo(startMyTurn_); }
 function startMyTurn_(){
   if (me.out) { const to = nextSeat(mySeat); if (to !== mySeat) changeTable({ turnSeat:to, turnNum:table.turnNum + 1, phase:0 }); return; }  // (out of the game: skipped)
   me.turns++; me.lands = 0; for (const k of COLORS) me.mana[k] = 0;
-  if (settings.autoUntap) for (const c of me.zones.bf) c.tapped = false;
+  // (an exerted creature doesn't untap this time; goad lasts until the goading player's next turn, taken off by hand)
+  if (settings.autoUntap) for (const c of me.zones.bf) { if (c.ctr?.[MARK.exert]) delete c.ctr[MARK.exert]; else c.tapped = false; }
   if (settings.autoDraw) draw(1, true);
   say(`${settings.autoUntap ? "untapped" : "started their turn"}${settings.autoDraw ? " and drew a card" : ""} (turn ${table.turnNum}).`);
   if (table.initiative === mySeat) setTimeout(() => venture("has the initiative (upkeep)"), 50);
@@ -1613,6 +1617,51 @@ function takeAct_(from, a){
 /* =====================================================================
    Combat: attack (a button for several at once, or a creature's menu), block, and combat damage
    ===================================================================== */
+/* Small combat helpers, all by hand (the table doesn't decide anything): markers on a creature (exerted, goaded, deals
+   no combat damage), a Fog for everyone this turn, a creature put into the attack (it entered tapped and attacking),
+   ninjutsu, taking a creature out of combat, and an extra combat phase. */
+const MARK = { exert:"Exerted", goad:"Goaded", noDmg:"No combat damage" }, MARKS = new Set(Object.values(MARK));
+function toggleMark(c, k, verb){
+  c.ctr ||= {}; if (c.ctr[k]) { delete c.ctr[k]; say(`took the "${k}" marker off ${nameOf(c)}.`); } else { c.ctr[k] = 1; say(`${verb} ${nameOf(c)}.`); }
+  changed();
+}
+$("#combatBtn").onclick = e => {
+  const r = e.currentTarget.getBoundingClientRect(), myTurn = table.turnSeat === mySeat;
+  const mine = me.zones.bf.filter(c => isCreature(c)), attacking = mine.filter(c => c.atk);
+  const opps = presentSeats().filter(s => s !== mySeat && !isOut(s));
+  const pick = (list, title, fn) => list.length ? pickCards(list, 1, title, "Pick", cs => fn(cs[0])) : toast("No creatures for that.");
+  const items = [{ head:"Combat helpers" }];
+  if (myTurn) items.push(
+    { label:"Put a creature into the attack (it entered tapped and attacking)...", fn:() => pick(mine.filter(c => !c.atk), "Which creature is attacking?", c => {
+      const go = s => { c.atk = s; c.tapped = true; say(`put ${nameOf(c)} into the attack against ${nm(s)} (tapped and attacking).`); changed(); };
+      if (opps.length === 1) go(opps[0]); else setTimeout(() => pickPlayer("Attacking whom?", opps, go), 50); }) },
+    { label:"Ninjutsu (return an unblocked attacker, put a card from your hand in attacking)...", fn:ninjutsu },
+    { label:"Exert an attacker...", fn:() => pick(attacking, "Exert which attacker?", c => toggleMark(c, MARK.exert, "exerted")) },
+    { label:"Take a creature out of combat...", fn:() => pick(mine.filter(c => c.atk || c.blk), "Take which one out?", c => { c.atk = 0; c.blk = ""; say(`removed ${nameOf(c)} from combat.`); changed(); }) },
+    { label:"Extra combat: untap the creatures that attacked and attack again", fn:() => { for (const c of attacking) { c.tapped = false; c.atk = 0; delete c.atkTapped; } say(`got an additional combat phase (untapped ${attacking.length} attacker${attacking.length === 1 ? "" : "s"}).`); changed(); } },
+    { label:"End this combat (clear attackers and blockers)", fn:() => { for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; } attackMode = 0; say("ended combat."); changed(); } }, "-");
+  items.push(
+    { label:"A creature of mine deals no combat damage this turn...", fn:() => pick(mine, "Which creature?", c => toggleMark(c, MARK.noDmg, "prevented the combat damage of")) },
+    table.fog === table.turnNum ? { label:"Undo the Fog (combat damage happens again)", fn:() => { changeTable({ fog:0 }); say("undid the Fog."); } }
+      : { label:"Fog: prevent all combat damage this turn", fn:() => { changeTable({ fog:table.turnNum }); say("prevented all combat damage this turn (Fog)."); } },
+    { label:"Take the Exerted, Goaded and No combat damage markers off my creatures", fn:() => { for (const c of me.zones.bf) for (const k of MARKS) delete c.ctr?.[k]; say("cleared their combat markers."); changed(); } });
+  openMenu(r.left, r.bottom + 4, items);
+};
+// Ninjutsu: an unblocked attacker goes back to your hand, and a card from your hand comes in tapped and attacking the same player
+function ninjutsu(){
+  const unblocked = me.zones.bf.filter(c => c.atk && !Object.values(players).some(p => (p.bf || []).some(b => b.blk === c.iid)));
+  const hand = me.zones.hand.filter(c => isCreature(c));
+  if (!unblocked.length) { toast("No unblocked attackers."); return; }
+  if (!hand.length) { toast("No creature cards in your hand."); return; }
+  pickCards(unblocked, 1, "Return which unblocked attacker?", "Return", ([back]) => {
+    const seat = back.atk, x = back.x, y = back.y;
+    setTimeout(() => pickCards(hand, 1, "Put which card in attacking?", "Ninjutsu", ([ninja]) => {
+      move(back.iid, "hand", { quiet:true }); move(ninja.iid, "bf", { quiet:true, x, y });
+      const n = findCard(ninja.iid)?.c; if (n) { n.tapped = true; n.atk = seat; }
+      say(`used ninjutsu: returned ${nameOf(back)} to their hand and put ${nameOf(ninja)} onto the battlefield tapped and attacking ${nm(seat)}.`); changed();
+    }), 50);
+  });
+}
 let attackMode = 0;  // the player you're attacking while "Attack" is on: clicking your creatures toggles them
 const isCreature = c => c.fd || /\bCreature\b/.test(typeOf(cardOf(c), c.face || 0));
 const attackersAt = seat => Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === seat).map(c => ({ c, s:+s })));
@@ -1683,7 +1732,9 @@ function combatant(c, pt){
     }
   const short = name.split(",")[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const unblockable = new RegExp(`(^|\\n)(${short}|this creature) can't be blocked\\.`, "i").test(text);
-  return { c, name, ...pt, kw:kwOf(c), colors:c.fd ? [] : (f?.colors || k?.colors || []), prot, unblockable };
+  // (combat damage prevented: a Fog this turn, or this creature deals none)
+  const prevented = table.fog === table.turnNum || !!c.ctr?.[MARK.noDmg];
+  return { c, name, ...pt, ...(prevented ? { p:0 } : {}), kw:kwOf(c), colors:c.fd ? [] : (f?.colors || k?.colors || []), prot, unblockable };
 }
 const protects = (x, src) => !!x.prot && (x.prot.has("all") || x.prot.has("creatures") || (src.colors || []).some(col => x.prot.has(col)));
 // Why this creature can't block that attacker ("" if it can)
@@ -1912,7 +1963,9 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const img = c.fd ? "" : c.img || imgOf(cardOf(c), c.face, small ? "small" : "normal");
   if (img) e.append(el("img", { src:img, alt:c.name || nameOf(c), loading:"lazy", draggable:false }));
   else if (!c.fd) e.append(el("span", { className:"lbl", textContent:c.name || nameOf(c) }));
-  const cs = Object.entries(c.ctr || {}).filter(([, v]) => v);
+  const cs = Object.entries(c.ctr || {}).filter(([k, v]) => v && !MARKS.has(k));
+  const marks = Object.keys(c.ctr || {}).filter(k => MARKS.has(k) && c.ctr[k]);
+  if (marks.length) e.append(el("div", { className:"marks" }, ...marks.map(k => el("span", { textContent:k }))));
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
   // (another player's card carries its power/toughness as they see it; yours is worked out here)
@@ -1930,12 +1983,13 @@ let ctrlSeat = 0;  // (whose battlefield is being drawn, to mark cards owned by 
 // Battlefield cards, attachments first (tucked behind and above the card they're attached to, and moving with it)
 /* Basic lands of the same kind stack into one pile with a count, so they take the room of one card: shown untapped
    while any of them is, with how many are untapped. Click your stack to tap one (adding its mana); right-click to tap or
-   untap several, or all. A land with counters, attachments or in combat stays on its own. (Help turns stacking off.) */
-function landStacks(list){
+   untap several, or all. A land with counters, attachments, in combat, or owned by another player stays on its own. (Help turns stacking off.) */
+function landStacks(list, seat = ctrlSeat){
   const byIid = new Map(list.map(c => [c.iid, c])), groups = new Map();
   if (!settings.stackLands) return groups;
   for (const c of list) {
     if (c.fd || c.att || c.atk || c.blk || Object.keys(c.ctr || {}).length || list.some(x => x.att === c.iid)) continue;
+    const own = c.owner || c.own; if (own && own !== seat) continue;  // (another player's land stays on its own, marked as theirs)
     const name = c.name || nameOf(c);
     if (!/^(Snow-Covered )?(Plains|Island|Swamp|Mountain|Forest|Wastes)$/.test(name)) continue;
     if (!groups.has(name)) groups.set(name, []); groups.get(name).push(c);
@@ -1943,7 +1997,7 @@ function landStacks(list){
   for (const [k, v] of groups) if (v.length < 2) groups.delete(k);
   return groups;
 }
-const stackOf = name => landStacks(me.zones.bf).get(name) || [];
+const stackOf = name => landStacks(me.zones.bf, mySeat).get(name) || [];
 function drawBattlefield(box, list, opts){
   const byIid = new Map(list.map(c => [c.iid, c]));
   const hosted = c => c.att && byIid.has(c.att);
@@ -2334,6 +2388,12 @@ function cardMenu(iid, x, y){
   if (z === "bf") {
     items.push({ label:c.tapped ? "Untap" : "Tap", fn:() => toggleTap(c) });
     if (c.atk || c.blk) items.push({ label:"Remove from combat", fn:() => { c.atk = 0; c.blk = ""; say(`removed ${nameOf(c)} from combat.`); changed(); } });
+    if (c.atk) {
+      for (const s of presentSeats().filter(s => s !== mySeat && s !== c.atk && !isOut(s))) items.push({ label:`Attack ${nm(s)} instead`, fn:() => { c.atk = s; say(`sent ${nameOf(c)} to attack ${nm(s)} instead.`); changed(); } });
+      items.push({ label:c.ctr?.[MARK.exert] ? "Not exerted" : "Exert it (it won't untap next time)", fn:() => toggleMark(c, MARK.exert, "exerted") });
+    }
+    if (isCreature(c)) items.push({ label:c.ctr?.[MARK.noDmg] ? "It deals combat damage again" : "It deals no combat damage this turn", fn:() => toggleMark(c, MARK.noDmg, "prevented the combat damage of") });
+    if (c.ctr?.[MARK.goad]) items.push({ label:"Take off Goaded", fn:() => toggleMark(c, MARK.goad, "") });
     else if (isCreature(c)) {
       for (const s of presentSeats().filter(s => s !== mySeat)) items.push({ label:`Attack ${nm(s)}`, fn:() => toggleAttack(c, s) });
       const attackers = attackersAt(mySeat);
@@ -2376,7 +2436,8 @@ function theirCardMenu(seat, iid, x, y){
     { label:c.tapped ? "Untap it" : "Tap it", fn:act("tap", { v:!c.tapped }, `${c.tapped ? "untapped" : "tapped"} ${whose}.`) },
     { label:"Put a +1/+1 counter on it", fn:act("ctr", { name:"+1/+1", d:1 }, `put a +1/+1 counter on ${whose}.`) },
     { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) },
-    { label:"Change its power/toughness...", fn:() => ptDialog(whose, null, d => sendAct(seat, c, "pt", d, `gave ${whose} ${ptText(d)}.`)) }];
+    { label:"Change its power/toughness...", fn:() => ptDialog(whose, null, d => sendAct(seat, c, "pt", d, `gave ${whose} ${ptText(d)}.`)) },
+    ...(c.ctr?.[MARK.goad] ? [] : [{ label:"Goad it (it attacks each combat if able, and not you)", fn:act("ctr", { name:MARK.goad, d:1 }, `goaded ${whose}.`) }])];
   const cs = Object.keys(c.ctr || {}); for (const k of cs) items.push({ label:`Remove a ${k} counter`, fn:act("ctr", { name:k, d:-1 }, `removed a ${k} counter from ${whose}.`) });
   items.push("-",
     { label:"Destroy it (to the graveyard)", fn:act("gy", {}, `destroyed ${whose}.`) },
@@ -3176,6 +3237,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
+    el("p", { innerHTML:"<b>Combat...</b> has small helpers you use by hand: put a creature in attacking, ninjutsu, exert, take one out of combat, a Fog, an extra combat. Right-click a creature to exert it, send it at someone else, or goad another player's. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
