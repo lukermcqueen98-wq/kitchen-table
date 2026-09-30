@@ -350,3 +350,60 @@ test("digital table: combat helpers (by hand): exert, goad, attack someone else,
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: card names in the log and chat are links that pop the card up on hover and open it on click", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Beta Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  // Luke plays Gamma Card: on Rick's screen (Rick's deck has no Gamma Card) the log line links it
+  await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "hand"); ktPlay.move(c.iid, "bf"); });
+  const link = b.locator("#log li", { hasText:"Luke played Gamma Card" }).locator("a.clink", { hasText:"Gamma Card" });
+  await expect(link).toHaveCount(1);
+  await link.hover();
+  await expect(b.locator("#pop")).toBeVisible();
+  await expect(b.locator("#zoomText")).toContainText("Gamma Card");
+  await link.click();
+  await expect(b.locator(".modal-card h2")).toHaveText("Gamma Card");
+  await button(b, "Close");
+  // Chat too
+  await a.fill("#chatIn", "watch out for my Gamma Card"); await a.press("#chatIn", "Enter");
+  await expect(b.locator("#log li.chat a.clink", { hasText:"Gamma Card" })).toHaveCount(1);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
+
+test("digital table: playmats everyone sees, including players who sit down later", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  // Luke picks the Island mat before Rick arrives
+  await a.click("#matBtn"); await a.locator(".modal .matpick", { hasText:"Island" }).click();
+  await expect(a.locator("#bf")).toHaveClass(/mat/);
+  expect(await a.locator("#bf").evaluate(e => e.style.background)).toContain("gradient");
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(b, "Luke")).toBeVisible({ timeout:15000 });
+  await expect(opp(b, "Luke").locator(".obody")).toHaveClass(/mat/);
+  // A picture from a link
+  await a.click("#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://cards.scryfall.io/art_crop/0.png"); await button(a, "Use this picture");
+  await expect.poll(() => opp(b, "Luke").locator(".obody").evaluate(e => e.style.background)).toContain("cards.scryfall.io/art_crop/0.png");
+  await expect(b.locator("#log")).toContainText("Luke put down a new playmat.");
+  // ...and back to plain felt
+  await a.click("#matBtn"); await a.locator(".modal .matpick", { hasText:"Felt (plain)" }).click();
+  await expect(opp(b, "Luke").locator(".obody")).not.toHaveClass(/mat/);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
