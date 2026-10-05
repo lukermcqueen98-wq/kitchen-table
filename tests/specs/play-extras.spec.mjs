@@ -90,15 +90,10 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await menu(b, "Put a -1/-1 counter on it");
   await expect(pt).toHaveText("4/5");
 
-  // The monarch: Luke takes it; Rick deals combat damage to him and it moves to Rick
+  // The monarch: Luke takes it; Rick hits him (combat is by hand) and takes it from the Monarch... menu
   await a.click("#desigBtn"); await menu(a, "Become the monarch");
   await expect(opp(b, "Luke").locator(".badge")).toHaveText("👑 Monarch");
-  const wolf = await fetchTo(b, "Gamma Card", "bf");
-  await b.locator(`#bf .card[data-iid="${wolf}"]`).click({ button:"right" });
-  await menu(b, "Attack Luke");
-  await b.click("#dmgBtn");
-  await button(a, "Take 3 damage");
-  await expect(a.locator("#lifeOut")).toHaveText("22");
+  await b.click("#desigBtn"); await menu(b, "Become the monarch");
   await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
   await expect(opp(a, "Rick").locator(".badge")).toHaveText("👑 Monarch");
   // Day and night
