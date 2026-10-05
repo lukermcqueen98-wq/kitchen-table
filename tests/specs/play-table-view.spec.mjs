@@ -647,3 +647,40 @@ test("digital table: inspecting shows both sides of a two-sided card, and cards 
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and toughness", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
+  const card = a.locator(`#bf .card[data-iid="${gamma}"]`);
+  await expect(card.locator(".pt")).toHaveText("3/4");
+  // Luke: two +1/+0 counters and a -0/-1 counter: 3/4 becomes 5/3
+  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Counters...", exact:true }).click();
+  for (let i = 0; i < 2; i++) await a.locator(".modal").getByRole("button", { name:"+1/+0 plus" }).click();
+  await a.locator(".modal").getByRole("button", { name:"-0/-1 plus" }).click();
+  await button(a, "Done");
+  await expect(card.locator(".pt")).toHaveText("5/3");
+  await expect(card.locator(".ctrs span")).toHaveText(["+2/+0", "-0/-1"]);
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .pt`)).toHaveText("5/3");
+  // Rick puts a +0/+1 counter on it from his side: 5/4
+  await opp(b, "Luke").locator(`.card[data-iid="${gamma}"]`).click({ button:"right" });
+  await b.getByRole("menuitem", { name:"Other power/toughness counters...", exact:true }).click();
+  await b.getByRole("menuitem", { name:"Put a +0/+1 counter on it", exact:true }).click();
+  await expect(card.locator(".pt")).toHaveText("5/4");
+  // ...and a -1/-0: 4/4
+  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Counters...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"-1/-0 plus" }).click(); await button(a, "Done");
+  await expect(card.locator(".pt")).toHaveText("4/4");
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});

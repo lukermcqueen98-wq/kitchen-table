@@ -2144,11 +2144,18 @@ function copyCard(c){
 /* Power and toughness as they are now: the printed numbers (2/2 face down), +1/+1 and -1/-1 counters, and changes
    from effects ("mod": lasting, like an anthem; "eot": until end of turn, like Giant Growth). Null for a card with no
    power and toughness that nothing has changed. dir: 1 if it's bigger than printed, -1 if smaller. */
+// Power/toughness counters: +1/+1 and -1/-1, and the ones that change only one side (+1/+0, +0/+1, -1/-0, -0/-1)
+const PT_CTRS = { "+1/+1":[1, 1], "-1/-1":[-1, -1], "+1/+0":[1, 0], "+0/+1":[0, 1], "-1/-0":[-1, 0], "-0/-1":[0, -1] };
+function ptCounters(c){
+  let p = 0, t = 0;
+  for (const [k, [a, b]] of Object.entries(PT_CTRS)) { const v = c.ctr?.[k] || 0; p += a * v; t += b * v; }
+  return [p, t];
+}
 function ptOf(c){
   const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
   const bp = c.fd ? "2" : f?.power ?? k?.power, bt = c.fd ? "2" : f?.toughness ?? k?.toughness;
-  const n = (c.ctr?.["+1/+1"] || 0) - (c.ctr?.["-1/-1"] || 0);
-  const dp = n + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = n + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
+  const [np, nt] = ptCounters(c);
+  const dp = np + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = nt + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
   if (bp == null && !dp && !dt && !c.mod && !c.eot) return null;
   const p0 = parseInt(bp ?? 0, 10), t0 = parseInt(bt ?? 0, 10), sg = v => (v < 0 ? "" : "+") + v;
   if (isNaN(p0) || isNaN(t0)) return { p:(isNaN(p0) ? 0 : p0) + dp, t:(isNaN(t0) ? 0 : t0) + dt, str:`${bp}/${bt}${dp || dt ? ` ${sg(dp)}/${sg(dt)}` : ""}`, dir:Math.sign(dp + dt) };
@@ -2164,7 +2171,8 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const cs = Object.entries(c.ctr || {}).filter(([k, v]) => v && !MARKS.has(k));
   const marks = Object.keys(c.ctr || {}).filter(k => MARKS.has(k) && c.ctr[k]);
   if (marks.length) e.append(el("div", { className:"marks" }, ...marks.map(k => el("span", { textContent:k }))));
-  if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
+  // (a power/toughness counter shows as what it adds up to: three +1/+0 counters read "+3/+0")
+  if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:PT_CTRS[k] && v > 0 ? k.replace(/1/g, v) : `${v} ${k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
   const kwl = cleanKw(c.kw);
   if (kwl.length) e.append(el("div", { className:"kwtags", title:kwl.map(x => x.n + (x.eot ? " (until end of turn)" : "")).join(", ") },
@@ -2645,6 +2653,8 @@ function theirCardMenu(seat, iid, x, y){
     { label:c.tapped ? "Untap it" : "Tap it", fn:act("tap", { v:!c.tapped }, `${c.tapped ? "untapped" : "tapped"} ${whose}.`) },
     { label:"Put a +1/+1 counter on it", fn:act("ctr", { name:"+1/+1", d:1 }, `put a +1/+1 counter on ${whose}.`) },
     { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) },
+    { label:"Other power/toughness counters...", fn:() => openMenu(x, y, [{ head:`Put a counter on ${whose}` },
+      ...["+1/+0", "+0/+1", "-1/-0", "-0/-1"].map(k => ({ label:`Put a ${k} counter on it`, fn:act("ctr", { name:k, d:1 }, `put a ${k} counter on ${whose}.`) }))]) },
     { label:"Change its power/toughness...", fn:() => ptDialog(whose, null, d => sendAct(seat, c, "pt", d, `gave ${whose} ${ptText(d)}.`)) },
     { label:"Key terms (flying, haste...)...", fn:() => kwDialog(c, (n, eot, add) => sendAct(seat, c, "kw", { n, eot, add }, `${add ? "gave" : "took"} ${n}${add && eot ? " (until end of turn)" : ""} ${add ? "to" : "from"} ${whose}.`)) },
     ...(c.ctr?.[MARK.goad] ? [] : [{ label:"Goad it (it attacks each combat if able, and not you)", fn:act("ctr", { name:MARK.goad, d:1 }, `goaded ${whose}.`) }])];
@@ -3031,7 +3041,7 @@ function ptDialog(title, c, done){
   openModal(`Power/toughness: ${title}`, body, btns);
 }
 function counterDialog(c){
-  const types = ["+1/+1", "-1/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
+  const types = ["+1/+1", "-1/-1", "+1/+0", "+0/+1", "-1/-0", "-0/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
   const body = el("div");
   const draw_ = () => {
     body.innerHTML = "";
