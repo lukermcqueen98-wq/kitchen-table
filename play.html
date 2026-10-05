@@ -123,7 +123,18 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .olife{font:700 22px/1 var(--serif);margin-left:auto}
 .ocount{color:var(--muted);font-size:12px;cursor:default}
 .ocount.link{cursor:pointer;text-decoration:underline dotted}
-.obody{flex:1;display:flex;min-height:0}
+.obody{flex:1;display:flex;min-height:0;position:relative;isolation:isolate}
+#bf{isolation:isolate}  /* (the playmat picture sits behind everything on it) */
+.matlayer{position:absolute;inset:0;z-index:-50;overflow:hidden;pointer-events:none;border-radius:inherit}
+.matlayer img{width:100%;height:100%;object-fit:cover;display:block}
+.matlayer::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,var(--dim,.25))}
+.matprev{position:relative;isolation:isolate;border:1px solid var(--felt-edge);border-radius:10px;overflow:hidden;background:var(--felt-deep);max-width:640px;margin:0 auto}
+.matprev.big{aspect-ratio:16/7;cursor:grab;touch-action:none}
+.matprev.big:active{cursor:grabbing}
+.matprev.strip{aspect-ratio:16/3.2}
+.matprev .matlayer{z-index:0}
+.matctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:10px}
+.matctl label{display:flex;gap:6px;align-items:center}
 .ocz{display:flex;flex-direction:column;gap:4px;padding:4px;border-right:1px solid var(--felt-edge)}
 .obf{flex:1;position:relative;min-height:0}
 .matgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
@@ -137,6 +148,9 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile.empty{cursor:default;opacity:.6}
 .opile .card{--w:60px}
 .pile .card.peek{outline:2px solid var(--brass)}
+.card .manatags{position:absolute;left:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;max-width:calc(100% - 6px);z-index:2}
+.card .manatags .mtag{width:16px;height:16px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.7);cursor:pointer;pointer-events:auto}  /* (card pictures ignore the pointer so cards drag; these are clickable) */
+.card.mine .manatags .mtag:hover{transform:scale(1.25)}
 .card .marks{position:absolute;left:2px;right:2px;top:22%;display:flex;flex-direction:column;gap:2px;align-items:center;pointer-events:none}
 .card .marks span{font-size:9px;font-weight:700;background:rgba(224,118,92,.92);color:#fff;border-radius:4px;padding:0 4px;white-space:nowrap}
 .card.landstack{box-shadow:4px -4px 0 -1px #0d201d,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #0d201d,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
@@ -839,7 +853,7 @@ function pubCard(c, onBf = false){
   if (c.fd) return { ...ptInfo, iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
   const k = cardOf(c);
   return { ...ptInfo, iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
-           own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
+           own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0, ...(c.mana?.length ? { mana:c.mana } : {}) };
 }
 function pub(){
   const z = me.zones;
@@ -1057,7 +1071,7 @@ function cleanPub(st){
     iid:String(c.iid || "").slice(0, 20), id:typeof c.id === "string" ? c.id.slice(0, 40) : "", name:String(c.name || "").slice(0, 150),
     img:typeof c.img === "string" && /^https:\/\/cards\.scryfall\.io\//.test(c.img) ? c.img : "", x:+c.x || 0, y:+c.y || 0, tapped:!!c.tapped,
     fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), own:clamp(+c.own || 0, 0, MAX), att:String(c.att || "").slice(0, 20),
-    atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0,
+    atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [],
     ...(typeof c.pt === "string" ? { pt:c.pt.slice(0, 16), ptDir:clamp(Math.sign(+c.ptDir || 0), -1, 1) } : {}), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
   } : null).filter(Boolean);
   const num = (v, a, b) => clamp(Math.round(+v || 0), a, b);
@@ -1533,7 +1547,7 @@ function move(iid, to, opt = {}){
   }
   me.zones[from].splice(f.i, 1);
   if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); }
-  if (to !== "bf") { c.tapped = false; c.ctr = {}; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; if (to !== "lib") c.fd = false; }
+  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; if (to !== "lib") c.fd = false; }
   if (to === "st") c.at = Date.now();
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
@@ -1569,11 +1583,11 @@ function detachFrom(host){
   for (const a of me.zones.bf.filter(x => x.att === host.iid)) { a.att = null; a.x = clamp(host.x + 0.02, 0, 0.94); a.y = clamp(host.y - 0.04, 0, 0.86); }
   me.arrows = (me.arrows || []).filter(a => a.from !== host.iid && a.card !== host.iid);
 }
-const wireCard = c => ({ iid:c.iid, id:c.id, face:c.face || 0, tapped:!!c.tapped, fd:!!c.fd, ctr:c.ctr || {}, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0, owner:c.owner || mySeat });
+const wireCard = c => ({ iid:c.iid, id:c.id, face:c.face || 0, tapped:!!c.tapped, fd:!!c.fd, ctr:c.ctr || {}, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0, owner:c.owner || mySeat, mana:c.mana || [] });
 function cleanWire(c){
   if (!c || typeof c !== "object" || typeof c.id !== "string" || !/^[0-9a-f-]{36}$/.test(c.id)) return null;
   return { iid:String(c.iid || uid()).slice(0, 20), id:c.id, face:c.face ? 1 : 0, tapped:!!c.tapped, fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99),
-           owner:clamp(+c.owner || 0, 0, MAX), x:0, y:0,
+           owner:clamp(+c.owner || 0, 0, MAX), x:0, y:0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [],
            ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, 0, 999)])) : {} };
 }
 /* Control: give one of your battlefield cards to another player (stealing, "gain control"), and take cards given to you */
@@ -1905,17 +1919,40 @@ function sendAct(seat, card, act, extra = {}, text = ""){
 }
 function toggleTap(c, want){
   c.tapped = want ?? !c.tapped;
-  // Tapping a land (or anything with one kind of mana) adds that mana to your pool
+  // Tapping a land that makes one kind of mana adds it to your pool (one that makes several just taps: add the mana
+  // you chose with the mana buttons, or click one of the mana symbols put on the card)
   if (c.tapped && settings.autoMana && !c.fd) {
     const pm = cardOf(c)?.produced_mana || [];
     if (pm.length === 1 && COLORS.includes(pm[0]) && isLand(cardOf(c))) { me.mana[pm[0]]++; }
-    else if (pm.length > 1 && isLand(cardOf(c))) pickMana(pm.filter(x => COLORS.includes(x)));
   }
   changed();
 }
-function pickMana(list){
-  if (!list.length) return;
-  openMenu(lastPointer.x, lastPointer.y, [{ head:"Add which mana?" }, ...list.map(m => ({ label:`Add ${m}`, fn:() => { me.mana[m]++; changed(); } }))]);
+/* Mana symbols on a card: a reminder of the mana it can make (a dual land, a mana rock, a creature that taps for
+   mana), shown on the card for everyone. Clicking one on your own card taps the card and adds that mana. */
+function manaDialog(c){
+  c.mana = (c.mana || []).filter(k => COLORS.includes(k));
+  const body = el("div"), made = (cardOf(c)?.produced_mana || []).filter(k => COLORS.includes(k));
+  const draw_ = () => {
+    body.innerHTML = "";
+    body.append(el("p", { className:"hint", textContent:"Pick the mana this card can make. The symbols show on the card for everyone; click one on the table to tap the card and add that mana." }));
+    const row = el("div", { className:"row", style:"flex-wrap:wrap;gap:6px" });
+    for (const k of COLORS) {
+      const on = c.mana.includes(k), b = el("button", { type:"button", className:"btn small manapick" + (on ? " primary" : ""), ariaLabel:`${k} mana`, ariaPressed:String(on) },
+        el("img", { src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:"", style:"width:18px;height:18px;vertical-align:-4px" }), ` ${MANA_NAME[k]}`);
+      b.onclick = () => { c.mana = on ? c.mana.filter(x => x !== k) : COLORS.filter(x => x === k || c.mana.includes(x)); changed(); draw_(); };
+      row.append(b);
+    }
+    body.append(row);
+    if (made.length && made.join() !== c.mana.join()) { const u = el("button", { className:"btn small", style:"margin-top:8px", textContent:`Use what it makes (${made.join(", ")})` }); u.onclick = () => { c.mana = COLORS.filter(k => made.includes(k)); changed(); draw_(); }; body.append(u); }
+  };
+  draw_();
+  openModal(`Mana symbols on ${nameOf(c)}`, body, [{ label:"Clear", fn:() => { c.mana = []; changed(); } }, { label:"Done", primary:true, fn:() => { if (c.mana.length) say(`marked ${nameOf(c)} as making ${c.mana.map(k => MANA_NAME[k]).join(", ")} mana.`); } }]);
+}
+const MANA_NAME = { W:"white", U:"blue", B:"black", R:"red", G:"green", C:"colorless" };
+function manaFromTag(c, k){
+  if (!COLORS.includes(k)) return;
+  me.mana[k]++; if (!c.tapped) c.tapped = true;
+  changed();
 }
 function tapFromStack(name, n){
   const g = stackOf(name), up = g.filter(c => !c.tapped).slice(0, n);
@@ -1976,6 +2013,9 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   if (marks.length) e.append(el("div", { className:"marks" }, ...marks.map(k => el("span", { textContent:k }))));
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
+  const mt = (c.mana || []).filter(k => COLORS.includes(k));
+  if (mt.length && !c.fd) e.append(el("div", { className:"manatags", title:`Can make ${mt.map(k => MANA_NAME[k]).join(", ")} mana${mine ? " (click one to tap it for that mana)" : ""}` },
+    ...mt.map(k => { const t = el("img", { className:"mtag", src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:k }); t.dataset.mana = k; return t; })));
   // (another player's card carries its power/toughness as they see it; yours is worked out here)
   const pt = typeof c.pt === "string" ? (c.pt ? { str:c.pt, dir:c.ptDir || 0 } : null) : zone === "bf" ? showPt(c) : null;
   if (pt) e.append(el("span", { className:"pt" + (pt.dir > 0 ? " up" : pt.dir < 0 ? " down" : ""), title:"Power/toughness now", textContent:pt.str }));
@@ -1996,7 +2036,7 @@ function landStacks(list, seat = ctrlSeat){
   const byIid = new Map(list.map(c => [c.iid, c])), groups = new Map();
   if (!settings.stackLands) return groups;
   for (const c of list) {
-    if (c.fd || c.att || c.atk || c.blk || Object.keys(c.ctr || {}).length || list.some(x => x.att === c.iid)) continue;
+    if (c.fd || c.att || c.atk || c.blk || Object.keys(c.ctr || {}).length || c.mana?.length || list.some(x => x.att === c.iid)) continue;
     const own = c.owner || c.own; if (own && own !== seat) continue;  // (another player's land stays on its own, marked as theirs)
     const name = c.name || nameOf(c);
     if (!/^(Snow-Covered )?(Plains|Island|Swamp|Mountain|Forest|Wastes)$/.test(name)) continue;
@@ -2291,6 +2331,8 @@ document.addEventListener("pointerup", e => {
   const d = drag; drag = null;
   document.querySelectorAll(".drop").forEach(x => x.classList.remove("drop"));
   d.ghost?.remove(); d.el.classList.remove("dragging");
+  const tag = !d.moved && d.zone === "bf" && e.target.closest?.(".mtag");
+  if (tag && !attackMode) { const f = findCard(d.iid); if (f) manaFromTag(f.c, tag.dataset.mana); return; }
   if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) tapFromStack(d.el.dataset.stack, 1); else clickCard(d.iid, d.zone, e); return; }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
@@ -2417,7 +2459,7 @@ function cardMenu(iid, x, y){
     }
     if (faces(k)) items.push({ label:"Transform (flip to the other face)", fn:() => { c.face = c.face ? 0 : 1; say(`transformed ${nameOf(c)}.`); changed(); } });
     items.push({ label:c.fd ? "Turn face up" : "Turn face down", fn:() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); } });
-    items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Power/toughness...", fn:() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }) },
+    items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Mana symbols (what it can make)...", fn:() => manaDialog(c) }, { label:"Power/toughness...", fn:() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }) },
       { label:"Create a token copy", fn:() => copyCard(c) });
     const rel = related(k); if (rel.length) items.push({ label:`Create its token${rel.length > 1 ? "s" : ""}...`, fn:() => tokenDialog(rel) });
     items.push("-", { label:"Target with an arrow...", fn:() => startTargeting("arrow", iid) },
@@ -3257,7 +3299,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
-    s("autoMana", "Tapping a land adds its mana to my mana pool"),
+    s("autoMana", "Tapping a land that makes one color adds that mana to my mana pool"),
     s("hoverPop", "Enlarge a card when I point at it"),
     s("stackLands", "Stack basic lands of the same kind (click a stack to tap one, right-click for more)"),
     s("sounds", "Sounds: my turn, being attacked, being targeted, and chat"),
@@ -3302,24 +3344,77 @@ const MATS = {
   wood:{ name:"Wood", css:"repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,transparent 2px 38px),repeating-linear-gradient(90deg,rgba(255,220,170,.05) 0 1px,transparent 1px 13px),linear-gradient(180deg,#5a3a22,#3a2414)" },
   parchment:{ name:"Parchment", css:"radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(80,50,20,.45)),linear-gradient(170deg,#8a7650,#5b4c30)" }
 };
-const mats = {};  // seat -> { kind:"preset", v } or { kind:"img", v } (https link or small data: picture)
+const mats = {};  // seat -> { kind:"preset", v } or { kind:"img", v, x, y, zoom, dim } (https link or data: picture)
 let myMat = (() => { try { return cleanMat(JSON.parse(store.get("kt-dig-mat", "null"))); } catch { return null; } })();
 function cleanMat(m){
   if (!m || typeof m !== "object") return null;
   if (m.kind === "preset" && MATS[m.v] && m.v !== "felt") return { kind:"preset", v:m.v };
-  if (m.kind === "img" && typeof m.v === "string" && (/^https:\/\/[^\s"'()<>\\]{1,500}$/.test(m.v) || (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(m.v) && m.v.length < 400000))) return { kind:"img", v:m.v };
+  // (a picture: where it's centered (x, y in %), how far it's zoomed in (100 to 400%) and how much it's darkened)
+  const n = (v, a, b, d) => Number.isFinite(+v) && v !== null && v !== "" ? clamp(Math.round(+v), a, b) : d;
+  if (m.kind === "img" && typeof m.v === "string" && (/^https:\/\/[^\s"'()<>\\]{1,500}$/.test(m.v) || (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(m.v) && m.v.length < 900000)))
+    return { kind:"img", v:m.v, x:n(m.x, 0, 100, 50), y:n(m.y, 0, 100, 50), zoom:n(m.zoom, 100, 400, 100), dim:n(m.dim, 0, 80, 25) };
   return null;
 }
-const matCss = m => !m ? "" : m.kind === "preset" ? MATS[m.v].css : `linear-gradient(rgba(0,0,0,.25),rgba(0,0,0,.25)),url("${m.v}") center/cover no-repeat`;
+const matCss = m => !m ? "" : m.kind === "preset" ? MATS[m.v].css : "";
+/* A picture mat is its own layer behind the cards: it fills the area (cropped, never stretched) whatever the area's
+   shape, centered where the player chose, zoomed and darkened as they set */
+function matLayer(m){
+  const d = el("div", { className:"matlayer" }), img = el("img", { src:m.v, alt:"", draggable:false });
+  const pos = `${m.x}% ${m.y}%`; img.style.objectPosition = pos; img.style.transformOrigin = pos; img.style.transform = `scale(${m.zoom / 100})`;
+  d.style.setProperty("--dim", m.dim / 100); d.dataset.key = JSON.stringify([m.v.length, m.v.slice(-40), m.x, m.y, m.zoom, m.dim]); d.append(img);
+  return d;
+}
+// (the board is redrawn often: each area keeps its picture layer and gets the same one back, so it never flickers)
+const matNodes = new Map();  // area ("me" or a seat) -> its picture layer
+function paintMat(box, m, slot){
+  box.style.background = matCss(m); box.classList.toggle("mat", !!m);
+  const old = [...box.children].find(x => x.classList.contains("matlayer"));
+  if (m?.kind !== "img") { old?.remove(); matNodes.delete(slot); return; }
+  let node = matNodes.get(slot); const fresh = matLayer(m);
+  if (!node || node.dataset.key !== fresh.dataset.key) { node = fresh; matNodes.set(slot, node); }
+  if (old !== node) { old?.remove(); box.prepend(node); }
+}
 function sendMat(conn){ if (conn && !me?.watch) send(conn, { type:"mat", mat:myMat }); }
 function applyMats(){
-  const mine = $("#bf"); if (mine) { mine.style.background = matCss(myMat); mine.classList.toggle("mat", !!myMat); }
-  for (const o of document.querySelectorAll(".opp")) { const b = o.querySelector(".obody"), m = mats[+o.dataset.seat]; if (b) { b.style.background = matCss(m); b.classList.toggle("mat", !!m); } }
+  const mine = $("#bf"); if (mine) paintMat(mine, myMat, "me");
+  for (const o of document.querySelectorAll(".opp")) { const b = o.querySelector(".obody"); if (b) paintMat(b, mats[+o.dataset.seat], +o.dataset.seat); }
 }
-function setMat(m){
-  myMat = cleanMat(m); store.set("kt-dig-mat", JSON.stringify(myMat));
+function setMat(m, quiet = false){
+  myMat = cleanMat(m);
+  try { store.set("kt-dig-mat", JSON.stringify(myMat)); } catch { toast("This picture is too big to remember for next time, but the table sees it."); }
   broadcast({ type:"mat", mat:myMat }); applyMats();
-  say(myMat ? `put down a new playmat${myMat.kind === "preset" ? ` (${MATS[myMat.v].name})` : ""}.` : "went back to the plain felt.");
+  if (!quiet) say(myMat ? `put down a new playmat${myMat.kind === "preset" ? ` (${MATS[myMat.v].name})` : ""}.` : "went back to the plain felt.");
+}
+// A picture link is tried first: some sites don't let their pictures show on other pages
+function tryPicture(src){ return new Promise(ok => { const i = new Image(); i.onload = () => ok(i.naturalWidth > 0); i.onerror = () => ok(false); i.src = src; setTimeout(() => ok(false), 15000); }); }
+/* Adjust a picture mat: drag the picture to choose which part shows, zoom in, and darken it so cards stand out.
+   Two previews: your battlefield, and the wider strip the other players see. */
+function adjustMat(start, isNew){
+  const m = { ...cleanMat(start) };
+  const big = el("div", { className:"matprev big", title:"Drag to move the picture" }), small = el("div", { className:"matprev strip" });
+  const zoom = el("input", { type:"range", min:100, max:400, value:m.zoom, ariaLabel:"Zoom" });
+  const dim = el("input", { type:"range", min:0, max:80, value:m.dim, ariaLabel:"Darken" });
+  const draw_ = () => { for (const b of [big, small]) { b.innerHTML = ""; b.append(matLayer(m)); } };
+  zoom.oninput = () => { m.zoom = +zoom.value; draw_(); };
+  dim.oninput = () => { m.dim = +dim.value; draw_(); };
+  let drag = null;
+  big.onpointerdown = e => { drag = { x:e.clientX, y:e.clientY, mx:m.x, my:m.y }; big.setPointerCapture(e.pointerId); };
+  big.onpointermove = e => {
+    if (!drag) return;
+    const r = big.getBoundingClientRect(), k = 100 / (m.zoom / 100);
+    m.x = clamp(Math.round(drag.mx - (e.clientX - drag.x) / r.width * k), 0, 100); m.y = clamp(Math.round(drag.my - (e.clientY - drag.y) / r.height * k), 0, 100); draw_();
+  };
+  big.onpointerup = big.onpointercancel = () => { drag = null; };
+  const nudge = (dx, dy) => { m.x = clamp(m.x + dx, 0, 100); m.y = clamp(m.y + dy, 0, 100); draw_(); };
+  const arrows = el("div", { className:"row", style:"gap:4px" }, ...[["←", -5, 0, "Move left"], ["→", 5, 0, "Move right"], ["↑", 0, -5, "Move up"], ["↓", 0, 5, "Move down"]].map(([t, dx, dy, l]) => {
+    const b = el("button", { type:"button", className:"btn small", textContent:t, ariaLabel:l }); b.onclick = () => nudge(dx, dy); return b; }),
+    (() => { const b = el("button", { type:"button", className:"btn small", textContent:"Center" }); b.onclick = () => { m.x = 50; m.y = 50; m.zoom = 100; zoom.value = 100; draw_(); }; return b; })());
+  draw_();
+  openModal("Adjust your playmat", el("div", {},
+    el("p", { className:"hint", textContent:"Drag the picture (or use the arrows) to choose which part shows. Zoom in to fill it with what matters; darken it so cards stand out." }),
+    el("div", { className:"hint", textContent:"Your battlefield" }), big, el("div", { className:"hint", style:"margin-top:8px", textContent:"What the other players see behind your side" }), small,
+    el("div", { className:"matctl" }, el("label", {}, el("span", { textContent:"Zoom" }), zoom), el("label", {}, el("span", { textContent:"Darken" }), dim), arrows)),
+    [{ label:"Cancel" }, { label:isNew ? "Use this playmat" : "Save", primary:true, fn:() => setMat(m, !isNew) }], { wide:true });
 }
 $("#matBtn").onclick = () => {
   const grid = el("div", { className:"matgrid" });
@@ -3332,21 +3427,34 @@ $("#matBtn").onclick = () => {
   }
   const url = el("input", { type:"url", placeholder:"https://... a picture link", ariaLabel:"Picture link", style:"flex:1;min-width:200px" });
   const useUrl = el("button", { className:"btn small", textContent:"Use this picture" });
-  useUrl.onclick = () => { const m = cleanMat({ kind:"img", v:url.value.trim() }); if (!m) { toast("That needs to be an https:// link to a picture."); return; } closeModal(); setMat(m); };
+  useUrl.onclick = async () => {
+    const m = cleanMat({ kind:"img", v:url.value.trim() }); if (!m) { toast("That needs to be an https:// link to a picture (ending in .jpg, .png or similar usually works best)."); return; }
+    useUrl.disabled = true; useUrl.textContent = "Checking...";
+    const ok = await tryPicture(m.v); useUrl.disabled = false; useUrl.textContent = "Use this picture";
+    if (!ok) { toast("That picture didn't load. Some sites don't let their pictures show elsewhere: save it and use Picture from my computer instead."); return; }
+    closeModal(); adjustMat(m, true);
+  };
   const file = el("input", { type:"file", accept:"image/*", className:"hidden" });
   const upload = el("button", { className:"btn small", textContent:"Picture from my computer..." }); upload.onclick = () => file.click();
   file.onchange = async () => {
     const f = file.files[0]; if (!f) return;
     try {
-      const img = await createImageBitmap(f), scale = Math.min(1, 1100 / Math.max(img.width, img.height));
-      const cv = el("canvas", { width:Math.round(img.width * scale), height:Math.round(img.height * scale) });
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      let q = 0.72, data = cv.toDataURL("image/jpeg", q); while (data.length > 380000 && q > 0.3) { q -= 0.1; data = cv.toDataURL("image/jpeg", q); }
-      closeModal(); setMat({ kind:"img", v:data });
+      // (kept sharp enough to fill a big screen, but small enough to send quickly: up to 1600 pixels, under ~800 KB)
+      const img = await createImageBitmap(f); let side = 1600, data = "";
+      for (let tries = 0; tries < 6; tries++) {
+        const scale = Math.min(1, side / Math.max(img.width, img.height)), cv = el("canvas", { width:Math.round(img.width * scale), height:Math.round(img.height * scale) });
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        let q = 0.82; data = cv.toDataURL("image/jpeg", q); while (data.length > 800000 && q > 0.45) { q -= 0.1; data = cv.toDataURL("image/jpeg", q); }
+        if (data.length <= 800000) break; side = Math.round(side * 0.8);
+      }
+      closeModal(); adjustMat({ kind:"img", v:data }, true);
     } catch { toast("That picture couldn't be read."); }
   };
+  const adjust = myMat?.kind === "img" ? el("button", { className:"btn small primary", textContent:"Adjust my picture (move, zoom, darken)..." }) : null;
+  if (adjust) adjust.onclick = () => { closeModal(); adjustMat(myMat, false); };
   openModal("Your playmat", el("div", {}, el("p", { className:"hint", textContent:"It goes behind your battlefield, and everyone at the table sees it behind your side." }), grid,
-    el("h3", { textContent:"Or a picture" }), el("div", { className:"row", style:"flex-wrap:wrap;gap:6px" }, url, useUrl, upload, file)), [{ label:"Close" }], { wide:true });
+    el("h3", { textContent:"Or a picture" }), ...(adjust ? [el("div", { style:"margin-bottom:8px" }, adjust)] : []),
+    el("div", { className:"row", style:"flex-wrap:wrap;gap:6px" }, url, useUrl, upload, file)), [{ label:"Close" }], { wide:true });
 };
 
 /* Card names in the log and chat are links: point at one to see it (large, and in the card view above the log), click
