@@ -398,12 +398,74 @@ test("digital table: playmats everyone sees, including players who sit down late
   await expect(opp(b, "Luke")).toBeVisible({ timeout:15000 });
   await expect(opp(b, "Luke").locator(".obody")).toHaveClass(/mat/);
   // A picture from a link
+  // (the picture is checked, then adjusted: move it and zoom in, with previews of both views)
   await a.click("#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://cards.scryfall.io/art_crop/0.png"); await button(a, "Use this picture");
-  await expect.poll(() => opp(b, "Luke").locator(".obody").evaluate(e => e.style.background)).toContain("cards.scryfall.io/art_crop/0.png");
+  await expect(a.locator(".modal-card h2")).toHaveText("Adjust your playmat");
+  await expect(a.locator(".modal .matprev .matlayer img")).toHaveCount(2);
+  await a.locator(".modal").getByRole("button", { name:"Move right" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Move down" }).click();
+  await a.locator(".modal input[aria-label='Zoom']").fill("150");
+  // dragging the big preview moves it too
+  const prev = await a.locator(".modal .matprev.big").boundingBox();
+  await a.mouse.move(prev.x + prev.width / 2, prev.y + prev.height / 2); await a.mouse.down();
+  await a.mouse.move(prev.x + prev.width / 2 - prev.width * 0.15, prev.y + prev.height / 2, { steps:4 }); await a.mouse.up();
+  await button(a, "Use this playmat");
+  const layer = opp(b, "Luke").locator(".obody > .matlayer img");
+  await expect(layer).toHaveAttribute("src", "https://cards.scryfall.io/art_crop/0.png");
+  const look = await layer.evaluate(i => [i.style.objectPosition, i.style.transform]);
+  expect(look[1]).toBe("scale(1.5)");
+  const [x, y] = look[0].match(/\d+/g).map(Number);
+  expect(x).toBeGreaterThan(55); expect(y).toBe(55);
   await expect(b.locator("#log")).toContainText("Luke put down a new playmat.");
+  expect(await a.locator("#bf > .matlayer img").evaluate(i => i.style.objectPosition)).toBe(look[0]);
+  // A link that doesn't load is caught before it's used
+  await a.click("#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://pictures.example.invalid/mat.png"); await button(a, "Use this picture");
+  await expect(a.locator("#toast")).toContainText("That picture didn't load.");
+  await button(a, "Close");
   // ...and back to plain felt
   await a.click("#matBtn"); await a.locator(".modal .matpick", { hasText:"Felt (plain)" }).click();
   await expect(opp(b, "Luke").locator(".obody")).not.toHaveClass(/mat/);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
+
+test("digital table: no mana question for lands that make several colors; mana symbols put on a card for everyone", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const mana = () => ktp(a, () => ({ ...ktPlay.me.mana }));
+  // A land that makes two colors (here, Forest made to say it makes green or blue) just taps: nothing is asked
+  const land = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Forest"); ktPlay.cards.get(c.id).produced_mana = ["G", "U"]; ktPlay.move(c.iid, "bf"); return c.iid; });
+  const before = await mana();
+  await a.locator(`#bf .card[data-iid="${land}"]`).click();
+  await expect.poll(() => ktp(a, l => ktPlay.me.zones.bf.find(c => c.iid === l).tapped, land)).toBe(true);
+  await expect(a.locator("#menu")).toBeHidden();
+  expect(await mana()).toEqual(before);
+  // Mana symbols on a card: green and blue on Gamma Card, seen by Rick; clicking one taps it for that mana
+  const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
+  await a.locator(`#bf .card[data-iid="${gamma}"]`).click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Mana symbols (what it can make)...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"G mana" }).click();
+  await a.locator(".modal").getByRole("button", { name:"U mana" }).click();
+  await button(a, "Done");
+  await expect(a.locator("#log")).toContainText("You marked Gamma Card as making blue, green mana.");
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .mtag`)).toHaveCount(2);
+  const g0 = (await mana()).G;
+  await a.locator(`#bf .card[data-iid="${gamma}"] .mtag[data-mana="G"]`).click();
+  expect((await mana()).G).toBe(g0 + 1);
+  expect(await ktp(a, g => ktPlay.me.zones.bf.find(c => c.iid === g).tapped, gamma)).toBe(true);
+  // ...and the symbols go when it leaves the battlefield
+  await ktp(a, g => ktPlay.move(g, "hand"), gamma);
+  expect(await ktp(a, g => ktPlay.me.zones.hand.find(c => c.iid === g).mana, gamma)).toBeUndefined();
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
