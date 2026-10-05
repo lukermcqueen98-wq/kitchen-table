@@ -291,6 +291,16 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 #menu hr{border:0;border-top:1px solid var(--felt-edge);margin:4px 0}
 #menu .mh{font-size:12px;color:var(--muted);padding:4px 10px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:70;padding:16px}
+#inspect{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:96;padding:16px}
+.inspectbody{max-width:340px;margin:0 auto}
+.inspectbody.two{max-width:720px}
+.inspectpics{display:flex;gap:12px;justify-content:center}
+.inspectpics figure{margin:0;flex:1;max-width:340px}
+.inspectpics img{width:100%;border-radius:4.75%/3.5%;display:block}
+.inspectpics figcaption{text-align:center;font-size:12px;color:var(--muted);margin-top:4px}
+.inspecttext{white-space:pre-wrap;margin-top:8px}
+.inspecttext b{display:block}
+.grid .card.inspectable{cursor:zoom-in}
 .modal-card{background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:12px;padding:16px 18px;width:min(100%,860px);max-height:92vh;overflow:auto}
 .modal-card.wide{width:min(100%,1240px)}
 .modal-card .good{color:#9fd3a2}
@@ -2556,6 +2566,7 @@ document.addEventListener("keydown", e => {
   if (me && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.target.matches("input,textarea,select") && $("#modal").classList.contains("hidden")) { e.preventDefault(); undo(); return; }
   if (!me || e.target.matches("input,textarea,select") || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape" && targeting) { stopTargeting(); return; }
+  if (e.key === "Escape" && $("#inspect")) { closeInspect(); return; }
   if (e.key === "Escape") { closeMenu(); if (!$("#modal").classList.contains("hidden") && modalClosable) closeModal(); return; }
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
@@ -2751,6 +2762,8 @@ function cardGrid(list, acts){
   const g = el("div", { className:"grid" });
   for (const c of list) {
     const e = cardEl(c, {}), box = el("div", { className:"gcard" }, e);
+    // (click a card in any list to see it large; another player's face-down card stays hidden)
+    if (!c.fd || findCard(c.iid)) { e.classList.add("inspectable"); e.title = `${nameOf(c)}: click to inspect`; e.onclick = ev => { ev.stopPropagation(); viewCard(findCard(c.iid)?.c || c); }; }
     if (acts) { const a = el("div", { className:"acts" }); for (const [label, fn] of acts(c)) { const b = el("button", { textContent:label }); b.onclick = () => fn(c, box); a.append(b); } box.append(a); }
     g.append(box);
   }
@@ -3166,22 +3179,43 @@ function reveal(list, what){
   say(`revealed ${list.map(nameOf).join(", ")}${what ? " from " + what : ""}.`);
 }
 // A card, large, with its rules text (on phones there's no pointing at cards, so the menus offer this)
+/* Inspecting a card: large, with its rules text and the Magic terms on it. A card with two sides (transform, modal
+   double-faced, flip...) shows both, the side up on the table marked. Opened over a list (a search, the top of the
+   library, a graveyard or exile, revealed cards), it comes up on top of it, and closing it goes back to the list. */
 function viewCard(c){
-  const own = c.iid && findCard(c.iid)?.c, k = own ? cardOf(own) : cards.get(c.id), face = own?.face || 0;
-  const src = own ? imgOf(k, face, "normal") : (c.img || "").replace("/small/", "/normal/");
-  const text = el("div", { className:"hint", style:"white-space:pre-wrap;margin-top:8px" });
-  const body = el("div", { style:"max-width:340px;margin:0 auto" }, el("img", { src, alt:c.name || nameOf(c), style:"width:100%;border-radius:4.75%/3.5%" }), text);
-  const terms = el("div");
+  const own = c.iid && findCard(c.iid)?.c, face = own?.face || 0, title = c.name || (own ? nameOf(own) : "Card");
+  const body = el("div", { className:"inspectbody" }), pics = el("div", { className:"inspectpics" }), text = el("div"), terms = el("div");
+  const picOf = (src, label) => el("figure", {}, el("img", { src, alt:label }), label ? el("figcaption", { textContent:label }) : null);
+  const first = own ? imgOf(cardOf(own), face, "normal") : (c.img || "").replace("/small/", "/normal/");
+  if (first) pics.append(picOf(first, ""));
+  body.append(pics, text, terms);
   cardById(c.id).then(x => {
     if (!x) return;
-    text.textContent = textOf(x, face);
+    const two = faces(x);
+    if (two) {
+      pics.innerHTML = "";
+      two.forEach((f, i) => pics.append(picOf(imgOf(x, i, "normal"), `${f.name}${own && i === face ? " (face up on the table)" : ""}`)));
+      text.append(...two.map((f, i) => el("div", { className:"inspecttext" }, el("b", { textContent:f.name }), el("div", { className:"hint", textContent:textOf(x, i) }))));
+    } else if (x.card_faces?.length > 1) {  // (two halves on one picture: split cards, adventures, flip cards)
+      text.append(...x.card_faces.map((f, i) => el("div", { className:"inspecttext" }, el("b", { textContent:f.name }), el("div", { className:"hint", textContent:textOf(x, i) }))));
+    } else text.append(el("div", { className:"inspecttext hint", textContent:textOf(x, 0) }));
+    if (!pics.children.length) { const src = imgOf(x, 0, "normal"); if (src) pics.append(picOf(src, "")); }
+    body.classList.toggle("two", !!two);
     // The Magic terms on this card, with what they mean
     const found = termsIn(`${x.oracle_text || ""} ${(x.card_faces || []).map(f => f.oracle_text || "").join(" ")} ${(x.keywords || []).join(" ")}`);
     if (found.length) terms.append(el("h3", { textContent:"Terms on this card" }), ...found.map(termEl));
   });
-  body.append(terms);
-  openModal(c.name || (own ? nameOf(own) : "Card"), body);
+  if ($("#modal").classList.contains("hidden")) { openModal(title, body, [{ label:"Close" }], { wide:true }); return; }
+  // (over a list: its own layer, so the list stays open underneath)
+  closeInspect();
+  const card = el("div", { className:"modal-card wide" }, el("h2", { textContent:title }), body);
+  const close = el("button", { className:"btn", textContent:"Close" }); close.onclick = closeInspect;
+  card.append(el("div", { className:"mfoot" }, close));
+  const layer = el("div", { id:"inspect", role:"dialog", ariaModal:"true", ariaLabel:title }, card);
+  layer.onclick = e => { if (e.target === layer) closeInspect(); };
+  document.body.append(layer); close.focus();
 }
+function closeInspect(){ $("#inspect")?.remove(); }
 /* Magic terms (terms.js, shared with the webcam table, plus every keyword on Scryfall's lists): the Terms window
    lists and searches them, and viewing a card shows the ones on it */
 const TERMS = new Map();

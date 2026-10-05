@@ -595,3 +595,55 @@ test("digital table: declare attackers, each creature at its own opponent", asyn
   expect([...a.errors, ...b.errors, ...c.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: inspecting shows both sides of a two-sided card, and cards in lists can be clicked to inspect", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  // A two-sided card on Luke's battlefield, turned to its back
+  await ktp(a, () => {
+    const face = (name, text, n) => ({ name, oracle_text:text, type_line:"Creature — Werewolf", image_uris:{ small:`https://cards.scryfall.io/small/${n}.png`, normal:`https://cards.scryfall.io/normal/${n}.png` } });
+    ktPlay.cards.set("00000000-dfc0-4000-8000-000000000000", { id:"00000000-dfc0-4000-8000-000000000000", name:"Test Pup // Test Wolf", layout:"transform", type_line:"Creature — Werewolf // Creature — Werewolf",
+      card_faces:[face("Test Pup", "When this enters, draw a card.", 1), face("Test Wolf", "Trample", 2)] });
+    ktPlay.me.zones.bf.push({ iid:"dfccard", id:"00000000-dfc0-4000-8000-000000000000", x:0.4, y:0.3, tapped:false, fd:false, face:1, ctr:{} });
+    ktPlay.draw(1);  // (anything that redraws the table)
+  });
+  await a.locator('#bf .card[data-iid="dfccard"]').click({ button:"right" });
+  await a.getByRole("menuitem", { name:"View card", exact:true }).click();
+  const pics = a.locator(".modal .inspectpics figure");
+  await expect(pics).toHaveCount(2);
+  await expect(pics.nth(0)).toContainText("Test Pup");
+  await expect(pics.nth(1)).toContainText("Test Wolf (face up on the table)");
+  await expect(a.locator(".modal .inspecttext")).toHaveCount(2);
+  await expect(a.locator(".modal")).toContainText("When this enters, draw a card.");
+  await button(a, "Close");
+  // Clicking a card in a list (Luke's graveyard) opens it on top; closing goes back to the list
+  await ktp(a, () => { for (let i = 0; i < 2; i++) ktPlay.move(ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card").iid, "gy"); });
+  await a.locator("#gyPile").click();
+  await expect(a.locator(".modal-card h2").first()).toHaveText("Your graveyard (2)");
+  await a.locator(".modal .gcard .card").first().click();
+  await expect(a.locator("#inspect h2")).toHaveText("Gamma Card");
+  await expect(a.locator("#inspect")).toContainText("{T}: Add {C}{C}.");
+  await a.keyboard.press("Escape");
+  await expect(a.locator("#inspect")).toHaveCount(0);
+  await expect(a.locator("#modal .modal-card h2")).toHaveText("Your graveyard (2)");
+  // ...also the top of the library, and another player's graveyard
+  await a.locator(".modal").getByRole("button", { name:"Close" }).click();
+  await ktp(b, () => ktPlay.move(ktPlay.me.zones.lib[0].iid, "gy"));
+  await opp(a, "Rick").locator(".opile", { hasText:"Graveyard 1" }).click();
+  await a.locator(".modal .gcard .card").first().click();
+  await expect(a.locator("#inspect h2")).toBeVisible();
+  await a.locator("#inspect").getByRole("button", { name:"Close" }).click();
+  await expect(a.locator("#inspect")).toHaveCount(0);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
