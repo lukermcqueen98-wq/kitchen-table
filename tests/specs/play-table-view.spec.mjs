@@ -277,16 +277,24 @@ test("digital table: game and turn clocks, turn counts, a turn time limit, your 
 
   // Basic lands of one kind stack with a count; a click taps one (and adds its mana); right-click taps several
   const forests = await ktp(a, () => { const out = []; for (let i = 0; i < 4; i++) { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Forest"); ktPlay.move(c.iid, "bf"); out.push(c.iid); } return out; });
-  const stack = a.locator("#bf .card.landstack");
+  const stack = a.locator("#bf .card.landstack"), upPile = a.locator('#bf .card.landstack[data-pile="untapped"]'), downPile = a.locator('#bf .card.landstack[data-pile="tapped"]');
   await expect(stack).toHaveCount(1);
-  await expect(stack.locator(".stackn")).toHaveText("×4"); await expect(stack.locator(".stackup")).toHaveText("4 untapped");
+  await expect(upPile.locator(".stackn")).toHaveText("×4"); await expect(upPile.locator(".stackup")).toHaveText("4 untapped");
   await expect(opp(b, "Luke").locator(".card.landstack .stackn")).toHaveText("×4");
-  await stack.click();
-  await expect(stack.locator(".stackup")).toHaveText("3 untapped");
-  await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Tap 2", exact:true }).click();
-  await expect(stack.locator(".stackup")).toHaveText("1 untapped");
-  await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Untap all 3", exact:true }).click();
-  await expect(stack.locator(".stackup")).toHaveText("4 untapped");
+  // a click taps one: it moves to a tapped pile beside the untapped one, each with its count
+  await upPile.click();
+  await expect(upPile.locator(".stackup")).toHaveText("3 untapped");
+  await expect(downPile.locator(".stackup")).toHaveText("1 tapped"); await expect(downPile).toHaveClass(/tapped/);
+  const [ub, db] = [await upPile.boundingBox(), await downPile.boundingBox()];
+  expect(db.x).toBeGreaterThan(ub.x + ub.width * 0.9);
+  await expect(opp(b, "Luke").locator('.card.landstack[data-pile="tapped"] .stackn')).toHaveText("×1");
+  await upPile.click({ button:"right" }); await a.getByRole("menuitem", { name:"Tap 2", exact:true }).click();
+  await expect(upPile.locator(".stackup")).toHaveText("1 untapped"); await expect(downPile.locator(".stackn")).toHaveText("×3");
+  // clicking the tapped pile untaps one
+  await downPile.click();
+  await expect(downPile.locator(".stackn")).toHaveText("×2"); await expect(upPile.locator(".stackn")).toHaveText("×2");
+  await downPile.click({ button:"right" }); await a.getByRole("menuitem", { name:"Untap all 2", exact:true }).click();
+  await expect(upPile.locator(".stackup")).toHaveText("4 untapped"); await expect(downPile).toHaveCount(0);
   expect(forests.length).toBe(4);
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();

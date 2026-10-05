@@ -165,7 +165,8 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .card.landstack{box-shadow:4px -4px 0 -1px #0d201d,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #0d201d,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
 .card.landstack .stackn{position:absolute;right:-6px;top:-10px;min-width:26px;padding:1px 6px;border-radius:999px;background:var(--brass);color:#1b1608;font:700 13px/1.4 var(--sans);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6);z-index:2}
 .card.landstack .stackup{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:600;background:rgba(0,0,0,.72);margin:0 4px;border-radius:5px;padding:1px 0}
-.card.landstack.tapped .stackup{transform:rotate(-90deg)}
+.card.landstack.tapped .stackn{transform:rotate(-90deg)}
+.card.landstack.tapped .stackup{left:50%;right:auto;top:50%;bottom:auto;margin:0;padding:1px 6px;white-space:nowrap;transform:translate(-50%,-50%) rotate(-90deg)}
 .opile .ph{width:60px;aspect-ratio:63/88;border:1px dashed var(--felt-edge);border-radius:4px}
 .opilelbl{font-size:12px;font-weight:600;white-space:nowrap}
 .dungeon{border:1px solid var(--brass);border-radius:10px;background:linear-gradient(180deg,rgba(60,40,20,.55),rgba(0,0,0,.35));padding:6px;display:flex;flex-direction:column;gap:4px;min-width:150px}
@@ -2200,11 +2201,19 @@ function drawBattlefield(box, list, opts){
     const st = inStack.get(c.iid);
     if (st) {
       if (st.g[0] !== c) continue;  // (the stack is drawn once, where its first land is)
-      const up = st.g.filter(x => !x.tapped).length, e = cardEl({ ...c, tapped:!up }, opts);
-      e.classList.add("landstack"); e.dataset.stack = st.name;
-      e.title = `${st.name}: ${st.g.length} (${up} untapped).${opts?.mine ? " Click to tap one; right-click for more." : ""}`;
-      e.append(el("span", { className:"stackn", textContent:`×${st.g.length}` }), el("span", { className:"stackup", textContent:`${up} untapped` }));
-      box.append(e); place(e, c); continue;
+      // (untapped ones in one pile, tapped ones in a second pile beside it, each with its count)
+      const up = st.g.filter(x => !x.tapped).length, down = st.g.length - up;
+      for (const [n, tapped] of [[up, false], [down, true]]) {
+        if (!n) continue;
+        const e = cardEl({ ...c, tapped }, opts);
+        e.classList.add("landstack"); e.dataset.stack = st.name; e.dataset.pile = tapped ? "tapped" : "untapped";
+        e.title = `${st.name}: ${n} ${tapped ? "tapped" : "untapped"} (${st.g.length} in all).${opts?.mine ? ` Click to ${tapped ? "untap" : "tap"} one; right-click for more.` : ""}`;
+        e.append(el("span", { className:"stackn", textContent:`×${n}` }), el("span", { className:"stackup", textContent:`${n} ${tapped ? "tapped" : "untapped"}` }));
+        box.append(e); place(e, c);
+        // (a tapped card lies sideways: set clear of the untapped pile)
+        if (tapped && up) { const w = parseFloat(getComputedStyle(e).getPropertyValue("--w")) || 84; e.style.left = `calc(${c.x * 100}% + ${Math.round(w * 1.5)}px)`; }
+      }
+      continue;
     }
     const e = cardEl(c, opts), host = hosted(c) ? byIid.get(c.att) : null;
     box.append(e);
@@ -2464,7 +2473,7 @@ document.addEventListener("pointerup", e => {
   d.ghost?.remove(); d.el.classList.remove("dragging");
   const tag = !d.moved && d.zone === "bf" && e.target.closest?.(".mtag");
   if (tag && !attackMode) { const f = findCard(d.iid); if (f) manaFromTag(f.c, tag.dataset.mana); return; }
-  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) tapFromStack(d.el.dataset.stack, 1); else clickCard(d.iid, d.zone, e); return; }
+  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) { if (d.el.dataset.pile === "tapped") untapFromStack(d.el.dataset.stack, 1); else tapFromStack(d.el.dataset.stack, 1); } else clickCard(d.iid, d.zone, e); return; }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
   if (to === "bf") {
