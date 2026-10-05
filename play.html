@@ -137,6 +137,11 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .matctl label{display:flex;gap:6px;align-items:center}
 .ocz{display:flex;flex-direction:column;gap:4px;padding:4px;border-right:1px solid var(--felt-edge)}
 .obf{flex:1;position:relative;min-height:0}
+.atkrow{display:flex;align-items:center;gap:10px;padding:6px;border:1px solid var(--felt-edge);border-radius:8px;margin-bottom:5px;flex-wrap:wrap}
+.atkrow.on{border-color:var(--brass);background:rgba(201,164,76,.08)}
+.atkrow img,.atkrow .atkph{width:44px;aspect-ratio:63/88;border-radius:4px;object-fit:cover;background:#111}
+.atkname{flex:1;min-width:140px;font-weight:600}
+.atkopts{display:flex;flex-wrap:wrap;gap:4px}
 .nextpc{display:flex;flex-wrap:wrap;gap:5px;max-height:160px;overflow:auto;margin-top:6px}
 .matgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 .matpick{display:flex;flex-direction:column;gap:4px;align-items:stretch;border:1px solid var(--felt-edge);border-radius:10px;padding:6px;background:rgba(0,0,0,.2);cursor:pointer;font-size:12px}
@@ -1748,7 +1753,7 @@ function toggleAttack(c, seat){
   if (!isCreature(c)) { toast("Only creatures can attack."); return; }
   if (c.tapped) { toast(`${nameOf(c)} is tapped.`); return; }
   c.atk = seat;
-  if (!(cardOf(c)?.keywords || []).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; }  // (attacking taps it, unless it has vigilance)
+  if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; }  // (attacking taps it, unless it has vigilance)
   say(`attacked ${nm(seat)} with ${nameOf(c)}.`); changed();
 }
 function setBlock(b, atk, seat){
@@ -1759,17 +1764,62 @@ $("#allInBtn").onclick = () => {
   if (!attackMode) return;
   const ready = me.zones.bf.filter(c => isCreature(c) && !c.tapped && !c.atk);
   if (!ready.length) { toast("No untapped creatures to attack with."); return; }
-  for (const c of ready) { c.atk = attackMode; if (!(cardOf(c)?.keywords || []).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
+  for (const c of ready) { c.atk = attackMode; if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
   say(`attacked ${nm(attackMode)} with ${ready.map(nameOf).join(", ")}.`); changed();
 };
-$("#attackBtn").onclick = e => {
+$("#attackBtn").onclick = () => {
   if (attackMode) { attackMode = 0; $("#toast").classList.add("hidden"); render(); return; }
-  const opps = presentSeats().filter(s => s !== mySeat);
-  if (!opps.length) { toast("There's nobody to attack yet."); return; }
-  const go = s => { attackMode = s; render(); toast(`Click your creatures to attack ${nm(s)} (click again to take one back). Press "Done attacking" when finished.`); };
-  if (opps.length === 1) go(opps[0]);
-  else openMenu(e.clientX, e.clientY, [{ head:"Attack who?" }, ...opps.map(s => ({ label:nm(s), fn:() => go(s) }))]);
+  declareAttackers();
 };
+/* Declare attackers: every creature that can attack, each with its own target (any opponent, or not attacking), so
+   one attack can go at several players. "Everyone at..." sends them all at one player; a creature already attacking
+   can be sent elsewhere or taken back. Attacking taps a creature unless it has vigilance. */
+function declareAttackers(){
+  const opps = presentSeats().filter(s => s !== mySeat && !isOut(s));
+  if (!opps.length) { toast("There's nobody to attack yet."); return; }
+  const list = me.zones.bf.filter(c => isCreature(c) && (c.atk || !c.tapped));
+  if (!list.length) { toast("No untapped creatures to attack with."); return; }
+  const pick = new Map(list.map(c => [c.iid, c.atk && opps.includes(c.atk) ? c.atk : 0]));
+  const body = el("div");
+  const draw_ = () => {
+    body.innerHTML = "";
+    const all = el("div", { className:"row", style:"flex-wrap:wrap;gap:6px;margin-bottom:10px" }, el("span", { className:"hint", textContent:"Everyone at:" }),
+      ...opps.map(s => { const b = el("button", { type:"button", className:"btn small", textContent:nm(s) }); b.style.borderColor = SEAT_HEX[s - 1]; b.onclick = () => { for (const c of list) pick.set(c.iid, s); draw_(); }; return b; }),
+      (() => { const b = el("button", { type:"button", className:"btn small", textContent:"No one" }); b.onclick = () => { for (const c of list) pick.set(c.iid, 0); draw_(); }; return b; })());
+    body.append(all);
+    for (const c of list) {
+      const now = pick.get(c.iid), pt = showPt(c), img = imgOf(cardOf(c), c.face || 0, "small");
+      const row = el("div", { className:"atkrow" + (now ? " on" : "") },
+        img && !c.fd ? el("img", { src:img, alt:"" }) : el("span", { className:"atkph" }),
+        el("span", { className:"atkname", textContent:`${nameOf(c)}${pt ? ` (${pt.str})` : ""}` }));
+      const opts = el("span", { className:"atkopts", role:"radiogroup", ariaLabel:`${nameOf(c)} attacks` });
+      for (const s of [0, ...opps]) {
+        const b = el("button", { type:"button", role:"radio", ariaChecked:String(now === s), className:"btn small" + (now === s ? " primary" : ""), textContent:s ? nm(s) : "Don't attack" });
+        if (s && now === s) b.style.boxShadow = `0 0 0 2px ${SEAT_HEX[s - 1]}`;
+        b.onclick = () => { pick.set(c.iid, s); draw_(); };
+        opts.append(b);
+      }
+      row.append(opts); body.append(row);
+    }
+    const n = [...pick.values()].filter(Boolean).length;
+    body.append(el("p", { className:"hint", style:"margin-top:8px", textContent:n ? opps.filter(s => [...pick.values()].includes(s)).map(s => `${[...pick.values()].filter(v => v === s).length} at ${nm(s)}`).join(", ") : "Nobody attacking yet." }));
+  };
+  draw_();
+  openModal("Declare attackers", body, [{ label:"Cancel" }, { label:"Attack", primary:true, fn:() => {
+    const by = {};
+    for (const c of list) {
+      const t = pick.get(c.iid), was = c.atk || 0;
+      if (t === was) continue;
+      if (!t) { c.atk = 0; if (c.atkTapped) c.tapped = false; delete c.atkTapped; continue; }
+      if (!was) { c.atk = t; if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
+      else c.atk = t;
+      (by[t] ||= []).push(nameOf(c));
+    }
+    const parts = Object.entries(by).map(([s, names]) => `${nm(+s)} with ${names.join(", ")}`);
+    if (parts.length) say(`attacked ${parts.join("; ")}.`);
+    changed();
+  } }], { wide:true });
+}
 // Unblocked attackers hit the player they're attacking (commander damage too); blocked ones are left to the players
 // Your attack is set: the players you're attacking get their combat screen to block and take the damage (only
 // they decide it). Call off attack on the combat bar ends it with no damage.

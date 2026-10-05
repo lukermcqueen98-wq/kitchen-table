@@ -543,3 +543,47 @@ test("digital table: when a game ends, each player picks the same deck or a new 
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: declare attackers, each creature at its own opponent", async () => {
+  test.setTimeout(150000);
+  const browser = await launchBrowser();
+  const [a, b, c] = [await newPlayer(browser), await newPlayer(browser), await newPlayer(browser)];
+  for (const [i, p] of [a, b, c].entries()) {
+    const room = i ? new URL(a.url()).searchParams.get("room") : "";
+    await p.goto(`${BASE}/play.html?kt-test${room ? "&room=" + room : ""}`);
+    await p.fill("#nameIn", ["Luke", "Rick", "Sam"][i]); await p.selectOption("#fmtSel", "sixty"); await p.fill("#deckIn", "30 Gamma Card\n30 Forest"); await p.click("#joinBtn");
+    await expect(p.locator("#table")).toBeVisible({ timeout:15000 });
+    if (!i) await settle(a);
+  }
+  await expect(a.locator(".opp")).toHaveCount(2, { timeout:20000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b, c]) await button(p, "Keep");
+  const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
+  while (await ktp(a, () => ktPlay.table.turnSeat) !== 1) { const s = await ktp(a, () => ktPlay.table.turnSeat), n = await ktp(a, () => ktPlay.table.turnNum); const p = [a, b, c][s - 1]; await p.click("#nextTurn"); await keepHand(p); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); }
+  const three = await ktp(a, () => [0, 1, 2].map(() => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; }));
+  // One at Rick, one at Sam, one stays home
+  await a.click("#attackBtn");
+  const rows = a.locator(".modal .atkrow");
+  await expect(rows).toHaveCount(3);
+  await rows.nth(0).getByRole("radio", { name:"Rick" }).click();
+  await rows.nth(1).getByRole("radio", { name:"Sam" }).click();
+  await expect(a.locator(".modal")).toContainText("1 at Rick, 1 at Sam");
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
+  expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i)).map(c => [c.atk || 0, c.tapped]), three)).toEqual([[2, true], [3, true], [0, false]]);
+  await expect(b.locator("#combatNote")).toContainText("1 attacking you");
+  await expect(c.locator("#combatNote")).toContainText("1 attacking you");
+  await expect(c.locator("#log")).toContainText("Luke attacked Rick with Gamma Card; Sam with Gamma Card.");
+  // Change of plan: the one at Sam goes at Rick instead, and the third joins in at Sam
+  await a.click("#attackBtn");
+  await rows.nth(1).getByRole("radio", { name:"Rick" }).click();
+  await rows.nth(2).getByRole("radio", { name:"Sam" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
+  expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk), three)).toEqual([2, 2, 3]);
+  await expect(b.locator("#combatNote")).toContainText("2 attacking you");
+  // ...and Everyone at Sam
+  await a.click("#attackBtn"); await a.locator(".modal").getByRole("button", { name:"Sam", exact:true }).first().click();
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
+  expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk), three)).toEqual([3, 3, 3]);
+  expect([...a.errors, ...b.errors, ...c.errors]).toEqual([]);
+  await browser.close();
+});
