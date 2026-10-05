@@ -49,11 +49,12 @@ test("digital table: undo, casting, and combat", async () => {
   const turn = await ktp(a, () => ktPlay.table.turnSeat);
   if (turn !== 1) { await b.click("#nextTurn"); await expect(a.locator("#turnInfo")).toContainText("Your turn"); }
   await a.click("#attackBtn");
-  await a.locator(`#bf .card[data-iid="${bear}"]`).click();
+  await expect(a.locator(".modal-card h2")).toHaveText("Declare attackers");
+  await a.locator(".modal .atkrow", { hasText:"Gamma Card" }).getByRole("radio", { name:"Rick" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
   await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking.tapped`)).toHaveCount(1);
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(1);
   await expect(b.locator("#combatNote")).toContainText("1 attacking you");
-  await a.click("#attackBtn");  // done attacking
   // Unblocked: Luke asks for combat damage; only Rick, the defender, decides, on his combat screen
   await a.click("#dmgBtn");
   await expect(b.locator(".modal-card h2")).toHaveText("Combat: you're being attacked");
@@ -86,9 +87,9 @@ test("digital table: undo, casting, and combat", async () => {
   // Blocking on the combat screen: Luke's creature is pumped to 5/6, so Rick's blocker dies (and goes to his graveyard)
   await untap();
   await ktp(a, iid => { ktPlay.me.zones.bf.find(c => c.iid === iid).eot = [2, 2]; }, bear);
-  await a.click("#attackBtn"); await a.click("#allInBtn");  // (Attack with all: his only creature)
+  await a.click("#attackBtn"); await a.locator(".modal").getByRole("button", { name:"Rick", exact:true }).first().click();  // (Everyone at Rick: his only creature)
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
   await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);
-  await a.click("#attackBtn");
   await a.click("#dmgBtn");
   await expect(b.locator(".modal .frow")).toContainText("Unblocked: 5 damage to you.");
   await b.locator(".modal select[aria-label='Block Gamma Card with']").selectOption(wall);

@@ -137,6 +137,12 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .matctl label{display:flex;gap:6px;align-items:center}
 .ocz{display:flex;flex-direction:column;gap:4px;padding:4px;border-right:1px solid var(--felt-edge)}
 .obf{flex:1;position:relative;min-height:0}
+.atkrow{display:flex;align-items:center;gap:10px;padding:6px;border:1px solid var(--felt-edge);border-radius:8px;margin-bottom:5px;flex-wrap:wrap}
+.atkrow.on{border-color:var(--brass);background:rgba(201,164,76,.08)}
+.atkrow img,.atkrow .atkph{width:44px;aspect-ratio:63/88;border-radius:4px;object-fit:cover;background:#111}
+.atkname{flex:1;min-width:140px;font-weight:600}
+.atkopts{display:flex;flex-wrap:wrap;gap:4px}
+.nextpc{display:flex;flex-wrap:wrap;gap:5px;max-height:160px;overflow:auto;margin-top:6px}
 .matgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 .matpick{display:flex;flex-direction:column;gap:4px;align-items:stretch;border:1px solid var(--felt-edge);border-radius:10px;padding:6px;background:rgba(0,0,0,.2);cursor:pointer;font-size:12px}
 .matpick.on,.matpick:hover,.matpick:focus-visible{border-color:var(--brass)}
@@ -159,7 +165,8 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .card.landstack{box-shadow:4px -4px 0 -1px #0d201d,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #0d201d,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
 .card.landstack .stackn{position:absolute;right:-6px;top:-10px;min-width:26px;padding:1px 6px;border-radius:999px;background:var(--brass);color:#1b1608;font:700 13px/1.4 var(--sans);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6);z-index:2}
 .card.landstack .stackup{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:600;background:rgba(0,0,0,.72);margin:0 4px;border-radius:5px;padding:1px 0}
-.card.landstack.tapped .stackup{transform:rotate(-90deg)}
+.card.landstack.tapped .stackn{transform:rotate(-90deg)}
+.card.landstack.tapped .stackup{left:50%;right:auto;top:50%;bottom:auto;margin:0;padding:1px 6px;white-space:nowrap;transform:translate(-50%,-50%) rotate(-90deg)}
 .opile .ph{width:60px;aspect-ratio:63/88;border:1px dashed var(--felt-edge);border-radius:4px}
 .opilelbl{font-size:12px;font-weight:600;white-space:nowrap}
 .dungeon{border:1px solid var(--brass);border-radius:10px;background:linear-gradient(180deg,rgba(60,40,20,.55),rgba(0,0,0,.35));padding:6px;display:flex;flex-direction:column;gap:4px;min-width:150px}
@@ -171,9 +178,6 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .dungeon .dfoot{font-size:11px;color:var(--parchment);text-align:center}
 .dungeon .btn{align-self:center}
 .opiles .dungeon{width:170px}
-.omana{display:inline-flex;gap:6px;align-items:center;font-weight:700;font-size:13px;background:rgba(0,0,0,.3);border:1px solid var(--felt-edge);border-radius:12px;padding:1px 8px}
-.omana>span{display:inline-flex;align-items:center;gap:2px}
-.omana img{width:15px;height:15px}
 .ocz .card{--w:52px;position:relative}
 #me{flex:1;display:flex;min-height:0;margin:8px;border:1px solid var(--felt-edge);border-radius:10px;background:rgba(0,0,0,.12);overflow:hidden}
 #bf{flex:1;position:relative;min-width:0}
@@ -287,6 +291,16 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 #menu hr{border:0;border-top:1px solid var(--felt-edge);margin:4px 0}
 #menu .mh{font-size:12px;color:var(--muted);padding:4px 10px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:70;padding:16px}
+#inspect{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:96;padding:16px}
+.inspectbody{max-width:340px;margin:0 auto}
+.inspectbody.two{max-width:720px}
+.inspectpics{display:flex;gap:12px;justify-content:center}
+.inspectpics figure{margin:0;flex:1;max-width:340px}
+.inspectpics img{width:100%;border-radius:4.75%/3.5%;display:block}
+.inspectpics figcaption{text-align:center;font-size:12px;color:var(--muted);margin-top:4px}
+.inspecttext{white-space:pre-wrap;margin-top:8px}
+.inspecttext b{display:block}
+.grid .card.inspectable{cursor:zoom-in}
 .modal-card{background:var(--felt-deep);border:1px solid var(--felt-edge);border-radius:12px;padding:16px 18px;width:min(100%,860px);max-height:92vh;overflow:auto}
 .modal-card.wide{width:min(100%,1240px)}
 .modal-card .good{color:#9fd3a2}
@@ -473,7 +487,6 @@ details.term a{font-size:13px;color:var(--brass)}
         </div>
         <div class="row" style="justify-content:space-between"><span id="landChip" class="chip"></span><span class="hint" id="handCount"></span></div>
         <div id="czone" data-drop="cz"></div>
-        <div class="mana" id="manaBox"></div>
         <div id="dungeonBox"></div>
       </div>
     </div>
@@ -863,7 +876,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0 };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1083,7 +1096,7 @@ function cleanPub(st){
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
            dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
@@ -1174,7 +1187,7 @@ function afterTable(before){
   if (before.day !== table.day && table.gameId === before.gameId) matchDayNight();
   // Taking the initiative (from the menu, combat damage, or a player leaving) ventures into the Undercity
   if (table.started && table.initiative === mySeat && before.initiative !== mySeat && table.gameId === before.gameId && before.gameId) setTimeout(() => venture("took the initiative"), 50);
-  if (table.started && table.gameId && me.gameId !== table.gameId) { dealNewGame(); turnAlert("A new game started", "Keep or mulligan your opening hand."); }
+  if (table.started && table.gameId && me.gameId !== table.gameId) { const first = !me.gameId; dealNewGame(); if (first || me.watch) turnAlert("A new game started", "Keep or mulligan your opening hand."); }
   else if (table.turnSeat === mySeat && (before.turnSeat !== mySeat || before.turnNum !== table.turnNum) && table.turnNum > 0) startMyTurn();
   render(); save();
 }
@@ -1189,7 +1202,7 @@ function nextSeat(s){
 $("#startBtn").onclick = () => {
   if (!table.started) { rulesDialog(startGame); return; }
   // A game in progress: who won? (saved in everyone's game records), then a new game
-  const seats = presentSeats(), body = el("div", {}, el("p", { className:"hint", textContent:"Everyone's cards go back into their decks. The result is saved in every player's game records (Stats)." }));
+  const seats = presentSeats(), body = el("div", {}, el("p", { className:"hint", textContent:"The result is saved in every player's game records (Stats). Then each player picks: the same deck again, or a new one." }));
   openModal("Who won this game?", body, [...seats.map(s => ({ label:nm(s), primary:true, fn:() => { recordGame(s); startGame(); } })),
     { label:"No winner", fn:() => { recordGame(0); startGame(); } }, { label:"Cancel" }]);
 };
@@ -1447,7 +1460,61 @@ function turnAlert(title, body){
 document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = TITLE; });
 // (asked when you sit down, since the browser only asks after a click)
 function askAlerts(){ try { if (settings.turnAlert && window.Notification?.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }
+/* Between games: each player picks the same deck or a new one (a saved deck, an official precon, or a pasted list)
+   before their new hand is dealt; the others see "choosing a deck" on their panel meanwhile. The first game after
+   sitting down uses the deck picked in the lobby. */
 function dealNewGame(){
+  if (!me.gameId || me.watch) { dealNewGame_(); return; }
+  me.gameId = table.gameId; me.picking = true;
+  me.zones = { lib:[], hand:[], bf:[], gy:[], ex:[], cz:[], st:[] }; withoutUndo(changed); undoStack = [];
+  nextDeckDialog();
+}
+function nextDeckDialog(){
+  const done = () => { me.picking = false; dealNewGame_(); turnAlert("A new game started", "Keep or mulligan your opening hand."); };
+  openModal("Next game: which deck?", el("p", { className:"hint", textContent:`Play ${deckName ? `"${deckName}"` : "the same deck"} again, or pick a new one for this game.` }),
+    [{ label:"New deck...", fn:() => newDeckDialog(done) }, { label:`Same deck${deckName ? ` (${deckName})` : ""}`, primary:true, fn:done }], { closable:false });
+}
+function newDeckDialog(done){
+  const isC = FORMATS[table.fmt].cmdr, body = el("div");
+  const text = el("textarea", { spellcheck:false, ariaLabel:"Decklist", rows:8, style:"width:100%;min-height:150px",
+    placeholder:isC ? "Commander\n1 Atraxa, Praetors' Voice\n\nDeck\n1 Sol Ring\n35 Forest" : "4 Lightning Bolt\n20 Mountain\n\nSideboard\n2 Pyroblast" });
+  const name = el("input", { type:"text", placeholder:"Deck name", maxLength:40, ariaLabel:"Deck name", style:"width:100%" });
+  const info = el("div", { className:"hint", role:"status" });
+  // saved decks
+  const saved = el("select", { ariaLabel:"Saved decks" }, el("option", { value:"", textContent:"Saved decks..." }), ...Object.keys(decks).sort().map(n => el("option", { value:n, textContent:n })));
+  saved.onchange = () => { if (saved.value) { text.value = decks[saved.value]; name.value = saved.value; } };
+  body.append(el("p", { className:"hint", textContent:`Pick one of your saved decks${precons ? ", an official deck" : ""}, or paste a list. ${isC ? "Mark the commander with a \"Commander\" heading." : ""}` }), saved);
+  // official decks for this format
+  if (precons) {
+    const search = el("input", { type:"search", placeholder:`Search official ${isC ? "Commander" : "60-card"} decks`, ariaLabel:"Search official decks", style:"width:100%;margin-top:8px" });
+    const list = el("div", { className:"nextpc" });
+    const draw_ = () => {
+      const q = norm(search.value);
+      list.innerHTML = "";
+      for (const d of precons.decks.filter(d => (isC ? d.fmt === "cmdr" : d.fmt === "sixty") && (!q || norm(d.name).includes(q))).slice(0, 30)) {
+        const b = el("button", { type:"button", className:"btn small", textContent:d.name }); b.onclick = () => { text.value = preconText(d); name.value = d.name; info.textContent = `${d.name} is ready: press Use this deck.`; };
+        list.append(b);
+      }
+    };
+    search.oninput = draw_; draw_();
+    body.append(search, list);
+  }
+  body.append(el("div", { style:"height:8px" }), name, el("div", { style:"height:6px" }), text, info);
+  openModal("Pick a new deck", body, [{ label:"Back", fn:nextDeckDialog }, { label:"Use this deck", primary:true, keep:true, fn:async () => {
+    const parsed = parseDeck(text.value);
+    if (!parsed.main.length && !parsed.cmdrs.length) { info.textContent = "Paste a decklist (or pick a deck) first."; return; }
+    info.textContent = "Looking up your cards...";
+    const d = await resolveDeck(parsed);
+    if (!d.main.length) { info.textContent = "None of those cards were found. Check the list."; return; }
+    if (isC && !d.cmdrs.length) { info.textContent = "This is a Commander table: put your commander under a \"Commander\" heading."; return; }
+    deckIds = d.main.slice(); cmdrIds = d.cmdrs.slice(); cmdrFromDeck = d.cmdrs.slice(); sideIds = d.side.slice();
+    deckName = (name.value.trim() || "New deck").slice(0, 40);
+    closeModal();
+    say(`switched decks: ${deckName}${d.missing.length ? ` (${d.missing.length} card${d.missing.length === 1 ? "" : "s"} not found, left out)` : ""}.`);
+    done();
+  } }], { closable:false, wide:true });
+}
+function dealNewGame_(){
   me.gameId = table.gameId; me.dungeon = { room:"", done:0 }; me.arrows = []; me.out = false; delete me.outZones; outAsked = ""; me.life = ruleNum("life"); me.poison = me.energy = me.exp = 0; me.cmd = {}; me.lands = 0; me.turns = 0; me.revealHand = false;
   for (const k of COLORS) me.mana[k] = 0;
   // (in a 60-card game, cards picked as commanders are just part of the deck)
@@ -1697,7 +1764,7 @@ function toggleAttack(c, seat){
   if (!isCreature(c)) { toast("Only creatures can attack."); return; }
   if (c.tapped) { toast(`${nameOf(c)} is tapped.`); return; }
   c.atk = seat;
-  if (!(cardOf(c)?.keywords || []).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; }  // (attacking taps it, unless it has vigilance)
+  if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; }  // (attacking taps it, unless it has vigilance)
   say(`attacked ${nm(seat)} with ${nameOf(c)}.`); changed();
 }
 function setBlock(b, atk, seat){
@@ -1708,17 +1775,62 @@ $("#allInBtn").onclick = () => {
   if (!attackMode) return;
   const ready = me.zones.bf.filter(c => isCreature(c) && !c.tapped && !c.atk);
   if (!ready.length) { toast("No untapped creatures to attack with."); return; }
-  for (const c of ready) { c.atk = attackMode; if (!(cardOf(c)?.keywords || []).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
+  for (const c of ready) { c.atk = attackMode; if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
   say(`attacked ${nm(attackMode)} with ${ready.map(nameOf).join(", ")}.`); changed();
 };
-$("#attackBtn").onclick = e => {
+$("#attackBtn").onclick = () => {
   if (attackMode) { attackMode = 0; $("#toast").classList.add("hidden"); render(); return; }
-  const opps = presentSeats().filter(s => s !== mySeat);
-  if (!opps.length) { toast("There's nobody to attack yet."); return; }
-  const go = s => { attackMode = s; render(); toast(`Click your creatures to attack ${nm(s)} (click again to take one back). Press "Done attacking" when finished.`); };
-  if (opps.length === 1) go(opps[0]);
-  else openMenu(e.clientX, e.clientY, [{ head:"Attack who?" }, ...opps.map(s => ({ label:nm(s), fn:() => go(s) }))]);
+  declareAttackers();
 };
+/* Declare attackers: every creature that can attack, each with its own target (any opponent, or not attacking), so
+   one attack can go at several players. "Everyone at..." sends them all at one player; a creature already attacking
+   can be sent elsewhere or taken back. Attacking taps a creature unless it has vigilance. */
+function declareAttackers(){
+  const opps = presentSeats().filter(s => s !== mySeat && !isOut(s));
+  if (!opps.length) { toast("There's nobody to attack yet."); return; }
+  const list = me.zones.bf.filter(c => isCreature(c) && (c.atk || !c.tapped));
+  if (!list.length) { toast("No untapped creatures to attack with."); return; }
+  const pick = new Map(list.map(c => [c.iid, c.atk && opps.includes(c.atk) ? c.atk : 0]));
+  const body = el("div");
+  const draw_ = () => {
+    body.innerHTML = "";
+    const all = el("div", { className:"row", style:"flex-wrap:wrap;gap:6px;margin-bottom:10px" }, el("span", { className:"hint", textContent:"Everyone at:" }),
+      ...opps.map(s => { const b = el("button", { type:"button", className:"btn small", textContent:nm(s) }); b.style.borderColor = SEAT_HEX[s - 1]; b.onclick = () => { for (const c of list) pick.set(c.iid, s); draw_(); }; return b; }),
+      (() => { const b = el("button", { type:"button", className:"btn small", textContent:"No one" }); b.onclick = () => { for (const c of list) pick.set(c.iid, 0); draw_(); }; return b; })());
+    body.append(all);
+    for (const c of list) {
+      const now = pick.get(c.iid), pt = showPt(c), img = imgOf(cardOf(c), c.face || 0, "small");
+      const row = el("div", { className:"atkrow" + (now ? " on" : "") },
+        img && !c.fd ? el("img", { src:img, alt:"" }) : el("span", { className:"atkph" }),
+        el("span", { className:"atkname", textContent:`${nameOf(c)}${pt ? ` (${pt.str})` : ""}` }));
+      const opts = el("span", { className:"atkopts", role:"radiogroup", ariaLabel:`${nameOf(c)} attacks` });
+      for (const s of [0, ...opps]) {
+        const b = el("button", { type:"button", role:"radio", ariaChecked:String(now === s), className:"btn small" + (now === s ? " primary" : ""), textContent:s ? nm(s) : "Don't attack" });
+        if (s && now === s) b.style.boxShadow = `0 0 0 2px ${SEAT_HEX[s - 1]}`;
+        b.onclick = () => { pick.set(c.iid, s); draw_(); };
+        opts.append(b);
+      }
+      row.append(opts); body.append(row);
+    }
+    const n = [...pick.values()].filter(Boolean).length;
+    body.append(el("p", { className:"hint", style:"margin-top:8px", textContent:n ? opps.filter(s => [...pick.values()].includes(s)).map(s => `${[...pick.values()].filter(v => v === s).length} at ${nm(s)}`).join(", ") : "Nobody attacking yet." }));
+  };
+  draw_();
+  openModal("Declare attackers", body, [{ label:"Cancel" }, { label:"Attack", primary:true, fn:() => {
+    const by = {};
+    for (const c of list) {
+      const t = pick.get(c.iid), was = c.atk || 0;
+      if (t === was) continue;
+      if (!t) { c.atk = 0; if (c.atkTapped) c.tapped = false; delete c.atkTapped; continue; }
+      if (!was) { c.atk = t; if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
+      else c.atk = t;
+      (by[t] ||= []).push(nameOf(c));
+    }
+    const parts = Object.entries(by).map(([s, names]) => `${nm(+s)} with ${names.join(", ")}`);
+    if (parts.length) say(`attacked ${parts.join("; ")}.`);
+    changed();
+  } }], { wide:true });
+}
 // Unblocked attackers hit the player they're attacking (commander damage too); blocked ones are left to the players
 // Your attack is set: the players you're attacking get their combat screen to block and take the damage (only
 // they decide it). Call off attack on the combat bar ends it with no damage.
@@ -1927,13 +2039,7 @@ function sendAct(seat, card, act, extra = {}, text = ""){
   if (text) say(text);
 }
 function toggleTap(c, want){
-  c.tapped = want ?? !c.tapped;
-  // Tapping a land that makes one kind of mana adds it to your pool (one that makes several just taps: add the mana
-  // you chose with the mana buttons, or click one of the mana symbols put on the card)
-  if (c.tapped && settings.autoMana && !c.fd) {
-    const pm = cardOf(c)?.produced_mana || [];
-    if (pm.length === 1 && COLORS.includes(pm[0]) && isLand(cardOf(c))) { me.mana[pm[0]]++; }
-  }
+  c.tapped = want ?? !c.tapped;  // (there's no mana pool to fill: players keep track of their own mana)
   changed();
 }
 /* Mana symbols on a card: a reminder of the mana it can make (a dual land, a mana rock, a creature that taps for
@@ -1943,7 +2049,7 @@ function manaDialog(c){
   const body = el("div"), made = (cardOf(c)?.produced_mana || []).filter(k => COLORS.includes(k));
   const draw_ = () => {
     body.innerHTML = "";
-    body.append(el("p", { className:"hint", textContent:"Pick the mana this card can make. The symbols show on the card for everyone; click one on the table to tap the card and add that mana." }));
+    body.append(el("p", { className:"hint", textContent:"Pick the mana this card can make: a reminder that shows on the card for everyone. Clicking a symbol on the table taps the card." }));
     const row = el("div", { className:"row", style:"flex-wrap:wrap;gap:6px" });
     for (const k of COLORS) {
       const on = c.mana.includes(k), b = el("button", { type:"button", className:"btn small manapick" + (on ? " primary" : ""), ariaLabel:`${k} mana`, ariaPressed:String(on) },
@@ -1998,14 +2104,13 @@ function kwDialog(c, send){
   openModal(`Key terms on ${c.fd ? "a face-down card" : c.name || nameOf(c)}`, body, [{ label:"Done", primary:true }], { wide:true });
 }
 function manaFromTag(c, k){
-  if (!COLORS.includes(k)) return;
-  me.mana[k]++; if (!c.tapped) c.tapped = true;
-  changed();
+  if (!COLORS.includes(k) || c.tapped) return;
+  c.tapped = true; changed();
 }
 function tapFromStack(name, n){
   const g = stackOf(name), up = g.filter(c => !c.tapped).slice(0, n);
   if (!up.length) { toast(`All your ${name}s are tapped. Right-click to untap.`); return; }
-  for (const c of up) { c.tapped = true; if (settings.autoMana) { const pm = cardOf(c)?.produced_mana || []; if (pm.length === 1 && COLORS.includes(pm[0])) me.mana[pm[0]]++; } }
+  for (const c of up) c.tapped = true;
   if (up.length > 1) say(`tapped ${up.length} ${name}s.`);
   changed();
 }
@@ -2065,7 +2170,7 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   if (kwl.length) e.append(el("div", { className:"kwtags", title:kwl.map(x => x.n + (x.eot ? " (until end of turn)" : "")).join(", ") },
     ...kwl.slice(0, 4).map(x => el("span", { className:x.eot ? "eot" : "", textContent:x.n })), ...(kwl.length > 4 ? [el("span", { textContent:`+${kwl.length - 4}` })] : [])));
   const mt = (c.mana || []).filter(k => COLORS.includes(k));
-  if (mt.length && !c.fd) e.append(el("div", { className:"manatags", title:`Can make ${mt.map(k => MANA_NAME[k]).join(", ")} mana${mine ? " (click one to tap it for that mana)" : ""}` },
+  if (mt.length && !c.fd) e.append(el("div", { className:"manatags", title:`Can make ${mt.map(k => MANA_NAME[k]).join(", ")} mana${mine ? " (click to tap it)" : ""}` },
     ...mt.map(k => { const t = el("img", { className:"mtag", src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:k }); t.dataset.mana = k; return t; })));
   // (another player's card carries its power/toughness as they see it; yours is worked out here)
   const pt = typeof c.pt === "string" ? (c.pt ? { str:c.pt, dir:c.ptDir || 0 } : null) : zone === "bf" ? showPt(c) : null;
@@ -2081,7 +2186,7 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
 let ctrlSeat = 0;  // (whose battlefield is being drawn, to mark cards owned by someone else)
 // Battlefield cards, attachments first (tucked behind and above the card they're attached to, and moving with it)
 /* Basic lands of the same kind stack into one pile with a count, so they take the room of one card: shown untapped
-   while any of them is, with how many are untapped. Click your stack to tap one (adding its mana); right-click to tap or
+   while any of them is, with how many are untapped. Click your stack to tap one; right-click to tap or
    untap several, or all. A land with counters, attachments, in combat, or owned by another player stays on its own. (Help turns stacking off.) */
 function landStacks(list, seat = ctrlSeat){
   const byIid = new Map(list.map(c => [c.iid, c])), groups = new Map();
@@ -2106,11 +2211,19 @@ function drawBattlefield(box, list, opts){
     const st = inStack.get(c.iid);
     if (st) {
       if (st.g[0] !== c) continue;  // (the stack is drawn once, where its first land is)
-      const up = st.g.filter(x => !x.tapped).length, e = cardEl({ ...c, tapped:!up }, opts);
-      e.classList.add("landstack"); e.dataset.stack = st.name;
-      e.title = `${st.name}: ${st.g.length} (${up} untapped).${opts?.mine ? " Click to tap one; right-click for more." : ""}`;
-      e.append(el("span", { className:"stackn", textContent:`×${st.g.length}` }), el("span", { className:"stackup", textContent:`${up} untapped` }));
-      box.append(e); place(e, c); continue;
+      // (untapped ones in one pile, tapped ones in a second pile beside it, each with its count)
+      const up = st.g.filter(x => !x.tapped).length, down = st.g.length - up;
+      for (const [n, tapped] of [[up, false], [down, true]]) {
+        if (!n) continue;
+        const e = cardEl({ ...c, tapped }, opts);
+        e.classList.add("landstack"); e.dataset.stack = st.name; e.dataset.pile = tapped ? "tapped" : "untapped";
+        e.title = `${st.name}: ${n} ${tapped ? "tapped" : "untapped"} (${st.g.length} in all).${opts?.mine ? ` Click to ${tapped ? "untap" : "tap"} one; right-click for more.` : ""}`;
+        e.append(el("span", { className:"stackn", textContent:`×${n}` }), el("span", { className:"stackup", textContent:`${n} ${tapped ? "tapped" : "untapped"}` }));
+        box.append(e); place(e, c);
+        // (a tapped card lies sideways: set clear of the untapped pile)
+        if (tapped && up) { const w = parseFloat(getComputedStyle(e).getPropertyValue("--w")) || 84; e.style.left = `calc(${c.x * 100}% + ${Math.round(w * 1.5)}px)`; }
+      }
+      continue;
     }
     const e = cardEl(c, opts), host = hosted(c) ? byIid.get(c.att) : null;
     box.append(e);
@@ -2186,10 +2299,10 @@ function renderOpps(){
     o.append(el("div", { className:"ohead" }, pip, el("span", { className:"oname", textContent:p.name }), ...desigBadges(s),
       el("span", { className:"ocount", textContent:`Hand ${p.hand}` }), el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
       table.started ? el("span", { className:"ocount", title:"Turns they've taken this game", textContent:`Turns ${p.turns || 0}` }) : null,
-      oppMana(p),
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
       cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
       p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
+      p.picking ? el("span", { className:"badge", textContent:"Choosing a deck..." }) : null,
       p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
       el("span", { className:"olife", title:"Life", textContent:p.life })));
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
@@ -2199,13 +2312,6 @@ function renderOpps(){
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     box.append(o);
   }
-}
-// The mana another player has floating, for everyone to see (only the colors they have)
-function oppMana(p){
-  const have = COLORS.filter(k => p.mana?.[k] > 0);
-  if (!have.length) return null;
-  return el("span", { className:"omana", title:"Mana they have floating", ariaLabel:`Mana: ${have.map(k => `${p.mana[k]} ${k}`).join(", ")}` },
-    ...have.map(k => el("span", {}, el("img", { src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:k }), String(p.mana[k]))));
 }
 function renderMine(){
   const z = me.zones;
@@ -2252,13 +2358,6 @@ function renderMine(){
       const d = v - (me.cmd[key] || 0); me.cmd[key] = v; me.life -= d;
       if (d) say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${players[s]?.name}).`);
     }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
-  }
-  const mb = $("#manaBox"); mb.innerHTML = "";
-  for (const k of COLORS) {
-    const b = el("button", { title:`${k} mana: click to add, right-click to spend`, ariaLabel:`${k} mana ${me.mana[k]}` }, el("img", { src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:k }), String(me.mana[k]));
-    b.onclick = () => { me.mana[k]++; changed(); };
-    b.oncontextmenu = e => { e.preventDefault(); me.mana[k] = Math.max(0, me.mana[k] - 1); changed(); };
-    mb.append(b);
   }
   const db = $("#dungeonBox"); db.innerHTML = "";
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
@@ -2384,7 +2483,7 @@ document.addEventListener("pointerup", e => {
   d.ghost?.remove(); d.el.classList.remove("dragging");
   const tag = !d.moved && d.zone === "bf" && e.target.closest?.(".mtag");
   if (tag && !attackMode) { const f = findCard(d.iid); if (f) manaFromTag(f.c, tag.dataset.mana); return; }
-  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) tapFromStack(d.el.dataset.stack, 1); else clickCard(d.iid, d.zone, e); return; }
+  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) { if (d.el.dataset.pile === "tapped") untapFromStack(d.el.dataset.stack, 1); else tapFromStack(d.el.dataset.stack, 1); } else clickCard(d.iid, d.zone, e); return; }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
   if (to === "bf") {
@@ -2467,6 +2566,7 @@ document.addEventListener("keydown", e => {
   if (me && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.target.matches("input,textarea,select") && $("#modal").classList.contains("hidden")) { e.preventDefault(); undo(); return; }
   if (!me || e.target.matches("input,textarea,select") || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape" && targeting) { stopTargeting(); return; }
+  if (e.key === "Escape" && $("#inspect")) { closeInspect(); return; }
   if (e.key === "Escape") { closeMenu(); if (!$("#modal").classList.contains("hidden") && modalClosable) closeModal(); return; }
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
@@ -2662,6 +2762,8 @@ function cardGrid(list, acts){
   const g = el("div", { className:"grid" });
   for (const c of list) {
     const e = cardEl(c, {}), box = el("div", { className:"gcard" }, e);
+    // (click a card in any list to see it large; another player's face-down card stays hidden)
+    if (!c.fd || findCard(c.iid)) { e.classList.add("inspectable"); e.title = `${nameOf(c)}: click to inspect`; e.onclick = ev => { ev.stopPropagation(); viewCard(findCard(c.iid)?.c || c); }; }
     if (acts) { const a = el("div", { className:"acts" }); for (const [label, fn] of acts(c)) { const b = el("button", { textContent:label }); b.onclick = () => fn(c, box); a.append(b); } box.append(a); }
     g.append(box);
   }
@@ -3077,22 +3179,43 @@ function reveal(list, what){
   say(`revealed ${list.map(nameOf).join(", ")}${what ? " from " + what : ""}.`);
 }
 // A card, large, with its rules text (on phones there's no pointing at cards, so the menus offer this)
+/* Inspecting a card: large, with its rules text and the Magic terms on it. A card with two sides (transform, modal
+   double-faced, flip...) shows both, the side up on the table marked. Opened over a list (a search, the top of the
+   library, a graveyard or exile, revealed cards), it comes up on top of it, and closing it goes back to the list. */
 function viewCard(c){
-  const own = c.iid && findCard(c.iid)?.c, k = own ? cardOf(own) : cards.get(c.id), face = own?.face || 0;
-  const src = own ? imgOf(k, face, "normal") : (c.img || "").replace("/small/", "/normal/");
-  const text = el("div", { className:"hint", style:"white-space:pre-wrap;margin-top:8px" });
-  const body = el("div", { style:"max-width:340px;margin:0 auto" }, el("img", { src, alt:c.name || nameOf(c), style:"width:100%;border-radius:4.75%/3.5%" }), text);
-  const terms = el("div");
+  const own = c.iid && findCard(c.iid)?.c, face = own?.face || 0, title = c.name || (own ? nameOf(own) : "Card");
+  const body = el("div", { className:"inspectbody" }), pics = el("div", { className:"inspectpics" }), text = el("div"), terms = el("div");
+  const picOf = (src, label) => el("figure", {}, el("img", { src, alt:label }), label ? el("figcaption", { textContent:label }) : null);
+  const first = own ? imgOf(cardOf(own), face, "normal") : (c.img || "").replace("/small/", "/normal/");
+  if (first) pics.append(picOf(first, ""));
+  body.append(pics, text, terms);
   cardById(c.id).then(x => {
     if (!x) return;
-    text.textContent = textOf(x, face);
+    const two = faces(x);
+    if (two) {
+      pics.innerHTML = "";
+      two.forEach((f, i) => pics.append(picOf(imgOf(x, i, "normal"), `${f.name}${own && i === face ? " (face up on the table)" : ""}`)));
+      text.append(...two.map((f, i) => el("div", { className:"inspecttext" }, el("b", { textContent:f.name }), el("div", { className:"hint", textContent:textOf(x, i) }))));
+    } else if (x.card_faces?.length > 1) {  // (two halves on one picture: split cards, adventures, flip cards)
+      text.append(...x.card_faces.map((f, i) => el("div", { className:"inspecttext" }, el("b", { textContent:f.name }), el("div", { className:"hint", textContent:textOf(x, i) }))));
+    } else text.append(el("div", { className:"inspecttext hint", textContent:textOf(x, 0) }));
+    if (!pics.children.length) { const src = imgOf(x, 0, "normal"); if (src) pics.append(picOf(src, "")); }
+    body.classList.toggle("two", !!two);
     // The Magic terms on this card, with what they mean
     const found = termsIn(`${x.oracle_text || ""} ${(x.card_faces || []).map(f => f.oracle_text || "").join(" ")} ${(x.keywords || []).join(" ")}`);
     if (found.length) terms.append(el("h3", { textContent:"Terms on this card" }), ...found.map(termEl));
   });
-  body.append(terms);
-  openModal(c.name || (own ? nameOf(own) : "Card"), body);
+  if ($("#modal").classList.contains("hidden")) { openModal(title, body, [{ label:"Close" }], { wide:true }); return; }
+  // (over a list: its own layer, so the list stays open underneath)
+  closeInspect();
+  const card = el("div", { className:"modal-card wide" }, el("h2", { textContent:title }), body);
+  const close = el("button", { className:"btn", textContent:"Close" }); close.onclick = closeInspect;
+  card.append(el("div", { className:"mfoot" }, close));
+  const layer = el("div", { id:"inspect", role:"dialog", ariaModal:"true", ariaLabel:title }, card);
+  layer.onclick = e => { if (e.target === layer) closeInspect(); };
+  document.body.append(layer); close.focus();
 }
+function closeInspect(){ $("#inspect")?.remove(); }
 /* Magic terms (terms.js, shared with the webcam table, plus every keyword on Scryfall's lists): the Terms window
    lists and searches them, and viewing a card shows the ones on it */
 const TERMS = new Map();
@@ -3351,7 +3474,6 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
-    s("autoMana", "Tapping a land that makes one color adds that mana to my mana pool"),
     s("hoverPop", "Enlarge a card when I point at it"),
     s("stackLands", "Stack basic lands of the same kind (click a stack to tap one, right-click for more)"),
     s("sounds", "Sounds: my turn, being attacked, being targeted, and chat"),

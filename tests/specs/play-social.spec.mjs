@@ -56,7 +56,8 @@ test("digital table: chat, watching, a dropped connection, and game records", as
   await a.click("#startBtn");
   await expect(a.locator(".modal-card h2")).toHaveText("Who won this game?");
   await a.locator(".modal").getByRole("button", { name:"Luke", exact:true }).click();
-  for (const p of [a, b]) await p.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();
+  // (each player is asked: the same deck or a new one; both keep theirs)
+  for (const p of [a, b]) { await p.locator(".modal").getByRole("button", { name:/^Same deck/ }).click(); await p.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click(); }
   for (const p of [a, b]) {
     await p.click("#statsBtn");
     await expect(p.locator(".modal")).toContainText("1 game recorded");

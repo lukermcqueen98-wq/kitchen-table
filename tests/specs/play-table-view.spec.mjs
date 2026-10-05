@@ -64,11 +64,9 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   await expect(b.locator(".modal-card h2")).toHaveText("Luke's graveyard (2)");
   await button(b, "Close");
 
-  // Mana Luke has floating shows on his panel for Rick
-  await a.locator("#manaBox button[aria-label^='G mana']").click();
-  await a.locator("#manaBox button[aria-label^='G mana']").click();
-  await a.locator("#manaBox button[aria-label^='R mana']").click();
-  await expect(opp(b, "Luke").locator(".omana")).toHaveAttribute("aria-label", "Mana: 1 R, 2 G");
+  // No mana pool counters (players keep track of their own mana)
+  await expect(a.locator("#manaBox")).toHaveCount(0);
+  await expect(b.locator(".omana")).toHaveCount(0);
 
   // Drop-downs are dark with light words (the Group effects ones were light on light)
   await a.click("#fxBtn");
@@ -113,7 +111,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   const hisCard = opp(b, "Luke").locator(".dungeon");
   await expect(hisCard.locator(".droom.here")).toHaveText("Secret Entrance");
   await expect(hisCard).toContainText("🗝 Initiative");
-  expect(await a.evaluate(() => { const m = document.querySelector("#manaBox").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= m.bottom; })).toBe(true);
+  expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom; })).toBe(true);
 
   // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
   await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
@@ -279,19 +277,24 @@ test("digital table: game and turn clocks, turn counts, a turn time limit, your 
 
   // Basic lands of one kind stack with a count; a click taps one (and adds its mana); right-click taps several
   const forests = await ktp(a, () => { const out = []; for (let i = 0; i < 4; i++) { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Forest"); ktPlay.move(c.iid, "bf"); out.push(c.iid); } return out; });
-  const stack = a.locator("#bf .card.landstack");
+  const stack = a.locator("#bf .card.landstack"), upPile = a.locator('#bf .card.landstack[data-pile="untapped"]'), downPile = a.locator('#bf .card.landstack[data-pile="tapped"]');
   await expect(stack).toHaveCount(1);
-  await expect(stack.locator(".stackn")).toHaveText("×4"); await expect(stack.locator(".stackup")).toHaveText("4 untapped");
+  await expect(upPile.locator(".stackn")).toHaveText("×4"); await expect(upPile.locator(".stackup")).toHaveText("4 untapped");
   await expect(opp(b, "Luke").locator(".card.landstack .stackn")).toHaveText("×4");
-  const g0 = await ktp(a, () => ktPlay.me.mana.G);
-  await stack.click();
-  await expect(stack.locator(".stackup")).toHaveText("3 untapped");
-  expect(await ktp(a, () => ktPlay.me.mana.G)).toBe(g0 + 1);
-  await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Tap 2", exact:true }).click();
-  await expect(stack.locator(".stackup")).toHaveText("1 untapped");
-  expect(await ktp(a, () => ktPlay.me.mana.G)).toBe(g0 + 3);
-  await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Untap all 3", exact:true }).click();
-  await expect(stack.locator(".stackup")).toHaveText("4 untapped");
+  // a click taps one: it moves to a tapped pile beside the untapped one, each with its count
+  await upPile.click();
+  await expect(upPile.locator(".stackup")).toHaveText("3 untapped");
+  await expect(downPile.locator(".stackup")).toHaveText("1 tapped"); await expect(downPile).toHaveClass(/tapped/);
+  const [ub, db] = [await upPile.boundingBox(), await downPile.boundingBox()];
+  expect(db.x).toBeGreaterThan(ub.x + ub.width * 0.9);
+  await expect(opp(b, "Luke").locator('.card.landstack[data-pile="tapped"] .stackn')).toHaveText("×1");
+  await upPile.click({ button:"right" }); await a.getByRole("menuitem", { name:"Tap 2", exact:true }).click();
+  await expect(upPile.locator(".stackup")).toHaveText("1 untapped"); await expect(downPile.locator(".stackn")).toHaveText("×3");
+  // clicking the tapped pile untaps one
+  await downPile.click();
+  await expect(downPile.locator(".stackn")).toHaveText("×2"); await expect(upPile.locator(".stackn")).toHaveText("×2");
+  await downPile.click({ button:"right" }); await a.getByRole("menuitem", { name:"Untap all 2", exact:true }).click();
+  await expect(upPile.locator(".stackup")).toHaveText("4 untapped"); await expect(downPile).toHaveCount(0);
   expect(forests.length).toBe(4);
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
@@ -442,15 +445,12 @@ test("digital table: no mana question for lands that make several colors; mana s
   await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
   await a.click("#startBtn"); await button(a, "Start the game");
   for (const p of [a, b]) await button(p, "Keep");
-  const mana = () => ktp(a, () => ({ ...ktPlay.me.mana }));
   // A land that makes two colors (here, Forest made to say it makes green or blue) just taps: nothing is asked
   const land = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Forest"); ktPlay.cards.get(c.id).produced_mana = ["G", "U"]; ktPlay.move(c.iid, "bf"); return c.iid; });
-  const before = await mana();
   await a.locator(`#bf .card[data-iid="${land}"]`).click();
   await expect.poll(() => ktp(a, l => ktPlay.me.zones.bf.find(c => c.iid === l).tapped, land)).toBe(true);
   await expect(a.locator("#menu")).toBeHidden();
-  expect(await mana()).toEqual(before);
-  // Mana symbols on a card: green and blue on Gamma Card, seen by Rick; clicking one taps it for that mana
+  // Mana symbols on a card: green and blue on Gamma Card, seen by Rick; clicking one taps it
   const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
   await a.locator(`#bf .card[data-iid="${gamma}"]`).click({ button:"right" });
   await a.getByRole("menuitem", { name:"Mana symbols (what it can make)...", exact:true }).click();
@@ -459,9 +459,7 @@ test("digital table: no mana question for lands that make several colors; mana s
   await button(a, "Done");
   await expect(a.locator("#log")).toContainText("You marked Gamma Card as making blue, green mana.");
   await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .mtag`)).toHaveCount(2);
-  const g0 = (await mana()).G;
   await a.locator(`#bf .card[data-iid="${gamma}"] .mtag[data-mana="G"]`).click();
-  expect((await mana()).G).toBe(g0 + 1);
   expect(await ktp(a, g => ktPlay.me.zones.bf.find(c => c.iid === g).tapped, gamma)).toBe(true);
   // ...and the symbols go when it leaves the battlefield
   await ktp(a, g => ktPlay.move(g, "hand"), gamma);
@@ -510,6 +508,142 @@ test("digital table: key terms on cards, for everyone, counted in combat, and un
   // The turn ends: flying and menace (until end of turn) wear off; Prowess stays
   await a.click("#nextTurn"); await keepHand(a);
   await expect(card.locator(".kwtags span")).toHaveText(["Prowess"]);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
+
+test("digital table: when a game ends, each player picks the same deck or a new one", async () => {
+  test.setTimeout(120000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  // The first game uses the decks picked in the lobby: no question
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) { await expect(p.locator(".modal-card h2")).toHaveText("Keep this hand?"); await button(p, "Keep"); }
+  // The game ends (Luke won): both are asked
+  await a.click("#startBtn"); await expect(a.locator(".modal-card h2")).toHaveText("Who won this game?"); await button(a, "Luke");
+  for (const p of [a, b]) await expect(p.locator(".modal-card h2")).toHaveText("Next game: which deck?");
+  // While Luke chooses, Rick sees it on Luke's panel
+  await expect(opp(b, "Luke")).toContainText("Choosing a deck...");
+  // Rick keeps his deck; Luke pastes a new one
+  await b.locator(".modal").getByRole("button", { name:/^Same deck/ }).click();
+  await expect(b.locator(".modal-card h2")).toHaveText("Keep this hand?");
+  await button(a, "New deck...");
+  await expect(a.locator(".modal-card h2")).toHaveText("Pick a new deck");
+  await a.fill(".modal input[aria-label='Deck name']", "Betas");
+  await a.fill(".modal textarea[aria-label='Decklist']", "30 Beta Card\n30 Forest");
+  await button(a, "Use this deck");
+  await expect(a.locator(".modal-card h2")).toHaveText("Keep this hand?");
+  await expect(b.locator("#log")).toContainText("Luke switched decks: Betas.");
+  await expect(opp(b, "Luke")).not.toContainText("Choosing a deck...");
+  const names = await ktp(a, () => [...new Set([...ktPlay.me.zones.lib, ...ktPlay.me.zones.hand].map(c => ktPlay.cards.get(c.id)?.name))].sort());
+  expect(names).toEqual(["Beta Card", "Forest"]);
+  expect(await ktp(a, () => ktPlay.me.zones.lib.length + ktPlay.me.zones.hand.length)).toBe(60);
+  const rick = await ktp(b, () => [...new Set([...ktPlay.me.zones.lib, ...ktPlay.me.zones.hand].map(c => ktPlay.cards.get(c.id)?.name))].sort());
+  expect(rick).toEqual(["Forest", "Gamma Card"]);
+  for (const p of [a, b]) await button(p, "Keep");
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
+
+test("digital table: declare attackers, each creature at its own opponent", async () => {
+  test.setTimeout(150000);
+  const browser = await launchBrowser();
+  const [a, b, c] = [await newPlayer(browser), await newPlayer(browser), await newPlayer(browser)];
+  for (const [i, p] of [a, b, c].entries()) {
+    const room = i ? new URL(a.url()).searchParams.get("room") : "";
+    await p.goto(`${BASE}/play.html?kt-test${room ? "&room=" + room : ""}`);
+    await p.fill("#nameIn", ["Luke", "Rick", "Sam"][i]); await p.selectOption("#fmtSel", "sixty"); await p.fill("#deckIn", "30 Gamma Card\n30 Forest"); await p.click("#joinBtn");
+    await expect(p.locator("#table")).toBeVisible({ timeout:15000 });
+    if (!i) await settle(a);
+  }
+  await expect(a.locator(".opp")).toHaveCount(2, { timeout:20000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b, c]) await button(p, "Keep");
+  const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
+  while (await ktp(a, () => ktPlay.table.turnSeat) !== 1) { const s = await ktp(a, () => ktPlay.table.turnSeat), n = await ktp(a, () => ktPlay.table.turnNum); const p = [a, b, c][s - 1]; await p.click("#nextTurn"); await keepHand(p); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); }
+  const three = await ktp(a, () => [0, 1, 2].map(() => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; }));
+  // One at Rick, one at Sam, one stays home
+  await a.click("#attackBtn");
+  const rows = a.locator(".modal .atkrow");
+  await expect(rows).toHaveCount(3);
+  await rows.nth(0).getByRole("radio", { name:"Rick" }).click();
+  await rows.nth(1).getByRole("radio", { name:"Sam" }).click();
+  await expect(a.locator(".modal")).toContainText("1 at Rick, 1 at Sam");
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
+  expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i)).map(c => [c.atk || 0, c.tapped]), three)).toEqual([[2, true], [3, true], [0, false]]);
+  await expect(b.locator("#combatNote")).toContainText("1 attacking you");
+  await expect(c.locator("#combatNote")).toContainText("1 attacking you");
+  await expect(c.locator("#log")).toContainText("Luke attacked Rick with Gamma Card; Sam with Gamma Card.");
+  // Change of plan: the one at Sam goes at Rick instead, and the third joins in at Sam
+  await a.click("#attackBtn");
+  await rows.nth(1).getByRole("radio", { name:"Rick" }).click();
+  await rows.nth(2).getByRole("radio", { name:"Sam" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
+  expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk), three)).toEqual([2, 2, 3]);
+  await expect(b.locator("#combatNote")).toContainText("2 attacking you");
+  // ...and Everyone at Sam
+  await a.click("#attackBtn"); await a.locator(".modal").getByRole("button", { name:"Sam", exact:true }).first().click();
+  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
+  expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk), three)).toEqual([3, 3, 3]);
+  expect([...a.errors, ...b.errors, ...c.errors]).toEqual([]);
+  await browser.close();
+});
+
+test("digital table: inspecting shows both sides of a two-sided card, and cards in lists can be clicked to inspect", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  // A two-sided card on Luke's battlefield, turned to its back
+  await ktp(a, () => {
+    const face = (name, text, n) => ({ name, oracle_text:text, type_line:"Creature — Werewolf", image_uris:{ small:`https://cards.scryfall.io/small/${n}.png`, normal:`https://cards.scryfall.io/normal/${n}.png` } });
+    ktPlay.cards.set("00000000-dfc0-4000-8000-000000000000", { id:"00000000-dfc0-4000-8000-000000000000", name:"Test Pup // Test Wolf", layout:"transform", type_line:"Creature — Werewolf // Creature — Werewolf",
+      card_faces:[face("Test Pup", "When this enters, draw a card.", 1), face("Test Wolf", "Trample", 2)] });
+    ktPlay.me.zones.bf.push({ iid:"dfccard", id:"00000000-dfc0-4000-8000-000000000000", x:0.4, y:0.3, tapped:false, fd:false, face:1, ctr:{} });
+    ktPlay.draw(1);  // (anything that redraws the table)
+  });
+  await a.locator('#bf .card[data-iid="dfccard"]').click({ button:"right" });
+  await a.getByRole("menuitem", { name:"View card", exact:true }).click();
+  const pics = a.locator(".modal .inspectpics figure");
+  await expect(pics).toHaveCount(2);
+  await expect(pics.nth(0)).toContainText("Test Pup");
+  await expect(pics.nth(1)).toContainText("Test Wolf (face up on the table)");
+  await expect(a.locator(".modal .inspecttext")).toHaveCount(2);
+  await expect(a.locator(".modal")).toContainText("When this enters, draw a card.");
+  await button(a, "Close");
+  // Clicking a card in a list (Luke's graveyard) opens it on top; closing goes back to the list
+  await ktp(a, () => { for (let i = 0; i < 2; i++) ktPlay.move(ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card").iid, "gy"); });
+  await a.locator("#gyPile").click();
+  await expect(a.locator(".modal-card h2").first()).toHaveText("Your graveyard (2)");
+  await a.locator(".modal .gcard .card").first().click();
+  await expect(a.locator("#inspect h2")).toHaveText("Gamma Card");
+  await expect(a.locator("#inspect")).toContainText("{T}: Add {C}{C}.");
+  await a.keyboard.press("Escape");
+  await expect(a.locator("#inspect")).toHaveCount(0);
+  await expect(a.locator("#modal .modal-card h2")).toHaveText("Your graveyard (2)");
+  // ...also the top of the library, and another player's graveyard
+  await a.locator(".modal").getByRole("button", { name:"Close" }).click();
+  await ktp(b, () => ktPlay.move(ktPlay.me.zones.lib[0].iid, "gy"));
+  await opp(a, "Rick").locator(".opile", { hasText:"Graveyard 1" }).click();
+  await a.locator(".modal .gcard .card").first().click();
+  await expect(a.locator("#inspect h2")).toBeVisible();
+  await a.locator("#inspect").getByRole("button", { name:"Close" }).click();
+  await expect(a.locator("#inspect")).toHaveCount(0);
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
