@@ -10,7 +10,7 @@ const ktp = (page, fn, arg) => page.evaluate(fn, arg);
 // Put a card from the library straight into a zone (so the test doesn't depend on the shuffle)
 const fetchTo = (page, name, zone) => ktp(page, ([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); return c.iid; }, [name, zone]);
 
-test("digital table: undo, casting, and combat", async () => {
+test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   test.setTimeout(180000);
   const browser = await launchBrowser();
   const a = await newPlayer(browser), b = await newPlayer(browser);
@@ -45,74 +45,42 @@ test("digital table: undo, casting, and combat", async () => {
   await expect(a.locator(`#bf .card[data-iid="${bear}"]`)).toHaveCount(1);
   await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`)).toHaveCount(1);
 
-  // Combat: Luke attacks Rick with the button; the attacker is marked on both screens and taps
+  // Combat by hand: Luke attacks Rick from the creature's menu; an arrow points at Rick on both screens, nothing taps
   const turn = await ktp(a, () => ktPlay.table.turnSeat);
   if (turn !== 1) { await b.click("#nextTurn"); await expect(a.locator("#turnInfo")).toContainText("Your turn"); }
-  await a.click("#attackBtn");
-  await expect(a.locator(".modal-card h2")).toHaveText("Declare attackers");
-  await a.locator(".modal .atkrow", { hasText:"Gamma Card" }).getByRole("radio", { name:"Rick" }).click();
-  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
-  await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking.tapped`)).toHaveCount(1);
-  await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(1);
-  await expect(b.locator("#combatNote")).toContainText("1 attacking you");
-  // Unblocked: Luke asks for combat damage; only Rick, the defender, decides, on his combat screen
-  await a.click("#dmgBtn");
-  await expect(b.locator(".modal-card h2")).toHaveText("Combat: you're being attacked");
-  await expect(b.locator(".modal .frow")).toContainText("Unblocked: 3 damage to you.");
-  await expect(b.locator("#lifeOut")).toHaveText("20");
-  await b.locator(".modal").getByRole("button", { name:"Take 3 damage" }).click();
-  await expect(b.locator("#lifeOut")).toHaveText("17");
-  await expect(a.locator("#log")).toContainText("Rick took 3 combat damage");
-  await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
-
-  // Blocked from the attacker's menu (right-click): a 3/4 into a 3/4, both survive and nothing gets through
-  const wall = await fetchTo(b, "Gamma Card", "bf");
-  const untap = () => ktp(a, iid => { ktPlay.me.zones.bf.find(c => c.iid === iid).tapped = false; }, bear);
-  await untap();
+  await expect(a.locator("#attackBtn")).toHaveCount(0); await expect(a.locator("#dmgBtn")).toHaveCount(0); await expect(a.locator("#combatBtn")).toHaveCount(0);
   await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
   await a.getByRole("menuitem", { name:"Attack Rick" }).click();
-  await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);  // (Rick sees the attack first)
+  await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);
+  await expect(a.locator(`#bf .card[data-iid="${bear}"].tapped`)).toHaveCount(0);
+  for (const p of [a, b]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(1);
+  await expect(b.locator("#combatNote")).toContainText("1 attacking you");
+  await expect(b.locator("#log")).toContainText("Luke attacked Rick with Gamma Card.");
+  // Rick blocks from the attacker's menu: an arrow from his creature to it; damage and life are by hand
+  const wall = await fetchTo(b, "Gamma Card", "bf");
   await opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`).click({ button:"right" });
   await b.getByRole("menuitem", { name:"Gamma Card" }).click();
   await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
-  await expect(a.locator("#arrows > path.blockline")).toHaveCount(1);
-  // (Rick doesn't have to wait to be asked: Take or block on the combat bar)
-  await b.click("#defendBtn");
-  await expect(b.locator(".modal .frow")).toContainText("Gamma Card survives. Your Gamma Card survives.");
-  await b.locator(".modal").getByRole("button", { name:"Apply (no damage to you)" }).click();
-  await expect(b.locator(`#bf .card.blocking`)).toHaveCount(0);
-  await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(0);
-  await expect(b.locator("#lifeOut")).toHaveText("17");
-
-  // Blocking on the combat screen: Luke's creature is pumped to 5/6, so Rick's blocker dies (and goes to his graveyard)
-  await untap();
-  await ktp(a, iid => { ktPlay.me.zones.bf.find(c => c.iid === iid).eot = [2, 2]; }, bear);
-  await a.click("#attackBtn"); await a.locator(".modal").getByRole("button", { name:"Rick", exact:true }).first().click();  // (Everyone at Rick: his only creature)
-  await a.locator(".modal").getByRole("button", { name:"Attack", exact:true }).click();
-  await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);
-  await a.click("#dmgBtn");
-  await expect(b.locator(".modal .frow")).toContainText("Unblocked: 5 damage to you.");
-  await b.locator(".modal select[aria-label='Block Gamma Card with']").selectOption(wall);
-  await expect(b.locator(".modal .frow")).toContainText("Gamma Card survives. Your Gamma Card dies.");
-  await expect(b.locator(".modal .fsum")).toContainText("You take no damage. Your Gamma Card dies.");
-  await b.locator(".modal").getByRole("button", { name:"Apply (no damage to you)" }).click();
-  await expect(b.locator(`#bf .card[data-iid="${wall}"]`)).toHaveCount(0);
-  await expect(b.locator("#gyPile")).toContainText("Graveyard 1");
-  await expect(a.locator(`#bf .card[data-iid="${bear}"]`)).toHaveCount(1);
-
-  // A fourth attack: Rick takes none (as with a fog); and Luke can call off an attack
-  await untap();
-  await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Attack Rick" }).click();
-  await b.locator("#defendBtn").click();
-  await b.locator(".modal").getByRole("button", { name:"Take no damage" }).click();
-  await expect(b.locator("#lifeOut")).toHaveText("17");
-  await expect(a.locator("#log")).toContainText("Rick took no combat damage.");
-  await untap();
-  await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Attack Rick" }).click();
-  await a.click("#calloffBtn");
+  for (const p of [a, b]) await expect(p.locator("#arrows > path.blockline")).toHaveCount(1);
+  await expect(b.locator("#lifeOut")).toHaveText("20");
+  // Clear arrows takes back Luke's attack; a new one, then the turn passing clears it
+  await a.click("#clearArrowsBtn");
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
+  await expect(a.locator("#arrows > path:not(.blockline)")).toHaveCount(0);
+  await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
+  await a.getByRole("menuitem", { name:"Attack Rick" }).click();
+  await expect(b.locator("#combatNote")).toContainText("1 attacking you");
+  // ...a blocker can also pick the attacker by clicking it (Block...)
+  await b.locator(`#bf .card[data-iid="${wall}"]`).click({ button:"right" });
+  await b.getByRole("menuitem", { name:"Block... (click the attacker)" }).click();
+  await opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`).click();
+  await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
+  await a.click("#nextTurn");
+  // (ending the turn with more than 7 cards asks for discards: keep them)
+  const keep = a.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
+  await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
+  await expect(b.locator(`#bf .card.blocking`)).toHaveCount(0);
+  await expect(a.locator("#arrows > path")).toHaveCount(0);
 
   // The library: a single click doesn't draw (it says how); a double-click does
   const before = await a.locator("#hand .card").count();
@@ -136,26 +104,6 @@ test("digital table: undo, casting, and combat", async () => {
   expect(await ktp(a, t => ktPlay.me.zones.hand.some(c => c.iid === t[0]) && ktPlay.me.zones.lib.slice(-2).every(c => t.slice(1).includes(c.iid)), top3)).toBe(true);
   await expect(b.locator("#log li").last()).toContainText("Luke looked at the top 3 cards of their library, put 1 card into their hand, and put the rest (2) on the bottom in a random order.");
 
-  // The fight rules the combat screen works out
-  const f = (att, ...bl) => ktp(a, ([att, bl]) => { const r = ktPlay.fight(att, bl); return [r.toYou, r.attDies, r.deadBlockers.length, r.attGain, r.blkGain]; }, [att, bl]);
-  const C = (p, t, ...kw) => ({ p, t, kw });
-  expect(await f(C(5, 5, "Trample"), C(2, 2))).toEqual([3, false, 1, 0, 0]);           // trample: the excess gets through
-  expect(await f(C(1, 1, "Deathtouch"), C(5, 5))).toEqual([0, true, 1, 0, 0]);        // deathtouch kills the big blocker
-  expect(await f(C(3, 3, "First strike"), C(2, 3))).toEqual([0, false, 1, 0, 0]);     // first strike: the blocker dies before hitting back
-  expect(await f(C(2, 2, "Double strike"))).toEqual([4, false, 0, 0, 0]);             // double strike, unblocked
-  expect(await f(C(4, 4), C(2, 2, "Indestructible"))).toEqual([0, false, 0, 0, 0]);   // indestructible survives
-  expect(await f(C(3, 3, "Lifelink"))).toEqual([3, false, 0, 3, 0]);                  // lifelink: the attacker's player gains
-  expect(await f(C(4, 4), C(2, 2), C(2, 2))).toEqual([0, true, 2, 0, 0]);             // two blockers share the damage
-  expect(await f(C(2, 2, "Menace"), C(5, 5))).toEqual([2, false, 0, 0, 0]);           // menace: a lone blocker doesn't count
-  const g = (att, ...bl) => ktp(a, ([att, bl]) => { const mk = x => ({ ...x, prot:new Set(x.prot || []) }); const r = ktPlay.fight(mk(att), bl.map(mk));
-    return { toYou:r.toYou, poison:r.poison, attDies:r.attDies, dead:r.deadBlockers.length, counters:r.counters.map(([, n]) => n) }; }, [att, bl]);
-  expect(await g(C(3, 3, "Infect"))).toMatchObject({ toYou:0, poison:3 });                         // infect: poison instead of damage
-  expect(await g(C(2, 2, "Wither"), C(1, 4))).toMatchObject({ dead:0, counters:[2] });               // wither: -1/-1 counters that stay
-  expect(await g({ ...C(2, 2), prot:["R"] }, { ...C(4, 4), colors:["R"] })).toMatchObject({ attDies:false });  // protection from red
-  const cb = (b, att) => ktp(a, ([b, att]) => ktPlay.cantBlock({ ...b, prot:new Set() }, { name:"Bird", ...att, prot:new Set(att.prot || []) }), [b, att]);
-  expect(await cb(C(1, 1), C(1, 1, "Flying"))).toBe("Bird has flying");
-  expect(await cb(C(1, 1, "Reach"), C(1, 1, "Flying"))).toBe("");
-  expect(await cb({ ...C(1, 1), colors:["G"] }, { ...C(1, 1), prot:["G"] })).toBe("Bird has protection from it");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });

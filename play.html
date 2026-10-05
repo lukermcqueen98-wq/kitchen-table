@@ -279,7 +279,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .card.blocking{box-shadow:0 0 0 3px #4a86c5,0 0 14px 3px rgba(74,134,197,.75)}
 .card .atk{position:absolute;left:-2px;right:-2px;top:-15px;font-size:10px;line-height:13px;text-align:center;color:#fff;background:#b3452f;border-radius:4px;white-space:nowrap;overflow:hidden}
 .card .atk.blk{background:#2f5f94}
-#arrows path.blockline{stroke:#4a86c5;stroke-width:3;stroke-dasharray:7 4}
+#arrows path.blockline{stroke-width:3;stroke-dasharray:7 4}  /* (a block: dashed, in the blocker's color) */
 #combatBar{display:flex;align-items:center;gap:10px;margin:8px 8px 0;padding:4px 10px;border:1px solid var(--brass);border-radius:10px;min-height:36px;background:rgba(0,0,0,.15)}  /* (only while creatures are attacking) */
 #combatNote{font-size:13px}
 .ghost{position:fixed;pointer-events:none;z-index:90;opacity:.9;transform:rotate(-3deg)}
@@ -448,10 +448,7 @@ details.term a{font-size:13px;color:var(--brass)}
       <span class="tgroup" aria-label="Your turn"><span class="tlabel">Turn</span>
         <button class="btn small primary playonly" id="startBtn">Start game</button>
         <button class="btn small playonly" id="nextTurn">Next turn</button>
-        <button class="btn small hidden playonly" id="attackBtn">Attack</button>
-        <button class="btn small hidden playonly" id="allInBtn" title="Every untapped creature you have attacks">Attack with all</button>
-        <button class="btn small hidden playonly" id="dmgBtn" title="Ask the players you're attacking to block and take the damage">Combat damage</button>
-        <button class="btn small playonly" id="combatBtn" title="Combat helpers: add a creature to the attack, ninjutsu, exert, prevent damage, extra combats..." aria-haspopup="menu">Combat...</button>
+        <button class="btn small playonly" id="clearArrowsBtn" title="Take back your arrows and attack/block marks (they also clear when the turn passes)">Clear arrows</button>
         <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
         <span class="phases" id="phases" title="The steps of a turn">Untap · Upkeep · Draw · Main 1 · Combat · Main 2 · End</span>
       </span>
@@ -845,7 +842,7 @@ $("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown
 let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
-let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, fog:0, rules:{} };
+let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1",
                    stackLands:store.get("kt-dig-stack", "1") === "1" };
@@ -1135,8 +1132,6 @@ function onMessage(s, msg){
       break;
     }
     case "act": takeAct(s, msg); break;
-    case "combatAsk": combatAsk(s); break;
-    case "combatDone": combatDone(s); break;
     case "ping": showPing(s, msg); break;
     case "ownerLeft": {  // (a player left the game: their cards you control leave with them)
       const gone = me.zones.bf.filter(c => c.owner === s);
@@ -1144,7 +1139,6 @@ function onMessage(s, msg){
       break;
     }
     case "effect": takeEffect(s, msg); break;
-    case "combatEnd": if (me.zones.bf.some(c => c.blk)) { for (const c of me.zones.bf) c.blk = ""; withoutUndo(changed); } break;
     case "give": takeCard(s, msg.card); break;
     case "return": takeBack(s, msg.card, msg.zone, !!msg.bottom); break;
     case "reveal": if (Array.isArray(msg.cards)) showReveal(players[s]?.name || "A player", cleanPub({ bf:msg.cards }).bf, String(msg.what || "").slice(0, 60)); break;
@@ -1160,7 +1154,7 @@ function takeTable(t){
   const before = { ...table };
   table = { tv:+t.tv || 0, at:+t.at || 0, fmt:FORMATS[t.fmt] ? t.fmt : "cmdr", started:!!t.started, gameId:String(t.gameId || "").slice(0, 30), startAt:+t.startAt || 0,
             turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX),
-            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), turnAt:+t.turnAt || 0, round:clamp(+t.round || 0, 0, 9999), fog:clamp(+t.fog || 0, 0, 99999), rules:cleanRules(t.rules) };
+            monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), turnAt:+t.turnAt || 0, round:clamp(+t.round || 0, 0, 9999), rules:cleanRules(t.rules) };
   afterTable(before);
 }
 function changeTable(patch){
@@ -1172,8 +1166,8 @@ function changeTable(patch){
 function afterTable(before){
   if (me?.watch) { render(); return; }
   // A turn ended: arrows, combat, and "until end of turn" power/toughness changes are over
-  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot || c.ctr?.[MARK.noDmg] || c.kw?.some(x => x.eot)))) {
-    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; if (c.ctr) delete c.ctr[MARK.noDmg]; if (c.kw) { c.kw = c.kw.filter(x => !x.eot); if (!c.kw.length) delete c.kw; } } attackMode = 0; withoutUndo(changed);
+  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot || c.kw?.some(x => x.eot)))) {
+    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; if (c.kw) { c.kw = c.kw.filter(x => !x.eot); if (!c.kw.length) delete c.kw; } } withoutUndo(changed);
   }
   if (!table.started && before.fmt !== table.fmt && me && FORMATS[table.fmt].cmdr && !FORMATS[before.fmt].cmdr && $("#modal").classList.contains("hidden")) setTimeout(askCommander, 300);
   if (!table.started && before.fmt !== table.fmt && me) {
@@ -1185,7 +1179,7 @@ function afterTable(before){
     withoutUndo(() => { draw(1, true); say("drew a card for being the monarch (end step)."); changed(); });
   }
   if (before.day !== table.day && table.gameId === before.gameId) matchDayNight();
-  // Taking the initiative (from the menu, combat damage, or a player leaving) ventures into the Undercity
+  // Taking the initiative (from the menu, or a player leaving) ventures into the Undercity
   if (table.started && table.initiative === mySeat && before.initiative !== mySeat && table.gameId === before.gameId && before.gameId) setTimeout(() => venture("took the initiative"), 50);
   if (table.started && table.gameId && me.gameId !== table.gameId) { const first = !me.gameId; dealNewGame(); if (first || me.watch) turnAlert("A new game started", "Keep or mulligan your opening hand."); }
   else if (table.turnSeat === mySeat && (before.turnSeat !== mySeat || before.turnNum !== table.turnNum) && table.turnNum > 0) startMyTurn();
@@ -1381,8 +1375,7 @@ function startMyTurn(){ withoutUndo(startMyTurn_); }
 function startMyTurn_(){
   if (me.out) { const to = nextSeat(mySeat); if (to !== mySeat) changeTable({ turnSeat:to, turnNum:table.turnNum + 1, phase:0 }); return; }  // (out of the game: skipped)
   me.turns++; me.lands = 0; for (const k of COLORS) me.mana[k] = 0;
-  // (an exerted creature doesn't untap this time; goad lasts until the goading player's next turn, taken off by hand)
-  if (settings.autoUntap) for (const c of me.zones.bf) { if (c.ctr?.[MARK.exert]) delete c.ctr[MARK.exert]; else c.tapped = false; }
+  if (settings.autoUntap) for (const c of me.zones.bf) c.tapped = false;
   if (settings.autoDraw) draw(1, true);
   say(`${settings.autoUntap ? "untapped" : "started their turn"}${settings.autoDraw ? " and drew a card" : ""} (turn ${table.turnNum}).`);
   if (table.initiative === mySeat) setTimeout(() => venture("has the initiative (upkeep)"), 50);
@@ -1708,328 +1701,33 @@ function takeAct_(from, a){
   else if (a.act === "steal") giveCard(c.iid, from);
 }
 /* =====================================================================
-   Combat: attack (a button for several at once, or a creature's menu), block, and combat damage
+   Combat, by hand: attacking draws an arrow from the creature to the player it attacks, blocking draws one from the
+   blocker to the attacker, for everyone to see. Nothing is worked out for you: players tap, deal damage and change
+   life themselves. Arrows and attack/block marks clear when the turn passes (or with Clear arrows).
    ===================================================================== */
-/* Small combat helpers, all by hand (the table doesn't decide anything): markers on a creature (exerted, goaded, deals
-   no combat damage), a Fog for everyone this turn, a creature put into the attack (it entered tapped and attacking),
-   ninjutsu, taking a creature out of combat, and an extra combat phase. */
-const MARK = { exert:"Exerted", goad:"Goaded", noDmg:"No combat damage" }, MARKS = new Set(Object.values(MARK));
-function toggleMark(c, k, verb){
-  c.ctr ||= {}; if (c.ctr[k]) { delete c.ctr[k]; say(`took the "${k}" marker off ${nameOf(c)}.`); } else { c.ctr[k] = 1; say(`${verb} ${nameOf(c)}.`); }
-  changed();
-}
-$("#combatBtn").onclick = e => {
-  const r = e.currentTarget.getBoundingClientRect(), myTurn = table.turnSeat === mySeat;
-  const mine = me.zones.bf.filter(c => isCreature(c)), attacking = mine.filter(c => c.atk);
-  const opps = presentSeats().filter(s => s !== mySeat && !isOut(s));
-  const pick = (list, title, fn) => list.length ? pickCards(list, 1, title, "Pick", cs => fn(cs[0])) : toast("No creatures for that.");
-  const items = [{ head:"Combat helpers" }];
-  if (myTurn) items.push(
-    { label:"Put a creature into the attack (it entered tapped and attacking)...", fn:() => pick(mine.filter(c => !c.atk), "Which creature is attacking?", c => {
-      const go = s => { c.atk = s; c.tapped = true; say(`put ${nameOf(c)} into the attack against ${nm(s)} (tapped and attacking).`); changed(); };
-      if (opps.length === 1) go(opps[0]); else setTimeout(() => pickPlayer("Attacking whom?", opps, go), 50); }) },
-    { label:"Ninjutsu (return an unblocked attacker, put a card from your hand in attacking)...", fn:ninjutsu },
-    { label:"Exert an attacker...", fn:() => pick(attacking, "Exert which attacker?", c => toggleMark(c, MARK.exert, "exerted")) },
-    { label:"Take a creature out of combat...", fn:() => pick(mine.filter(c => c.atk || c.blk), "Take which one out?", c => { c.atk = 0; c.blk = ""; say(`removed ${nameOf(c)} from combat.`); changed(); }) },
-    { label:"Extra combat: untap the creatures that attacked and attack again", fn:() => { for (const c of attacking) { c.tapped = false; c.atk = 0; delete c.atkTapped; } say(`got an additional combat phase (untapped ${attacking.length} attacker${attacking.length === 1 ? "" : "s"}).`); changed(); } },
-    { label:"End this combat (clear attackers and blockers)", fn:() => { for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; } attackMode = 0; say("ended combat."); changed(); } }, "-");
-  items.push(
-    { label:"A creature of mine deals no combat damage this turn...", fn:() => pick(mine, "Which creature?", c => toggleMark(c, MARK.noDmg, "prevented the combat damage of")) },
-    table.fog === table.turnNum ? { label:"Undo the Fog (combat damage happens again)", fn:() => { changeTable({ fog:0 }); say("undid the Fog."); } }
-      : { label:"Fog: prevent all combat damage this turn", fn:() => { changeTable({ fog:table.turnNum }); say("prevented all combat damage this turn (Fog)."); } },
-    { label:"Take the Exerted, Goaded and No combat damage markers off my creatures", fn:() => { for (const c of me.zones.bf) for (const k of MARKS) delete c.ctr?.[k]; say("cleared their combat markers."); changed(); } });
-  openMenu(r.left, r.bottom + 4, items);
-};
-// Ninjutsu: an unblocked attacker goes back to your hand, and a card from your hand comes in tapped and attacking the same player
-function ninjutsu(){
-  const unblocked = me.zones.bf.filter(c => c.atk && !Object.values(players).some(p => (p.bf || []).some(b => b.blk === c.iid)));
-  const hand = me.zones.hand.filter(c => isCreature(c));
-  if (!unblocked.length) { toast("No unblocked attackers."); return; }
-  if (!hand.length) { toast("No creature cards in your hand."); return; }
-  pickCards(unblocked, 1, "Return which unblocked attacker?", "Return", ([back]) => {
-    const seat = back.atk, x = back.x, y = back.y;
-    setTimeout(() => pickCards(hand, 1, "Put which card in attacking?", "Ninjutsu", ([ninja]) => {
-      move(back.iid, "hand", { quiet:true }); move(ninja.iid, "bf", { quiet:true, x, y });
-      const n = findCard(ninja.iid)?.c; if (n) { n.tapped = true; n.atk = seat; }
-      say(`used ninjutsu: returned ${nameOf(back)} to their hand and put ${nameOf(ninja)} onto the battlefield tapped and attacking ${nm(seat)}.`); changed();
-    }), 50);
-  });
-}
-let attackMode = 0;  // the player you're attacking while "Attack" is on: clicking your creatures toggles them
 const isCreature = c => c.fd || /\bCreature\b/.test(typeOf(cardOf(c), c.face || 0));
-const attackersAt = seat => Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === seat).map(c => ({ c, s:+s })));
-function powerOf(c){ return Math.max(0, ptOf(c)?.p || 0); }
-function toggleAttack(c, seat){
-  if (c.atk) { c.atk = 0; if (c.atkTapped) c.tapped = false; delete c.atkTapped; say(`took ${nameOf(c)} out of the attack.`); changed(); return; }
-  if (!isCreature(c)) { toast("Only creatures can attack."); return; }
-  if (c.tapped) { toast(`${nameOf(c)} is tapped.`); return; }
-  c.atk = seat;
-  if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; }  // (attacking taps it, unless it has vigilance)
-  say(`attacked ${nm(seat)} with ${nameOf(c)}.`); changed();
-}
-function setBlock(b, atk, seat){
-  b.blk = atk.iid;
-  say(`blocked ${nm(seat)}'s ${atk.name} with ${nameOf(b)}.`); changed();
-}
-$("#allInBtn").onclick = () => {
-  if (!attackMode) return;
-  const ready = me.zones.bf.filter(c => isCreature(c) && !c.tapped && !c.atk);
-  if (!ready.length) { toast("No untapped creatures to attack with."); return; }
-  for (const c of ready) { c.atk = attackMode; if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
-  say(`attacked ${nm(attackMode)} with ${ready.map(nameOf).join(", ")}.`); changed();
-};
-$("#attackBtn").onclick = () => {
-  if (attackMode) { attackMode = 0; $("#toast").classList.add("hidden"); render(); return; }
-  declareAttackers();
-};
-/* Declare attackers: every creature that can attack, each with its own target (any opponent, or not attacking), so
-   one attack can go at several players. "Everyone at..." sends them all at one player; a creature already attacking
-   can be sent elsewhere or taken back. Attacking taps a creature unless it has vigilance. */
-function declareAttackers(){
-  const opps = presentSeats().filter(s => s !== mySeat && !isOut(s));
-  if (!opps.length) { toast("There's nobody to attack yet."); return; }
-  const list = me.zones.bf.filter(c => isCreature(c) && (c.atk || !c.tapped));
-  if (!list.length) { toast("No untapped creatures to attack with."); return; }
-  const pick = new Map(list.map(c => [c.iid, c.atk && opps.includes(c.atk) ? c.atk : 0]));
-  const body = el("div");
-  const draw_ = () => {
-    body.innerHTML = "";
-    const all = el("div", { className:"row", style:"flex-wrap:wrap;gap:6px;margin-bottom:10px" }, el("span", { className:"hint", textContent:"Everyone at:" }),
-      ...opps.map(s => { const b = el("button", { type:"button", className:"btn small", textContent:nm(s) }); b.style.borderColor = SEAT_HEX[s - 1]; b.onclick = () => { for (const c of list) pick.set(c.iid, s); draw_(); }; return b; }),
-      (() => { const b = el("button", { type:"button", className:"btn small", textContent:"No one" }); b.onclick = () => { for (const c of list) pick.set(c.iid, 0); draw_(); }; return b; })());
-    body.append(all);
-    for (const c of list) {
-      const now = pick.get(c.iid), pt = showPt(c), img = imgOf(cardOf(c), c.face || 0, "small");
-      const row = el("div", { className:"atkrow" + (now ? " on" : "") },
-        img && !c.fd ? el("img", { src:img, alt:"" }) : el("span", { className:"atkph" }),
-        el("span", { className:"atkname", textContent:`${nameOf(c)}${pt ? ` (${pt.str})` : ""}` }));
-      const opts = el("span", { className:"atkopts", role:"radiogroup", ariaLabel:`${nameOf(c)} attacks` });
-      for (const s of [0, ...opps]) {
-        const b = el("button", { type:"button", role:"radio", ariaChecked:String(now === s), className:"btn small" + (now === s ? " primary" : ""), textContent:s ? nm(s) : "Don't attack" });
-        if (s && now === s) b.style.boxShadow = `0 0 0 2px ${SEAT_HEX[s - 1]}`;
-        b.onclick = () => { pick.set(c.iid, s); draw_(); };
-        opts.append(b);
-      }
-      row.append(opts); body.append(row);
-    }
-    const n = [...pick.values()].filter(Boolean).length;
-    body.append(el("p", { className:"hint", style:"margin-top:8px", textContent:n ? opps.filter(s => [...pick.values()].includes(s)).map(s => `${[...pick.values()].filter(v => v === s).length} at ${nm(s)}`).join(", ") : "Nobody attacking yet." }));
-  };
-  draw_();
-  openModal("Declare attackers", body, [{ label:"Cancel" }, { label:"Attack", primary:true, fn:() => {
-    const by = {};
-    for (const c of list) {
-      const t = pick.get(c.iid), was = c.atk || 0;
-      if (t === was) continue;
-      if (!t) { c.atk = 0; if (c.atkTapped) c.tapped = false; delete c.atkTapped; continue; }
-      if (!was) { c.atk = t; if (!kwOf(c).includes("Vigilance")) { c.tapped = true; c.atkTapped = true; } }
-      else c.atk = t;
-      (by[t] ||= []).push(nameOf(c));
-    }
-    const parts = Object.entries(by).map(([s, names]) => `${nm(+s)} with ${names.join(", ")}`);
-    if (parts.length) say(`attacked ${parts.join("; ")}.`);
-    changed();
-  } }], { wide:true });
-}
-// Unblocked attackers hit the player they're attacking (commander damage too); blocked ones are left to the players
-// Your attack is set: the players you're attacking get their combat screen to block and take the damage (only
-// they decide it). Call off attack on the combat bar ends it with no damage.
-$("#dmgBtn").onclick = () => {
-  attackMode = 0;
-  const defenders = [...new Set(me.zones.bf.filter(c => c.atk).map(c => c.atk))];
-  const missing = defenders.filter(s => !conns[s]?.open);
-  if (missing.length) { toast(`${missing.map(nm).join(", ")} isn't connected.`); return; }
-  for (const s of defenders) send(conns[s], { type:"combatAsk" });
-  say(`is ready for combat damage (${defenders.map(nm).join(", ")} to block and take it).`);
-  toast(`Waiting for ${defenders.map(nm).join(" and ")} to block and take the damage.`); render();
-};
-/* Being attacked: only you decide. The combat screen lists each attacker with a "Block with" picker, works out
-   each fight as you block (who dies, what gets through to you: trample, deathtouch, first and double strike,
-   lifelink, indestructible, several blockers), and one button applies it all. */
-// Asked for combat damage: open the combat screen (the attack itself can arrive a moment after the ask, so wait
-// for it; with another window open, say so instead)
-function combatAsk(from, tries = 0){
-  if (!incoming().some(a => a.s === from)) { if (tries < 20) setTimeout(() => combatAsk(from, tries + 1), 150); return; }
-  if ($("#modal").classList.contains("hidden")) defendDialog(); else toast(`${nm(from)} is ready for combat damage: press Take or block.`);
-}
-function incoming(){ return Object.entries(players).filter(([s]) => +s !== mySeat).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === mySeat).map(c => ({ s:+s, c }))); }
 // (a card's keywords: printed ones, plus key terms given to it on the table, "until end of turn" or for as long as it's out)
 const kwGiven = c => (c.kw || []).map(x => typeof x === "string" ? x : x.n).filter(Boolean);
 const kwOf = c => { const k = cards.get(c.id); return c.fd ? kwGiven(c) : [...(k?.card_faces?.[c.face || 0]?.keywords || k?.keywords || []), ...kwGiven(c)]; };
-const ptParse = str => { const m = /^(-?\d+)\/(-?\d+)/.exec(str || ""); return m ? { p:Math.max(0, +m[1]), t:+m[2] } : { p:0, t:0 }; };
-const FIGHT_KW = ["Flying", "Reach", "Menace", "Trample", "Deathtouch", "First strike", "Double strike", "Lifelink", "Indestructible", "Infect", "Wither"];
-const COLOR_WORDS = { white:"W", blue:"U", black:"B", red:"R", green:"G" };
-// A creature in combat: power/toughness, keywords, colors, what it has protection from, and "can't be blocked"
-function combatant(c, pt){
-  const k = cards.get(c.id), f = c.fd ? null : (k?.card_faces?.[c.face || 0] || k), name = c.name || nameOf(c);
-  // (key terms given on the table count too: "Protection from red", "Can't be blocked")
-  const given = kwGiven(c).map(t => /^can'?t be blocked$/i.test(t) ? `${name.split(",")[0]} can't be blocked.` : t + ".");
-  const text = [String(f?.oracle_text ?? k?.oracle_text ?? ""), ...given].join("\n");
-  const prot = new Set();
-  for (const m of text.matchAll(/protection from ([a-z ,]+?)(?=[.\n(]|$)/gi))
-    for (const w of m[1].toLowerCase().split(/,|\band\b|\bor\b/).map(x => x.trim()).filter(Boolean)) {
-      if (COLOR_WORDS[w]) prot.add(COLOR_WORDS[w]);
-      else if (w === "everything") prot.add("all");
-      else if (w === "all colors" || w === "each color") Object.values(COLOR_WORDS).forEach(x => prot.add(x));
-      else if (/^creatures?$/.test(w)) prot.add("creatures");
-    }
-  const short = name.split(",")[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const unblockable = new RegExp(`(^|\\n)(${short}|this creature) can't be blocked\\.`, "i").test(text);
-  // (combat damage prevented: a Fog this turn, or this creature deals none)
-  const prevented = table.fog === table.turnNum || !!c.ctr?.[MARK.noDmg];
-  return { c, name, ...pt, ...(prevented ? { p:0 } : {}), kw:kwOf(c), colors:c.fd ? [] : (f?.colors || k?.colors || []), prot, unblockable };
+function attackWith(c, seat){
+  me.arrows = (me.arrows || []).filter(a => a.from !== c.iid);
+  c.atk = seat; c.blk = ""; me.arrows.push({ from:c.iid, player:seat });
+  say(`attacked ${nm(seat)} with ${nameOf(c)}.`); changed();
 }
-const protects = (x, src) => !!x.prot && (x.prot.has("all") || x.prot.has("creatures") || (src.colors || []).some(col => x.prot.has(col)));
-// Why this creature can't block that attacker ("" if it can)
-function cantBlock(b, a){
-  if (a.unblockable) return `${a.name} can't be blocked`;
-  if (a.kw.includes("Flying") && !b.kw.includes("Flying") && !b.kw.includes("Reach")) return `${a.name} has flying`;
-  if (protects(a, b)) return `${a.name} has protection from it`;
-  return "";
+function setBlock(b, atk, seat){
+  me.arrows = (me.arrows || []).filter(a => a.from !== b.iid);
+  b.blk = atk.iid; b.atk = 0;  // (drawn as an arrow from the blocker to the attacker)
+  say(`blocked ${nm(seat)}'s ${atk.name} with ${nameOf(b)}.`); changed();
 }
-/* One attacker against its blockers (in blocking order): damage and poison to you, who dies, lifelink, and -1/-1
-   counters from infect and wither. Protection prevents damage; a lone blocker on a menace creature doesn't count. */
-function fight(att, blockers){
-  for (const x of [att, ...blockers]) { x.prot ||= new Set(); x.colors ||= []; x.dmg = 0; x.dtHit = false; x.ctr = 0; }
-  const has = (x, k) => x.kw.includes(k), fs = x => has(x, "First strike") || has(x, "Double strike"), rs = x => !has(x, "First strike") || has(x, "Double strike");
-  const menaceBad = has(att, "Menace") && blockers.length === 1;
-  if (menaceBad || att.unblockable) blockers = [];
-  const all = [att, ...blockers];
-  const dead = x => !has(x, "Indestructible") && (x.dmg >= x.t || x.dtHit || x.t <= 0);
-  const hurt = (to, from, n) => {
-    if (protects(to, from)) return 0;
-    to.dmg += n; if (has(from, "Deathtouch")) to.dtHit = true; if (has(from, "Infect") || has(from, "Wither")) to.ctr += n;
-    return n;
-  };
-  let toYou = 0, poison = 0, attGain = 0, blkGain = 0;
-  for (const step of [fs, rs]) {
-    if (!all.some(step)) continue;
-    const alive = all.filter(x => !dead(x)), deal = [];
-    if (alive.includes(att) && step(att) && att.p > 0) {
-      const live = blockers.filter(b => alive.includes(b));
-      if (!blockers.length) deal.push(["you", att.p]);
-      else if (!live.length) { if (has(att, "Trample")) deal.push(["you", att.p]); }
-      else {
-        let left = att.p;
-        live.forEach((b, i) => {
-          const lethal = has(att, "Deathtouch") ? 1 : Math.max(0, b.t - b.dmg);
-          const give = i === live.length - 1 && !has(att, "Trample") ? left : Math.min(left, lethal);
-          if (give > 0) deal.push([b, give]); left -= give;
-        });
-        if (left > 0) deal.push(["you", left]);
-      }
-    }
-    const back = blockers.filter(b => alive.includes(b) && step(b) && b.p > 0 && alive.includes(att)).map(b => [b, b.p]);
-    for (const [to, n] of deal) {
-      const d = to === "you" ? n : hurt(to, att, n);
-      if (to === "you") { if (has(att, "Infect")) poison += n; else toYou += n; }
-      if (has(att, "Lifelink")) attGain += d;
-    }
-    for (const [b, n] of back) { const d = hurt(att, b, n); if (has(b, "Lifelink")) blkGain += d; }
-  }
-  return { toYou, poison, attDies:dead(att), deadBlockers:blockers.filter(dead), attGain, blkGain, menaceBad,
-           counters:all.filter(x => x.ctr && !dead(x)).map(x => [x, x.ctr]) };
+function outOfCombat(c){
+  c.atk = 0; c.blk = ""; me.arrows = (me.arrows || []).filter(a => a.from !== c.iid);
+  say(`took ${nameOf(c)} out of combat.`); changed();
 }
-async function defendDialog(){
-  const list = incoming(); if (!list.length) { toast("Nobody is attacking you."); return; }
-  await Promise.all(list.map(({ c }) => c.id && !cards.has(c.id) ? cardById(c.id).catch(() => null) : null));
-  const body = el("div"), foot = el("p", { className:"fsum" });
-  const mineOf = b => { const x = ptOf(b); return combatant(b, { p:Math.max(0, x?.p || 0), t:x?.t ?? 0 }); };
-  const empty = () => ({ hits:{}, theirDead:[], myDead:[], gains:{}, myGain:0, total:0, poison:0, myCounters:[], theirCounters:[] });
-  let plan = null;
-  const draw_ = () => {
-    body.innerHTML = ""; plan = empty();
-    const free = me.zones.bf.filter(b => isCreature(b) && !b.tapped && (!b.blk || !list.some(a => a.c.iid === b.blk)));
-    for (const { s, c } of list) {
-      const att = combatant(c, ptParse(c.pt));
-      const bl = me.zones.bf.filter(b => b.blk === c.iid).map(mineOf), r = fight(att, bl);
-      const hit = (amount, poison) => (plan.hits[s] ||= []).push({ iid:c.iid, name:att.name, amount, cmdr:!!c.cmdr, poison });
-      if (r.toYou) { plan.total += r.toYou; hit(r.toYou, false); }
-      if (r.poison) { plan.poison += r.poison; hit(r.poison, true); }
-      if (r.attDies) plan.theirDead.push({ s, c });
-      plan.myDead.push(...r.deadBlockers.map(x => x.c));
-      for (const [x, n] of r.counters) (x === att ? plan.theirCounters.push({ s, c, n }) : plan.myCounters.push({ c:x.c, n }));
-      if (r.attGain) plan.gains[s] = (plan.gains[s] || 0) + r.attGain;
-      plan.myGain += r.blkGain;
-      const open = free.filter(b => !b.blk), why = open.map(b => [b, cantBlock(mineOf(b), att)]);
-      const pick = el("select", { ariaLabel:`Block ${att.name} with` }, el("option", { value:"", textContent:bl.length ? "Add another blocker..." : "Block with..." }),
-        ...why.filter(([, w]) => !w).map(([b]) => el("option", { value:b.iid, textContent:`${nameOf(b)} (${ptOf(b)?.str || "?"})` })));
-      pick.onchange = () => { const b = findCard(pick.value)?.c; if (b) { b.blk = c.iid; say(`blocked ${nm(s)}'s ${att.name} with ${nameOf(b)}.`); changed(); draw_(); } };
-      const cant = why.filter(([, w]) => w);
-      const chips = el("div", { className:"chips" }, ...bl.map(x => { const rm = el("button", { textContent:"×", ariaLabel:`Stop blocking with ${x.name}` }); rm.onclick = () => { x.c.blk = ""; changed(); draw_(); }; return el("span", {}, `${x.name} (${x.p}/${x.t})`, rm); }));
-      const blocked = bl.length && !r.menaceBad && !att.unblockable;
-      const outcome = [r.menaceBad ? "Menace: it needs two or more blockers, so one doesn't count." : "",
-        !blocked ? `Unblocked: ${r.poison ? `${r.poison} poison` : `${r.toYou} damage`} to you${c.cmdr ? " (commander damage)" : ""}.` : r.toYou || r.poison ? `${r.toYou || r.poison} ${r.poison ? "poison" : ""} tramples over to you.`.replace("  ", " ") : "",
-        blocked ? (r.attDies ? `${att.name} dies.` : `${att.name} survives.`) : "",
-        ...(blocked ? r.deadBlockers.map(x => `Your ${x.name} dies.`) : []), ...(blocked ? bl.filter(x => !r.deadBlockers.includes(x)).map(x => `Your ${x.name} survives.`) : []),
-        ...r.counters.map(([x, n]) => `${x === att ? att.name : `Your ${x.name}`} gets ${n} -1/-1 counter${n === 1 ? "" : "s"}.`),
-        r.attGain ? `${nm(s)} gains ${r.attGain} (lifelink).` : "", r.blkGain ? `You gain ${r.blkGain} (lifelink).` : ""].filter(Boolean).join(" ");
-      const img = el("img", { className:"fimg", alt:"", src:(c.img || "").replace("/small/", "/normal/") || "card-back.jpg" });
-      const tags = [...att.kw.filter(k => FIGHT_KW.includes(k)), ...(att.prot.size ? ["Protection"] : []), ...(att.unblockable ? ["Can't be blocked"] : [])];
-      body.append(el("div", { className:"frow" }, img, el("div", {},
-        el("div", { className:"fname" }, `${nm(s)}'s `, el("b", { textContent:att.name }), ` ${att.p}/${att.t}`, ...tags.map(k => el("span", { className:"tag", textContent:k }))),
-        chips, why.some(([, w]) => !w) ? pick : null,
-        cant.length ? el("p", { className:"hint", textContent:`Can't block it: ${cant.map(([b, w]) => `${nameOf(b)} (${w.replace(`${att.name} `, "")})`).join(", ")}.` }) : null,
-        el("p", { className:"fout", textContent:outcome }))));
-    }
-    const take = [plan.total ? `${plan.total} damage` : "", plan.poison ? `${plan.poison} poison` : ""].filter(Boolean).join(" and ") || "no damage";
-    foot.textContent = `You take ${take}${plan.myGain ? ` and gain ${plan.myGain}` : ""}. ${plan.myDead.length ? `Your ${plan.myDead.map(nameOf).join(", ")} die${plan.myDead.length === 1 ? "s" : ""}. ` : ""}${plan.theirDead.length ? `Their ${plan.theirDead.map(x => x.c.name).join(", ")} die${plan.theirDead.length === 1 ? "s" : ""}.` : ""}`;
-    body.append(foot, el("p", { className:"hint", textContent:"Worked out from power/toughness (counters and changes included), flying and reach, menace, can't be blocked, protection from colors, trample, deathtouch, first and double strike, lifelink, indestructible, infect and wither. Anything else is yours to account for." }));
-    const main = $("#modal .mfoot .primary"); if (main) main.textContent = label();
-  };
-  const label = () => plan.total || plan.poison ? `Take ${[plan.total ? `${plan.total} damage` : "", plan.poison ? `${plan.poison} poison` : ""].filter(Boolean).join(" and ")}` : "Apply (no damage to you)";
-  draw_();
-  openModal("Combat: you're being attacked", body, [
-    { label:"Take no damage", fn:() => resolveCombat(empty(), "took no combat damage.") },
-    { label:label(), primary:true, fn:() => resolveCombat(plan) }], { wide:true });
+function clearArrows(){
+  me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; }
+  say("cleared their arrows."); changed();
 }
-function resolveCombat(plan, note){
-  const { hits, theirDead, myDead, gains, myGain, total, poison = 0, myCounters = [], theirCounters = [] } = plan;
-  for (const [s, h] of Object.entries(hits)) takeHits(+s, h);
-  const what = h => `${h.amount}${h.poison ? " poison" : ""} from ${h.name}`;
-  say(note || (total || poison ? `took ${[total ? `${total} combat damage` : "", poison ? `${poison} poison` : ""].filter(Boolean).join(" and ")} (${Object.entries(hits).map(([s, l]) => `${l.map(what).join(", ")} of ${nm(+s)}'s`).join("; ")}).` : "took no combat damage."));
-  withoutUndo(() => {
-    for (const b of myDead) move(b.iid, "gy", { quiet:true });
-    if (myDead.length) say(`lost ${myDead.map(nameOf).join(", ")} in combat.`);
-    for (const { c, n } of myCounters) { c.ctr["-1/-1"] = (c.ctr["-1/-1"] || 0) + n; say(`put ${n} -1/-1 counter${n === 1 ? "" : "s"} on ${nameOf(c)} (infect or wither).`); }
-    if (myGain) { me.life += myGain; say(`gained ${myGain} life (lifelink).`); }
-    for (const b of me.zones.bf) b.blk = "";
-    changed();
-  });
-  for (const { s, c } of theirDead) sendAct(s, c, "gy", {}, `killed ${nm(s)}'s ${c.name} in combat.`);
-  for (const { s, c, n } of theirCounters) for (let i = 0; i < n; i++) sendAct(s, c, "ctr", { name:"-1/-1", d:1 }, i ? "" : `put ${n} -1/-1 counter${n === 1 ? "" : "s"} on ${nm(s)}'s ${c.name} (infect or wither).`);
-  for (const [s, n] of Object.entries(gains)) send(conns[s], { type:"effect", kind:"gain", n, card:"lifelink" });
-  broadcast({ type:"combatDone" });
-}
-// A defending player finished: your creatures attacking them are out of combat
-function combatDone(from){
-  if (!me.zones.bf.some(c => c.atk === from)) return;
-  withoutUndo(() => { for (const c of me.zones.bf) if (c.atk === from) { c.atk = 0; delete c.atkTapped; } if (!me.zones.bf.some(c => c.atk)) attackMode = 0; changed(); });
-}
-function endCombat(){ for (const c of me.zones.bf) { c.atk = 0; delete c.atkTapped; } attackMode = 0; broadcast({ type:"combatEnd" }); changed(); }
-// Combat damage dealt to you: life, and commander damage from a commander
-function takeHits(from, hits){
-  if (!Array.isArray(hits)) return;
-  withoutUndo(() => {
-    let total = 0, poison = 0;  // (infect damage to a player is poison counters instead of life)
-    for (const h of hits.slice(0, 40)) {
-      const n = clamp(Math.round(+h?.amount || 0), 0, 999); if (!n) continue;
-      if (h.poison) poison += n; else total += n;
-      if (h.cmdr && typeof h.iid === "string") { const key = `${from}:${h.iid.slice(0, 20)}`; me.cmd[key] = (me.cmd[key] || 0) + n; }
-    }
-    if (!total && !poison) return;
-    me.life -= total; me.poison += poison;
-    toast(`You took ${[total ? `${total} combat damage` : "", poison ? `${poison} poison` : ""].filter(Boolean).join(" and ")} from ${nm(from)}.`);
-    const moved = {}; if (table.monarch === mySeat) moved.monarch = from; if (table.initiative === mySeat) moved.initiative = from;
-    if (Object.keys(moved).length) {
-      changeTable(moved);
-      const msg = [moved.monarch ? `${nm(from)} became the monarch` : "", moved.initiative ? `${nm(from)} took the initiative (venture into the Undercity)` : ""].filter(Boolean).join(" and ") + " (combat damage).";
-      log(msg); broadcast({ type:"log", text:msg });
-    }
-    for (const c of me.zones.bf) c.blk = "";
-    changed();
-  });
-}
+$("#clearArrowsBtn").onclick = clearArrows;
 $("#undoBtn").onclick = undo;
 $("#logBtn").onclick = () => { document.body.classList.toggle("panel-open"); $("#logWrap").scrollTop = $("#logWrap").scrollHeight; };
 $("#panelClose").onclick = () => document.body.classList.remove("panel-open");
@@ -2065,7 +1763,7 @@ function manaDialog(c){
 }
 const MANA_NAME = { W:"white", U:"blue", B:"black", R:"red", G:"green", C:"colorless" };
 /* Key terms on a card: keywords it gains on the table ("gains flying until end of turn", an Equipment's haste, a
-   commander's ward...). Shown on the card for everyone, and combat counts them (flying, menace, deathtouch...). */
+   commander's ward...). Shown on the card for everyone, as a reminder. */
 const KW_COMMON = ["Flying", "Haste", "Vigilance", "Trample", "Lifelink", "Deathtouch", "First strike", "Double strike", "Menace", "Reach", "Hexproof",
   "Indestructible", "Shroud", "Ward", "Defender", "Infect", "Wither", "Can't be blocked", "Can't block", "Protection from white", "Protection from blue",
   "Protection from black", "Protection from red", "Protection from green"];
@@ -2086,7 +1784,7 @@ function kwDialog(c, send){
   const draw_ = () => {
     body.innerHTML = "";
     const has = cur();
-    body.append(el("p", { className:"hint", textContent:"Key terms it has on the table. They show on the card for everyone, and combat counts them (flying, menace, deathtouch, protection...)." }));
+    body.append(el("p", { className:"hint", textContent:"Key terms it has on the table. They show on the card for everyone, as a reminder." }));
     if (has.length) body.append(el("div", { className:"row", style:"flex-wrap:wrap;gap:6px;margin-bottom:8px" }, ...has.map(x => {
       const b = el("button", { type:"button", className:"btn small primary", textContent:`${x.n}${x.eot ? " (this turn)" : ""} ×`, ariaLabel:`Remove ${x.n}` }); b.onclick = () => set(x.n, false); return b; })));
     body.append(el("label", { style:"display:flex;gap:6px;align-items:center;margin:4px 0 8px" }, eot, "Until end of turn (untick for as long as it's on the battlefield)"));
@@ -2144,11 +1842,18 @@ function copyCard(c){
 /* Power and toughness as they are now: the printed numbers (2/2 face down), +1/+1 and -1/-1 counters, and changes
    from effects ("mod": lasting, like an anthem; "eot": until end of turn, like Giant Growth). Null for a card with no
    power and toughness that nothing has changed. dir: 1 if it's bigger than printed, -1 if smaller. */
+// Power/toughness counters: +1/+1 and -1/-1, and the ones that change only one side (+1/+0, +0/+1, -1/-0, -0/-1)
+const PT_CTRS = { "+1/+1":[1, 1], "-1/-1":[-1, -1], "+1/+0":[1, 0], "+0/+1":[0, 1], "-1/-0":[-1, 0], "-0/-1":[0, -1] };
+function ptCounters(c){
+  let p = 0, t = 0;
+  for (const [k, [a, b]] of Object.entries(PT_CTRS)) { const v = c.ctr?.[k] || 0; p += a * v; t += b * v; }
+  return [p, t];
+}
 function ptOf(c){
   const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
   const bp = c.fd ? "2" : f?.power ?? k?.power, bt = c.fd ? "2" : f?.toughness ?? k?.toughness;
-  const n = (c.ctr?.["+1/+1"] || 0) - (c.ctr?.["-1/-1"] || 0);
-  const dp = n + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = n + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
+  const [np, nt] = ptCounters(c);
+  const dp = np + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = nt + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
   if (bp == null && !dp && !dt && !c.mod && !c.eot) return null;
   const p0 = parseInt(bp ?? 0, 10), t0 = parseInt(bt ?? 0, 10), sg = v => (v < 0 ? "" : "+") + v;
   if (isNaN(p0) || isNaN(t0)) return { p:(isNaN(p0) ? 0 : p0) + dp, t:(isNaN(t0) ? 0 : t0) + dt, str:`${bp}/${bt}${dp || dt ? ` ${sg(dp)}/${sg(dt)}` : ""}`, dir:Math.sign(dp + dt) };
@@ -2161,10 +1866,9 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const img = c.fd ? "" : c.img || imgOf(cardOf(c), c.face, small ? "small" : "normal");
   if (img) e.append(el("img", { src:img, alt:c.name || nameOf(c), loading:"lazy", draggable:false }));
   else if (!c.fd) e.append(el("span", { className:"lbl", textContent:c.name || nameOf(c) }));
-  const cs = Object.entries(c.ctr || {}).filter(([k, v]) => v && !MARKS.has(k));
-  const marks = Object.keys(c.ctr || {}).filter(k => MARKS.has(k) && c.ctr[k]);
-  if (marks.length) e.append(el("div", { className:"marks" }, ...marks.map(k => el("span", { textContent:k }))));
-  if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
+  const cs = Object.entries(c.ctr || {}).filter(([, v]) => v);
+  // (a power/toughness counter shows as what it adds up to: three +1/+0 counters read "+3/+0")
+  if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:PT_CTRS[k] && v > 0 ? k.replace(/1/g, v) : `${v} ${k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
   const kwl = cleanKw(c.kw);
   if (kwl.length) e.append(el("div", { className:"kwtags", title:kwl.map(x => x.n + (x.eot ? " (until end of turn)" : "")).join(", ") },
@@ -2271,7 +1975,7 @@ function drawArrows(){
       if (from && to) line(from, to, color, "", "ah" + s);
     }
     for (const c of p.bf || []) if (c.att && !(p.bf || []).some(x => x.iid === c.att)) { const a = at(c.iid), b = at(c.att); if (a && b) line(a, b, color, "link", ""); }
-    for (const c of p.bf || []) if (c.blk) { const a = at(c.iid), b = at(c.blk); if (a && b) line(a, b, "#4a86c5", "blockline", ""); }
+    for (const c of p.bf || []) if (c.blk) { const a = at(c.iid), b = at(c.blk); if (a && b) line(a, b, color, "blockline", "ah" + s); }
   }
 }
 addEventListener("resize", () => requestAnimationFrame(drawArrows));
@@ -2363,18 +2067,14 @@ function renderMine(){
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
 }
 let lastAtMe = 0;
-// The combat bar, while creatures are attacking: who's attacking whom, and Take or block if it's you
+// The combat bar, while creatures are attacking: who's attacking whom (the arrows show which creature)
 function renderCombat(){
   const attackers = Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk).map(c => ({ c, s:+s })));
   const note = $("#combatNote"), atMe = attackers.filter(a => a.c.atk === mySeat);
   $("#combatBar").classList.toggle("hidden", !attackers.length);
-  for (const a of atMe) if (a.c.id && !cards.has(a.c.id)) cardById(a.c.id).catch(() => {});  // (for flying, protection and the like)
   if (atMe.length > lastAtMe) cue("attack");
   lastAtMe = atMe.length;
-  note.textContent = atMe.length ? `${atMe.length} attacking you: right-click one to block ` : attackers.length ? `${attackers.length} attacking` : "";
-  if (atMe.length && !me.watch) { const b = el("button", { className:"btn small primary", id:"defendBtn", textContent:"Take or block" }); b.onclick = defendDialog; note.append(b); }
-  const mine = attackers.filter(a => a.s === mySeat);
-  if (mine.length && !me.watch) { const b = el("button", { className:"btn small", id:"calloffBtn", textContent:"Call off attack" }); b.onclick = endCombat; note.append(" ", b); }
+  note.textContent = atMe.length ? `${atMe.length} attacking you: right-click your creature, Block..., to block with an arrow` : attackers.length ? `${attackers.length} attacking` : "";
 }
 function renderTurn(){
   const f = FORMATS[table.fmt];
@@ -2389,11 +2089,7 @@ function renderTurn(){
   $("#clocks").classList.toggle("hidden", !table.started);
   tickClocks();
   $("#nextTurn").classList.toggle("primary", table.started && table.turnSeat === mySeat);
-  const myTurn = table.started && table.turnSeat === mySeat, attacking = me.zones.bf.some(c => c.atk);
-  $("#attackBtn").classList.toggle("hidden", !myTurn); $("#attackBtn").textContent = attackMode ? "Done attacking" : "Attack";
-  $("#attackBtn").classList.toggle("primary", !!attackMode);
-  $("#allInBtn").classList.toggle("hidden", !attackMode);
-  $("#dmgBtn").classList.toggle("hidden", !attacking);
+  $("#clearArrowsBtn").classList.toggle("hidden", !(me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk)));
   $("#sideBtn").classList.toggle("hidden", f.cmdr || !sideIds.length || !!me.watch);
   $("#undoBtn").classList.toggle("hidden", !!rule("noUndo"));
   const nRules = Object.keys(table.rules || {}).length; $("#rulesBtn").textContent = nRules ? `House rules (${nRules})` : "House rules";
@@ -2482,8 +2178,8 @@ document.addEventListener("pointerup", e => {
   document.querySelectorAll(".drop").forEach(x => x.classList.remove("drop"));
   d.ghost?.remove(); d.el.classList.remove("dragging");
   const tag = !d.moved && d.zone === "bf" && e.target.closest?.(".mtag");
-  if (tag && !attackMode) { const f = findCard(d.iid); if (f) manaFromTag(f.c, tag.dataset.mana); return; }
-  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf" && !attackMode) { if (d.el.dataset.pile === "tapped") untapFromStack(d.el.dataset.stack, 1); else tapFromStack(d.el.dataset.stack, 1); } else clickCard(d.iid, d.zone, e); return; }
+  if (tag) { const f = findCard(d.iid); if (f) manaFromTag(f.c, tag.dataset.mana); return; }
+  if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf") { if (d.el.dataset.pile === "tapped") untapFromStack(d.el.dataset.stack, 1); else tapFromStack(d.el.dataset.stack, 1); } else clickCard(d.iid, d.zone, e); return; }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
   if (to === "bf") {
@@ -2495,8 +2191,7 @@ document.addEventListener("pointerup", e => {
 });
 function clickCard(iid, zone, e){
   const f = findCard(iid); if (!f) return;
-  if (zone === "bf" && attackMode) toggleAttack(f.c, attackMode);
-  else if (zone === "bf") toggleTap(f.c);
+  if (zone === "bf") toggleTap(f.c);
   else if (zone === "lib") libHint();
   else if (zone === "gy" || zone === "ex") viewZone(`Your ${ZONE_NAME[zone]}`, me.zones[zone], zone);
 }
@@ -2596,17 +2291,11 @@ function cardMenu(iid, x, y){
   const to = (label, zone, opt) => ({ label, fn:() => move(iid, zone, opt) });
   if (z === "bf") {
     items.push({ label:c.tapped ? "Untap" : "Tap", fn:() => toggleTap(c) });
-    if (c.atk || c.blk) items.push({ label:"Remove from combat", fn:() => { c.atk = 0; c.blk = ""; say(`removed ${nameOf(c)} from combat.`); changed(); } });
-    if (c.atk) {
-      for (const s of presentSeats().filter(s => s !== mySeat && s !== c.atk && !isOut(s))) items.push({ label:`Attack ${nm(s)} instead`, fn:() => { c.atk = s; say(`sent ${nameOf(c)} to attack ${nm(s)} instead.`); changed(); } });
-      items.push({ label:c.ctr?.[MARK.exert] ? "Not exerted" : "Exert it (it won't untap next time)", fn:() => toggleMark(c, MARK.exert, "exerted") });
-    }
-    if (isCreature(c)) items.push({ label:c.ctr?.[MARK.noDmg] ? "It deals combat damage again" : "It deals no combat damage this turn", fn:() => toggleMark(c, MARK.noDmg, "prevented the combat damage of") });
-    if (c.ctr?.[MARK.goad]) items.push({ label:"Take off Goaded", fn:() => toggleMark(c, MARK.goad, "") });
-    else if (isCreature(c)) {
-      for (const s of presentSeats().filter(s => s !== mySeat)) items.push({ label:`Attack ${nm(s)}`, fn:() => toggleAttack(c, s) });
-      const attackers = attackersAt(mySeat);
-      if (attackers.length && !c.tapped) items.push({ label:"Block...", fn:() => startTargeting("block", iid) });
+    // (combat by hand: an arrow to the player it attacks, or to the creature it blocks)
+    if (c.atk || c.blk) items.push({ label:"Out of combat (remove its arrow)", fn:() => outOfCombat(c) });
+    if (isCreature(c)) {
+      for (const s of presentSeats().filter(s => s !== mySeat && s !== c.atk && !isOut(s))) items.push({ label:`Attack ${nm(s)}`, fn:() => attackWith(c, s) });
+      items.push({ label:"Block... (click the attacker)", fn:() => startTargeting("block", iid) });
     }
     if (faces(k)) items.push({ label:"Transform (flip to the other face)", fn:() => { c.face = c.face ? 0 : 1; say(`transformed ${nameOf(c)}.`); changed(); } });
     items.push({ label:c.fd ? "Turn face up" : "Turn face down", fn:() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); } });
@@ -2645,9 +2334,11 @@ function theirCardMenu(seat, iid, x, y){
     { label:c.tapped ? "Untap it" : "Tap it", fn:act("tap", { v:!c.tapped }, `${c.tapped ? "untapped" : "tapped"} ${whose}.`) },
     { label:"Put a +1/+1 counter on it", fn:act("ctr", { name:"+1/+1", d:1 }, `put a +1/+1 counter on ${whose}.`) },
     { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) },
+    { label:"Other power/toughness counters...", fn:() => openMenu(x, y, [{ head:`Put a counter on ${whose}` },
+      ...["+1/+0", "+0/+1", "-1/-0", "-0/-1"].map(k => ({ label:`Put a ${k} counter on it`, fn:act("ctr", { name:k, d:1 }, `put a ${k} counter on ${whose}.`) }))]) },
     { label:"Change its power/toughness...", fn:() => ptDialog(whose, null, d => sendAct(seat, c, "pt", d, `gave ${whose} ${ptText(d)}.`)) },
     { label:"Key terms (flying, haste...)...", fn:() => kwDialog(c, (n, eot, add) => sendAct(seat, c, "kw", { n, eot, add }, `${add ? "gave" : "took"} ${n}${add && eot ? " (until end of turn)" : ""} ${add ? "to" : "from"} ${whose}.`)) },
-    ...(c.ctr?.[MARK.goad] ? [] : [{ label:"Goad it (it attacks each combat if able, and not you)", fn:act("ctr", { name:MARK.goad, d:1 }, `goaded ${whose}.`) }])];
+];
   const cs = Object.keys(c.ctr || {}); for (const k of cs) items.push({ label:`Remove a ${k} counter`, fn:act("ctr", { name:k, d:-1 }, `removed a ${k} counter from ${whose}.`) });
   items.push("-",
     { label:"Destroy it (to the graveyard)", fn:act("gy", {}, `destroyed ${whose}.`) },
@@ -2655,9 +2346,9 @@ function theirCardMenu(seat, iid, x, y){
     { label:"Return it to its owner's hand", fn:act("hand", {}, `returned ${whose} to its owner's hand.`) },
     { label:"Put it on top of its owner's library", fn:act("lib", {}, `put ${whose} on top of its owner's library.`) }, "-",
     { label:"Gain control of it", fn:act("steal", {}, `gained control of ${whose}.`) });
+  // (attacking you: block it with one of your creatures, drawn as an arrow)
   if (c.atk === mySeat) {
-    const A = combatant(c, ptParse(c.pt));
-    const mine = me.zones.bf.filter(b => !b.tapped && isCreature(b) && !cantBlock(combatant(b, { p:0, t:0 }), A));
+    const mine = me.zones.bf.filter(b => isCreature(b) && !b.atk);
     if (mine.length) items.unshift({ head:"Block it with:" }, ...mine.slice(0, 8).map(b => ({ label:nameOf(b), fn:() => setBlock(b, c, seat) })), "-");
   }
   openMenu(x, y, items);
@@ -2867,8 +2558,8 @@ function sideboardDialog(done, cancel){
 }
 $("#sideBtn").onclick = () => sideboardDialog(() => { if (table.started && me.gameId === table.gameId) toast("Your new deck is used from the next game."); });
 
-/* The monarch, the initiative, and day and night: kept with the table, so everyone sees them. Combat damage to the
-   monarch or the player with the initiative moves it to the attacker; the monarch draws when their turn ends. */
+/* The monarch, the initiative, and day and night: kept with the table, so everyone sees them. A player who deals
+   combat damage to the monarch (or the initiative's holder) takes it from this menu; the monarch draws as their turn ends. */
 $("#desigBtn").onclick = e => {
   const r = e.currentTarget.getBoundingClientRect();
   const items = [{ head:"The monarch" },
@@ -3031,7 +2722,7 @@ function ptDialog(title, c, done){
   openModal(`Power/toughness: ${title}`, body, btns);
 }
 function counterDialog(c){
-  const types = ["+1/+1", "-1/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
+  const types = ["+1/+1", "-1/-1", "+1/+0", "+0/+1", "-1/-0", "-0/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
   const body = el("div");
   const draw_ = () => {
     body.innerHTML = "";
@@ -3306,8 +2997,8 @@ function noteLife(){
   lifeTimer = setTimeout(() => { const d = me.life - lifeFrom; if (d) say(`${d > 0 ? "gained" : "lost"} ${Math.abs(d)} life (${lifeFrom} → ${me.life}).`); lifeFrom = null; }, 1500);
 }
 /* The initiative's dungeon, the Undercity (rules 725 and 309). Taking the initiative ventures into it, and so does
-   the upkeep of the player who has it; combat damage to that player (or them leaving) hands it on, and the new
-   holder ventures. Each player has their own way through: from Secret Entrance down to Throne of the Dead Three,
+   the upkeep of the player who has it; a player who deals combat damage to its holder takes it from the menu (and
+   it passes on when the holder leaves); the new holder ventures. Each player has their own way through: from Secret Entrance down to Throne of the Dead Three,
    choosing where the map splits. Finishing the last room completes the dungeon; the next venture starts a new one.
    The card shows under your mana, and next to each other player's graveyard and exile, for everyone to see. */
 const UNDERCITY = {
@@ -3465,12 +3156,11 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Keys:</b> U untap all, T tap the card you're pointing at. (Drawing is a double-click on your library, so it can't happen by accident.)" }),
     el("p", { innerHTML:"Press <b>Start game</b> when everyone's here: a random player goes first, everyone's deck is shuffled and dealt 7, and you choose to keep or mulligan. <b>Next turn</b> passes the turn. <b>New game</b> asks who won and saves it under <b>Stats</b>." }),
     el("p", { innerHTML:"<b>Casting:</b> double-click a card in hand (or right-click, <b>Play</b> or <b>Cast it</b>): permanents go onto the battlefield, and instants and sorceries go to your graveyard. Say what you're casting so others can respond." }),
-    el("p", { innerHTML:"<b>Combat:</b> on your turn press <b>Attack</b>, click the creatures that attack (or <b>Attack with all</b>), then <b>Done attacking</b> and <b>Combat damage</b>. Only the defending player decides the damage: their combat screen (also <b>Take or block</b> on the combat bar) has a <b>Block with</b> picker for each attacker and shows what happens: who dies and what gets through, counting trample, deathtouch, first and double strike, lifelink and indestructible. One button applies it all. <b>Call off attack</b> ends an attack with no damage." }),
     el("p", { innerHTML:"<b>Power/toughness:</b> creatures show what they are now (counters and changes included; green is bigger than printed, red smaller). Right-click one and choose <b>Power/toughness...</b> for pump spells (until end of turn) or lasting changes. <b>Point</b> at any card to see it large." }),
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
-    el("p", { innerHTML:"<b>Combat...</b> has small helpers you use by hand: put a creature in attacking, ninjutsu, exert, take one out of combat, a Fog, an extra combat. Right-click a creature to exert it, send it at someone else, or goad another player's. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
+    el("p", { innerHTML:"<b>Combat</b> is by hand: right-click a creature, <b>Attack</b> a player, and an arrow shows it to everyone; to block, right-click your creature, <b>Block...</b>, and click the attacker (or right-click the attacker). Tap, deal damage and change life yourself. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
@@ -3677,7 +3367,7 @@ function linkCards(text){
 window.addEventListener("beforeunload", () => save());
 
 // For tests: a way to reach the game state
-if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards, alerts, fight, cantBlock, cues };
+if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards, alerts, cues };
 })();
 </script>
 </body>
