@@ -148,6 +148,9 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile.empty{cursor:default;opacity:.6}
 .opile .card{--w:60px}
 .pile .card.peek{outline:2px solid var(--brass)}
+.card .kwtags{position:absolute;left:2px;top:2px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:calc(100% - 4px);z-index:2;pointer-events:none}
+.card .kwtags span{font:700 9px/1.3 var(--sans);background:rgba(13,32,29,.92);color:var(--parchment);border:1px solid var(--brass);border-radius:4px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.card .kwtags span.eot{border-style:dashed}
 .card .manatags{position:absolute;left:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;max-width:calc(100% - 6px);z-index:2}
 .card .manatags .mtag{width:16px;height:16px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.7);cursor:pointer;pointer-events:auto}  /* (card pictures ignore the pointer so cards drag; these are clickable) */
 .card.mine .manatags .mtag:hover{transform:scale(1.25)}
@@ -853,7 +856,7 @@ function pubCard(c, onBf = false){
   if (c.fd) return { ...ptInfo, iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
   const k = cardOf(c);
   return { ...ptInfo, iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
-           own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0, ...(c.mana?.length ? { mana:c.mana } : {}) };
+           own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0, ...(c.mana?.length ? { mana:c.mana } : {}), ...(c.kw?.length ? { kw:c.kw.map(x => ({ n:x.n, eot:!!x.eot })) } : {}) };
 }
 function pub(){
   const z = me.zones;
@@ -1071,7 +1074,7 @@ function cleanPub(st){
     iid:String(c.iid || "").slice(0, 20), id:typeof c.id === "string" ? c.id.slice(0, 40) : "", name:String(c.name || "").slice(0, 150),
     img:typeof c.img === "string" && /^https:\/\/cards\.scryfall\.io\//.test(c.img) ? c.img : "", x:+c.x || 0, y:+c.y || 0, tapped:!!c.tapped,
     fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), own:clamp(+c.own || 0, 0, MAX), att:String(c.att || "").slice(0, 20),
-    atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [],
+    atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [], kw:cleanKw(c.kw),
     ...(typeof c.pt === "string" ? { pt:c.pt.slice(0, 16), ptDir:clamp(Math.sign(+c.ptDir || 0), -1, 1) } : {}), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
   } : null).filter(Boolean);
   const num = (v, a, b) => clamp(Math.round(+v || 0), a, b);
@@ -1156,8 +1159,8 @@ function changeTable(patch){
 function afterTable(before){
   if (me?.watch) { render(); return; }
   // A turn ended: arrows, combat, and "until end of turn" power/toughness changes are over
-  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot || c.ctr?.[MARK.noDmg]))) {
-    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; if (c.ctr) delete c.ctr[MARK.noDmg]; } attackMode = 0; withoutUndo(changed);
+  if (before.turnNum !== table.turnNum && me && (me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk || c.eot || c.ctr?.[MARK.noDmg] || c.kw?.some(x => x.eot)))) {
+    me.arrows = []; for (const c of me.zones.bf) { c.atk = 0; c.blk = ""; delete c.eot; if (c.ctr) delete c.ctr[MARK.noDmg]; if (c.kw) { c.kw = c.kw.filter(x => !x.eot); if (!c.kw.length) delete c.kw; } } attackMode = 0; withoutUndo(changed);
   }
   if (!table.started && before.fmt !== table.fmt && me && FORMATS[table.fmt].cmdr && !FORMATS[before.fmt].cmdr && $("#modal").classList.contains("hidden")) setTimeout(askCommander, 300);
   if (!table.started && before.fmt !== table.fmt && me) {
@@ -1547,7 +1550,7 @@ function move(iid, to, opt = {}){
   }
   me.zones[from].splice(f.i, 1);
   if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); }
-  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; if (to !== "lib") c.fd = false; }
+  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; if (to !== "lib") c.fd = false; }
   if (to === "st") c.at = Date.now();
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
@@ -1583,11 +1586,11 @@ function detachFrom(host){
   for (const a of me.zones.bf.filter(x => x.att === host.iid)) { a.att = null; a.x = clamp(host.x + 0.02, 0, 0.94); a.y = clamp(host.y - 0.04, 0, 0.86); }
   me.arrows = (me.arrows || []).filter(a => a.from !== host.iid && a.card !== host.iid);
 }
-const wireCard = c => ({ iid:c.iid, id:c.id, face:c.face || 0, tapped:!!c.tapped, fd:!!c.fd, ctr:c.ctr || {}, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0, owner:c.owner || mySeat, mana:c.mana || [] });
+const wireCard = c => ({ iid:c.iid, id:c.id, face:c.face || 0, tapped:!!c.tapped, fd:!!c.fd, ctr:c.ctr || {}, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0, owner:c.owner || mySeat, mana:c.mana || [], kw:c.kw || [] });
 function cleanWire(c){
   if (!c || typeof c !== "object" || typeof c.id !== "string" || !/^[0-9a-f-]{36}$/.test(c.id)) return null;
   return { iid:String(c.iid || uid()).slice(0, 20), id:c.id, face:c.face ? 1 : 0, tapped:!!c.tapped, fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99),
-           owner:clamp(+c.owner || 0, 0, MAX), x:0, y:0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [],
+           owner:clamp(+c.owner || 0, 0, MAX), x:0, y:0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [], kw:cleanKw(c.kw),
            ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, 0, 999)])) : {} };
 }
 /* Control: give one of your battlefield cards to another player (stealing, "gain control"), and take cards given to you */
@@ -1633,6 +1636,7 @@ function takeAct_(from, a){
     const t = String(a.name || "").slice(0, 20), d = clamp(Math.round(+a.d || 0), -1, 1); if (!t || !d) return;
     c.ctr[t] = Math.max(0, (c.ctr[t] || 0) + d); if (!c.ctr[t]) delete c.ctr[t]; changed();
   } else if (a.act === "pt") { addPt(c, a); changed(); }
+  else if (a.act === "kw") { const n = cleanKw([{ n:a.n, eot:a.eot }])[0]; if (!n) return; c.kw = (c.kw || []).filter(x => x.n !== n.n); if (a.add) c.kw.push(n); if (!c.kw.length) delete c.kw; changed(); }
   else if (["gy", "ex", "hand", "lib"].includes(a.act)) move(c.iid, a.act, { quiet:true });
   else if (a.act === "steal") giveCard(c.iid, from);
 }
@@ -1737,13 +1741,18 @@ function combatAsk(from, tries = 0){
   if ($("#modal").classList.contains("hidden")) defendDialog(); else toast(`${nm(from)} is ready for combat damage: press Take or block.`);
 }
 function incoming(){ return Object.entries(players).filter(([s]) => +s !== mySeat).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === mySeat).map(c => ({ s:+s, c }))); }
-const kwOf = c => { const k = cards.get(c.id); return c.fd ? [] : (k?.card_faces?.[c.face || 0]?.keywords || k?.keywords || []); };
+// (a card's keywords: printed ones, plus key terms given to it on the table, "until end of turn" or for as long as it's out)
+const kwGiven = c => (c.kw || []).map(x => typeof x === "string" ? x : x.n).filter(Boolean);
+const kwOf = c => { const k = cards.get(c.id); return c.fd ? kwGiven(c) : [...(k?.card_faces?.[c.face || 0]?.keywords || k?.keywords || []), ...kwGiven(c)]; };
 const ptParse = str => { const m = /^(-?\d+)\/(-?\d+)/.exec(str || ""); return m ? { p:Math.max(0, +m[1]), t:+m[2] } : { p:0, t:0 }; };
 const FIGHT_KW = ["Flying", "Reach", "Menace", "Trample", "Deathtouch", "First strike", "Double strike", "Lifelink", "Indestructible", "Infect", "Wither"];
 const COLOR_WORDS = { white:"W", blue:"U", black:"B", red:"R", green:"G" };
 // A creature in combat: power/toughness, keywords, colors, what it has protection from, and "can't be blocked"
 function combatant(c, pt){
-  const k = cards.get(c.id), f = c.fd ? null : (k?.card_faces?.[c.face || 0] || k), text = String(f?.oracle_text ?? k?.oracle_text ?? ""), name = c.name || nameOf(c);
+  const k = cards.get(c.id), f = c.fd ? null : (k?.card_faces?.[c.face || 0] || k), name = c.name || nameOf(c);
+  // (key terms given on the table count too: "Protection from red", "Can't be blocked")
+  const given = kwGiven(c).map(t => /^can'?t be blocked$/i.test(t) ? `${name.split(",")[0]} can't be blocked.` : t + ".");
+  const text = [String(f?.oracle_text ?? k?.oracle_text ?? ""), ...given].join("\n");
   const prot = new Set();
   for (const m of text.matchAll(/protection from ([a-z ,]+?)(?=[.\n(]|$)/gi))
     for (const w of m[1].toLowerCase().split(/,|\band\b|\bor\b/).map(x => x.trim()).filter(Boolean)) {
@@ -1949,6 +1958,45 @@ function manaDialog(c){
   openModal(`Mana symbols on ${nameOf(c)}`, body, [{ label:"Clear", fn:() => { c.mana = []; changed(); } }, { label:"Done", primary:true, fn:() => { if (c.mana.length) say(`marked ${nameOf(c)} as making ${c.mana.map(k => MANA_NAME[k]).join(", ")} mana.`); } }]);
 }
 const MANA_NAME = { W:"white", U:"blue", B:"black", R:"red", G:"green", C:"colorless" };
+/* Key terms on a card: keywords it gains on the table ("gains flying until end of turn", an Equipment's haste, a
+   commander's ward...). Shown on the card for everyone, and combat counts them (flying, menace, deathtouch...). */
+const KW_COMMON = ["Flying", "Haste", "Vigilance", "Trample", "Lifelink", "Deathtouch", "First strike", "Double strike", "Menace", "Reach", "Hexproof",
+  "Indestructible", "Shroud", "Ward", "Defender", "Infect", "Wither", "Can't be blocked", "Can't block", "Protection from white", "Protection from blue",
+  "Protection from black", "Protection from red", "Protection from green"];
+function cleanKw(list){
+  return (Array.isArray(list) ? list : []).slice(0, 12).map(x => typeof x === "string" ? { n:x } : x)
+    .filter(x => x && typeof x.n === "string" && x.n.trim()).map(x => ({ n:x.n.trim().slice(0, 40), eot:!!x.eot }));
+}
+// mine: your own card (changed here); send: for another player's card, how to ask them (name, until end of turn, add)
+function kwDialog(c, send){
+  const cur = () => send ? cleanKw(c.kw) : (c.kw || []);
+  const eot = el("input", { type:"checkbox", checked:true, ariaLabel:"Until end of turn" });
+  const body = el("div");
+  const set = (n, add) => {
+    if (send) { send(n, eot.checked, add); closeModal(); return; }
+    c.kw = (c.kw || []).filter(x => x.n !== n); if (add) c.kw.push({ n, eot:eot.checked }); if (!c.kw.length) delete c.kw;
+    say(add ? `gave ${nameOf(c)} ${n}${eot.checked ? " until end of turn" : ""}.` : `took ${n} away from ${nameOf(c)}.`); changed(); draw_();
+  };
+  const draw_ = () => {
+    body.innerHTML = "";
+    const has = cur();
+    body.append(el("p", { className:"hint", textContent:"Key terms it has on the table. They show on the card for everyone, and combat counts them (flying, menace, deathtouch, protection...)." }));
+    if (has.length) body.append(el("div", { className:"row", style:"flex-wrap:wrap;gap:6px;margin-bottom:8px" }, ...has.map(x => {
+      const b = el("button", { type:"button", className:"btn small primary", textContent:`${x.n}${x.eot ? " (this turn)" : ""} ×`, ariaLabel:`Remove ${x.n}` }); b.onclick = () => set(x.n, false); return b; })));
+    body.append(el("label", { style:"display:flex;gap:6px;align-items:center;margin:4px 0 8px" }, eot, "Until end of turn (untick for as long as it's on the battlefield)"));
+    const grid = el("div", { className:"row", style:"flex-wrap:wrap;gap:5px" });
+    for (const n of KW_COMMON.filter(n => !has.some(x => x.n === n))) { const b = el("button", { type:"button", className:"btn small", textContent:n }); b.onclick = () => set(n, true); grid.append(b); }
+    body.append(grid);
+    const other = el("input", { type:"text", placeholder:"Another key term (any keyword or short rule)", maxLength:40, ariaLabel:"Another key term", style:"flex:1;min-width:220px" });
+    other.setAttribute("list", "kwList");  // (list is read-only as a property)
+    const dl = el("datalist", { id:"kwList" }, ...[...TERMS.values()].map(t => el("option", { value:t.name })));
+    const add = el("button", { className:"btn small", textContent:"Add" }); add.onclick = () => { const n = other.value.trim().slice(0, 40); if (n) set(n.replace(/^./, x => x.toUpperCase()), true); };
+    other.onkeydown = e => { if (e.key === "Enter") add.click(); };
+    body.append(el("div", { className:"row", style:"margin-top:10px;gap:6px" }, other, add, dl));
+  };
+  draw_();
+  openModal(`Key terms on ${c.fd ? "a face-down card" : c.name || nameOf(c)}`, body, [{ label:"Done", primary:true }], { wide:true });
+}
 function manaFromTag(c, k){
   if (!COLORS.includes(k)) return;
   me.mana[k]++; if (!c.tapped) c.tapped = true;
@@ -2013,6 +2061,9 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   if (marks.length) e.append(el("div", { className:"marks" }, ...marks.map(k => el("span", { textContent:k }))));
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:`${k === "+1/+1" && v > 0 ? "+" + v + "/+" + v : k === "-1/-1" ? "-" + v + "/-" + v : v + " " + k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
+  const kwl = cleanKw(c.kw);
+  if (kwl.length) e.append(el("div", { className:"kwtags", title:kwl.map(x => x.n + (x.eot ? " (until end of turn)" : "")).join(", ") },
+    ...kwl.slice(0, 4).map(x => el("span", { className:x.eot ? "eot" : "", textContent:x.n })), ...(kwl.length > 4 ? [el("span", { textContent:`+${kwl.length - 4}` })] : [])));
   const mt = (c.mana || []).filter(k => COLORS.includes(k));
   if (mt.length && !c.fd) e.append(el("div", { className:"manatags", title:`Can make ${mt.map(k => MANA_NAME[k]).join(", ")} mana${mine ? " (click one to tap it for that mana)" : ""}` },
     ...mt.map(k => { const t = el("img", { className:"mtag", src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:k }); t.dataset.mana = k; return t; })));
@@ -2036,7 +2087,7 @@ function landStacks(list, seat = ctrlSeat){
   const byIid = new Map(list.map(c => [c.iid, c])), groups = new Map();
   if (!settings.stackLands) return groups;
   for (const c of list) {
-    if (c.fd || c.att || c.atk || c.blk || Object.keys(c.ctr || {}).length || c.mana?.length || list.some(x => x.att === c.iid)) continue;
+    if (c.fd || c.att || c.atk || c.blk || Object.keys(c.ctr || {}).length || c.mana?.length || c.kw?.length || list.some(x => x.att === c.iid)) continue;
     const own = c.owner || c.own; if (own && own !== seat) continue;  // (another player's land stays on its own, marked as theirs)
     const name = c.name || nameOf(c);
     if (!/^(Snow-Covered )?(Plains|Island|Swamp|Mountain|Forest|Wastes)$/.test(name)) continue;
@@ -2459,7 +2510,7 @@ function cardMenu(iid, x, y){
     }
     if (faces(k)) items.push({ label:"Transform (flip to the other face)", fn:() => { c.face = c.face ? 0 : 1; say(`transformed ${nameOf(c)}.`); changed(); } });
     items.push({ label:c.fd ? "Turn face up" : "Turn face down", fn:() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); } });
-    items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Mana symbols (what it can make)...", fn:() => manaDialog(c) }, { label:"Power/toughness...", fn:() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }) },
+    items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Mana symbols (what it can make)...", fn:() => manaDialog(c) }, { label:"Key terms (flying, haste...)...", fn:() => kwDialog(c) }, { label:"Power/toughness...", fn:() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }) },
       { label:"Create a token copy", fn:() => copyCard(c) });
     const rel = related(k); if (rel.length) items.push({ label:`Create its token${rel.length > 1 ? "s" : ""}...`, fn:() => tokenDialog(rel) });
     items.push("-", { label:"Target with an arrow...", fn:() => startTargeting("arrow", iid) },
@@ -2495,6 +2546,7 @@ function theirCardMenu(seat, iid, x, y){
     { label:"Put a +1/+1 counter on it", fn:act("ctr", { name:"+1/+1", d:1 }, `put a +1/+1 counter on ${whose}.`) },
     { label:"Put a -1/-1 counter on it", fn:act("ctr", { name:"-1/-1", d:1 }, `put a -1/-1 counter on ${whose}.`) },
     { label:"Change its power/toughness...", fn:() => ptDialog(whose, null, d => sendAct(seat, c, "pt", d, `gave ${whose} ${ptText(d)}.`)) },
+    { label:"Key terms (flying, haste...)...", fn:() => kwDialog(c, (n, eot, add) => sendAct(seat, c, "kw", { n, eot, add }, `${add ? "gave" : "took"} ${n}${add && eot ? " (until end of turn)" : ""} ${add ? "to" : "from"} ${whose}.`)) },
     ...(c.ctr?.[MARK.goad] ? [] : [{ label:"Goad it (it attacks each combat if able, and not you)", fn:act("ctr", { name:MARK.goad, d:1 }, `goaded ${whose}.`) }])];
   const cs = Object.keys(c.ctr || {}); for (const k of cs) items.push({ label:`Remove a ${k} counter`, fn:act("ctr", { name:k, d:-1 }, `removed a ${k} counter from ${whose}.`) });
   items.push("-",

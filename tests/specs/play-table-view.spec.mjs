@@ -469,3 +469,47 @@ test("digital table: no mana question for lands that make several colors; mana s
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
+
+test("digital table: key terms on cards, for everyone, counted in combat, and until end of turn", async () => {
+  test.setTimeout(120000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) await button(p, "Keep");
+  const keepHand = async page => { const k = page.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await k.isVisible()) await k.click(); };
+  if (await ktp(a, () => ktPlay.table.turnSeat) !== 1) { await b.click("#nextTurn"); await keepHand(b); await expect.poll(() => ktp(a, () => ktPlay.table.turnSeat)).toBe(1); }
+  const fetch = page => ktp(page, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
+  const mine = await fetch(a); await fetch(b);
+  const card = a.locator(`#bf .card[data-iid="${mine}"]`);
+  // Luke gives his Gamma Card flying until end of turn, and Prowess for good
+  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Key terms (flying, haste...)...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"Flying", exact:true }).click();
+  await a.locator(".modal input[aria-label='Until end of turn']").uncheck();
+  await a.fill(".modal input[aria-label='Another key term']", "prowess"); await a.locator(".modal").getByRole("button", { name:"Add", exact:true }).click();
+  await button(a, "Done");
+  await expect(card.locator(".kwtags span")).toHaveText(["Flying", "Prowess"]);
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${mine}"] .kwtags span`)).toHaveText(["Flying", "Prowess"]);
+  await expect(b.locator("#log")).toContainText("Luke gave Gamma Card Flying until end of turn.");
+  // Rick gives it menace from his side (it shows on Luke's card)
+  await opp(b, "Luke").locator(`.card[data-iid="${mine}"]`).click({ button:"right" });
+  await b.getByRole("menuitem", { name:"Key terms (flying, haste...)...", exact:true }).click();
+  await b.locator(".modal").getByRole("button", { name:"Menace", exact:true }).click();
+  await expect(card.locator(".kwtags span")).toHaveText(["Flying", "Prowess", "Menace"]);
+  // Combat counts it: Rick's Gamma Card (no flying or reach) can't block the flier
+  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Attack Rick", exact:true }).click();
+  await a.click("#dmgBtn");
+  await expect(b.locator(".modal")).toContainText("Can't block it: Gamma Card");
+  await b.locator(".modal").getByRole("button", { name:/^Take/ }).first().click();
+  // The turn ends: flying and menace (until end of turn) wear off; Prowess stays
+  await a.click("#nextTurn"); await keepHand(a);
+  await expect(card.locator(".kwtags span")).toHaveText(["Prowess"]);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
