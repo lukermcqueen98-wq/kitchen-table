@@ -64,11 +64,9 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   await expect(b.locator(".modal-card h2")).toHaveText("Luke's graveyard (2)");
   await button(b, "Close");
 
-  // Mana Luke has floating shows on his panel for Rick
-  await a.locator("#manaBox button[aria-label^='G mana']").click();
-  await a.locator("#manaBox button[aria-label^='G mana']").click();
-  await a.locator("#manaBox button[aria-label^='R mana']").click();
-  await expect(opp(b, "Luke").locator(".omana")).toHaveAttribute("aria-label", "Mana: 1 R, 2 G");
+  // No mana pool counters (players keep track of their own mana)
+  await expect(a.locator("#manaBox")).toHaveCount(0);
+  await expect(b.locator(".omana")).toHaveCount(0);
 
   // Drop-downs are dark with light words (the Group effects ones were light on light)
   await a.click("#fxBtn");
@@ -113,7 +111,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   const hisCard = opp(b, "Luke").locator(".dungeon");
   await expect(hisCard.locator(".droom.here")).toHaveText("Secret Entrance");
   await expect(hisCard).toContainText("🗝 Initiative");
-  expect(await a.evaluate(() => { const m = document.querySelector("#manaBox").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= m.bottom; })).toBe(true);
+  expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom; })).toBe(true);
 
   // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
   await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
@@ -283,13 +281,10 @@ test("digital table: game and turn clocks, turn counts, a turn time limit, your 
   await expect(stack).toHaveCount(1);
   await expect(stack.locator(".stackn")).toHaveText("×4"); await expect(stack.locator(".stackup")).toHaveText("4 untapped");
   await expect(opp(b, "Luke").locator(".card.landstack .stackn")).toHaveText("×4");
-  const g0 = await ktp(a, () => ktPlay.me.mana.G);
   await stack.click();
   await expect(stack.locator(".stackup")).toHaveText("3 untapped");
-  expect(await ktp(a, () => ktPlay.me.mana.G)).toBe(g0 + 1);
   await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Tap 2", exact:true }).click();
   await expect(stack.locator(".stackup")).toHaveText("1 untapped");
-  expect(await ktp(a, () => ktPlay.me.mana.G)).toBe(g0 + 3);
   await stack.click({ button:"right" }); await a.getByRole("menuitem", { name:"Untap all 3", exact:true }).click();
   await expect(stack.locator(".stackup")).toHaveText("4 untapped");
   expect(forests.length).toBe(4);
@@ -442,15 +437,12 @@ test("digital table: no mana question for lands that make several colors; mana s
   await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
   await a.click("#startBtn"); await button(a, "Start the game");
   for (const p of [a, b]) await button(p, "Keep");
-  const mana = () => ktp(a, () => ({ ...ktPlay.me.mana }));
   // A land that makes two colors (here, Forest made to say it makes green or blue) just taps: nothing is asked
   const land = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Forest"); ktPlay.cards.get(c.id).produced_mana = ["G", "U"]; ktPlay.move(c.iid, "bf"); return c.iid; });
-  const before = await mana();
   await a.locator(`#bf .card[data-iid="${land}"]`).click();
   await expect.poll(() => ktp(a, l => ktPlay.me.zones.bf.find(c => c.iid === l).tapped, land)).toBe(true);
   await expect(a.locator("#menu")).toBeHidden();
-  expect(await mana()).toEqual(before);
-  // Mana symbols on a card: green and blue on Gamma Card, seen by Rick; clicking one taps it for that mana
+  // Mana symbols on a card: green and blue on Gamma Card, seen by Rick; clicking one taps it
   const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
   await a.locator(`#bf .card[data-iid="${gamma}"]`).click({ button:"right" });
   await a.getByRole("menuitem", { name:"Mana symbols (what it can make)...", exact:true }).click();
@@ -459,9 +451,7 @@ test("digital table: no mana question for lands that make several colors; mana s
   await button(a, "Done");
   await expect(a.locator("#log")).toContainText("You marked Gamma Card as making blue, green mana.");
   await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .mtag`)).toHaveCount(2);
-  const g0 = (await mana()).G;
   await a.locator(`#bf .card[data-iid="${gamma}"] .mtag[data-mana="G"]`).click();
-  expect((await mana()).G).toBe(g0 + 1);
   expect(await ktp(a, g => ktPlay.me.zones.bf.find(c => c.iid === g).tapped, gamma)).toBe(true);
   // ...and the symbols go when it leaves the battlefield
   await ktp(a, g => ktPlay.move(g, "hand"), gamma);
@@ -510,6 +500,46 @@ test("digital table: key terms on cards, for everyone, counted in combat, and un
   // The turn ends: flying and menace (until end of turn) wear off; Prowess stays
   await a.click("#nextTurn"); await keepHand(a);
   await expect(card.locator(".kwtags span")).toHaveText(["Prowess"]);
+  expect([...a.errors, ...b.errors]).toEqual([]);
+  await browser.close();
+});
+
+test("digital table: when a game ends, each player picks the same deck or a new one", async () => {
+  test.setTimeout(120000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser), b = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
+  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  const room = new URL(a.url()).searchParams.get("room"); await settle(a);
+  await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
+  await expect(opp(a, "Rick")).toBeVisible({ timeout:15000 });
+  // The first game uses the decks picked in the lobby: no question
+  await a.click("#startBtn"); await button(a, "Start the game");
+  for (const p of [a, b]) { await expect(p.locator(".modal-card h2")).toHaveText("Keep this hand?"); await button(p, "Keep"); }
+  // The game ends (Luke won): both are asked
+  await a.click("#startBtn"); await expect(a.locator(".modal-card h2")).toHaveText("Who won this game?"); await button(a, "Luke");
+  for (const p of [a, b]) await expect(p.locator(".modal-card h2")).toHaveText("Next game: which deck?");
+  // While Luke chooses, Rick sees it on Luke's panel
+  await expect(opp(b, "Luke")).toContainText("Choosing a deck...");
+  // Rick keeps his deck; Luke pastes a new one
+  await b.locator(".modal").getByRole("button", { name:/^Same deck/ }).click();
+  await expect(b.locator(".modal-card h2")).toHaveText("Keep this hand?");
+  await button(a, "New deck...");
+  await expect(a.locator(".modal-card h2")).toHaveText("Pick a new deck");
+  await a.fill(".modal input[aria-label='Deck name']", "Betas");
+  await a.fill(".modal textarea[aria-label='Decklist']", "30 Beta Card\n30 Forest");
+  await button(a, "Use this deck");
+  await expect(a.locator(".modal-card h2")).toHaveText("Keep this hand?");
+  await expect(b.locator("#log")).toContainText("Luke switched decks: Betas.");
+  await expect(opp(b, "Luke")).not.toContainText("Choosing a deck...");
+  const names = await ktp(a, () => [...new Set([...ktPlay.me.zones.lib, ...ktPlay.me.zones.hand].map(c => ktPlay.cards.get(c.id)?.name))].sort());
+  expect(names).toEqual(["Beta Card", "Forest"]);
+  expect(await ktp(a, () => ktPlay.me.zones.lib.length + ktPlay.me.zones.hand.length)).toBe(60);
+  const rick = await ktp(b, () => [...new Set([...ktPlay.me.zones.lib, ...ktPlay.me.zones.hand].map(c => ktPlay.cards.get(c.id)?.name))].sort());
+  expect(rick).toEqual(["Forest", "Gamma Card"]);
+  for (const p of [a, b]) await button(p, "Keep");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
