@@ -8,7 +8,7 @@ import { BASE, PEER_PORT } from "./global-setup.mjs";
 
 const MODULES = path.resolve(import.meta.dirname, "..", "node_modules");
 const LIBS = { "peerjs.min.js":"peerjs/dist/peerjs.min.js", "qrcode.min.js":"qrcodejs/qrcode.min.js", "opencv.js":"@techstark/opencv-js/dist/opencv.js" };
-const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], type_line:k === 2 ? "Legendary Creature — Test" : k === 6 ? "Sorcery" : k === 4 ? "Instant" : "Artifact", oracle_text:k === 6 ? "Each opponent draws a card, then you draw a card for each opponent who drew a card this way." : k === 4 ? "Target player draws two cards." : "{T}: Add {C}{C}.", mana_cost:"{2}{G/U}", scryfall_uri:"https://scryfall.com",
+const card = k => ({ object:"card", id:cardId(k), name:NAMES[k], set:"tst", collector_number:String(k), type_line:k === 2 ? "Legendary Creature — Test" : k === 6 ? "Sorcery" : k === 4 ? "Instant" : "Artifact", oracle_text:k === 6 ? "Each opponent draws a card, then you draw a card for each opponent who drew a card this way." : k === 4 ? "Target player draws two cards." : "{T}: Add {C}{C}.", mana_cost:"{2}{G/U}", scryfall_uri:"https://scryfall.com",
   color_identity:k === 2 ? ["G", "U"] : k === 5 ? ["B"] : [], ...(k === 2 ? { power:"3", toughness:"4" } : {}),
   // (Commander's Sphere stands in for Cut a Deal, a sorcery that makes each opponent draw; Rhystic Study is an instant that says "Target player draws two cards.")
   // (for the deck check: Gwenom is banned in Commander, and Sol Ring is banned in Modern and restricted in Vintage)
@@ -48,7 +48,10 @@ export async function newPlayer(browser, { lisp = false, rejectPhrases = false, 
     // decklists: up to 75 names at a time
     if (u.includes("/cards/collection")) {
       const ids = JSON.parse(r.request().postData() || "{}").identifiers || [], data = [], not_found = [];
-      for (const id of ids) { const n = String(id.name || "").toLowerCase(), i = NAMES.findIndex(x => x.toLowerCase() === n); if (i >= 0) data.push(card(i)); else if (n === "forest") data.push(FOREST); else not_found.push(id); }
+      for (const id of ids) {
+        // (by printing: the stand-in set "tst", collector number = the card's place in NAMES)
+        if (id.collector_number !== undefined) { const k = id.set === "tst" && /^\d$/.test(id.collector_number) ? +id.collector_number : -1; if (NAMES[k]) data.push(card(k)); else not_found.push(id); continue; }
+        const n = String(id.name || "").toLowerCase(), i = NAMES.findIndex(x => x.toLowerCase() === n); if (i >= 0) data.push(card(i)); else if (n === "forest") data.push(FOREST); else not_found.push(id); }
       return json(r, { object:"list", data, not_found });
     }
     if (u.includes("/catalog/keyword-abilities")) return json(r, { data:["Flying", "Offspring", "Fear"] });

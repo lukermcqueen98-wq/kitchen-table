@@ -68,6 +68,19 @@ test("Commander on the digital table: six players, each sees five opponents in t
   await ps[0].locator(".opp.zoomed").getByRole("button", { name:"Back to the table" }).click();
   await expect(ps[0].locator(".opp.zoomed")).toHaveCount(0);
 
+  // Starting the game shuffles the turn order once; the table is laid out around you in that order
+  await ps[0].click("#startBtn"); await ps[0].locator(".modal").getByRole("button", { name:"Start the game" }).click();
+  await expect(ps[0].locator("#log")).toContainText("Turn order (chosen at random):");
+  for (const p of ps.slice(0, 6)) await expect.poll(() => p.evaluate(() => ktPlay.table.order.length)).toBe(6);
+  const order = await ps[0].evaluate(() => ktPlay.table.order);
+  expect([...order].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+  expect(await ps[0].evaluate(() => ktPlay.table.turnSeat)).toBe(order[0]);
+  for (const p of ps.slice(0, 6)) {
+    const i = order.indexOf(ps.indexOf(p) + 1);  // (each player took the next free seat as they sat down)
+    const want = [...order.slice(i + 1), ...order.slice(0, i)];
+    await expect.poll(() => p.evaluate(() => [...document.querySelectorAll(".opp")].map(o => +o.dataset.seat))).toEqual(want);
+  }
+
   // Someone watching takes a seat after the six players' and sees all of them
   const w = ps[6];
   await w.goto(`${BASE}/play.html?kt-test&room=${room}`); await w.fill("#nameIn", "Dee"); await w.check("#watchIn"); await w.click("#joinBtn");

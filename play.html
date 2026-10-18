@@ -182,11 +182,12 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .dungeon .btn{align-self:center}
 .opiles .dungeon{width:170px}
 .ocz .card{--w:52px;position:relative}
-#me{flex:1;display:flex;min-height:0;margin:8px;border:1px solid var(--felt-edge);border-radius:10px;background:rgba(0,0,0,.12);overflow:hidden}
-#bf{flex:1;position:relative;min-width:0}
+/* Your area: battlefield over your hand, and your side panel (life, piles, command zone...) down the whole right edge */
+#me{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 210px;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"bf side" "hand side";min-height:0;margin:8px;border:1px solid var(--felt-edge);border-radius:10px;background:rgba(0,0,0,.12);overflow:hidden}
+#bf{grid-area:bf;position:relative;min-width:0;min-height:0}
 #bf .card{--w:var(--cw)}
 #bf.drop,.pile.drop,#hand.drop,#czone.drop{outline:2px dashed var(--brass);outline-offset:-4px}
-#side{width:210px;border-left:1px solid var(--felt-edge);display:flex;flex-direction:column;gap:8px;padding:8px;overflow:auto}
+#side{grid-area:side;min-height:0;border-left:1px solid var(--felt-edge);display:flex;flex-direction:column;gap:8px;padding:8px;overflow:auto}
 #side>*{flex-shrink:0}  /* (a short window scrolls the side column instead of squeezing the command zone under its card) */
 .ctrlhead{font-size:11px;color:var(--muted);margin:4px 0 -2px}
 .lifebox{display:flex;align-items:center;justify-content:space-between;gap:4px}
@@ -220,7 +221,7 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .sbcols li{margin:3px 0}
 .sbcols li button{width:100%;text-align:left}
 .chip.warn{border-color:var(--danger);color:var(--danger)}
-#handWrap{grid-column:1;border-top:1px solid var(--felt-edge);padding:6px 10px;display:flex;gap:10px;align-items:center}
+#handWrap{grid-area:hand;min-width:0;border-top:1px solid var(--felt-edge);padding:6px 10px;display:flex;gap:10px;align-items:center}
 #hand{flex:1;display:flex;min-height:134px;align-items:flex-end;overflow-x:auto;overflow-y:visible;padding-top:10px}
 #hand .card{--w:124px;position:relative;margin-right:-26px;transition:transform .12s}
 #hand .card:hover{transform:translateY(-10px);z-index:5}
@@ -349,7 +350,9 @@ details.term a{font-size:13px;color:var(--brass)}
    bottom; with 4 or 5 opponents the middle of the table shows whose turn it is and the turn order */
 #hub{display:none}
 @media (min-width:901px){
-  main#play.round{display:grid;gap:8px;padding:8px}
+  main#play.round{display:grid;gap:8px;padding:8px;--cw:92px}  /* (a little smaller: your hand shares your area) */
+  main#play.round #hand .card{--w:100px;margin-right:-22px}
+  main#play.round #hand{min-height:118px}
   main#play.round #opps{display:contents}
   main#play.round .opp{min-height:0;min-width:0}
   main#play.round #combatBar{grid-area:bar;margin:0}
@@ -357,11 +360,12 @@ details.term a{font-size:13px;color:var(--brass)}
   main#play.round .opp[data-pos="L"]{grid-area:L} main#play.round .opp[data-pos="R"]{grid-area:R} main#play.round .opp[data-pos="T"]{grid-area:T}
   main#play.round .opp[data-pos="L1"]{grid-area:L1} main#play.round .opp[data-pos="L2"]{grid-area:L2}
   main#play.round .opp[data-pos="R1"]{grid-area:R1} main#play.round .opp[data-pos="R2"]{grid-area:R2}
-  main#play.r1{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,.75fr) auto minmax(0,1.25fr);grid-template-areas:"T" "bar" "me"}
-  main#play.r2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,.75fr) auto minmax(0,1.25fr);grid-template-areas:"L R" "bar bar" "me me"}
-  main#play.r3{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,.8fr) auto minmax(0,1.2fr);grid-template-areas:"L T R" "bar bar bar" "me me me"}
-  main#play.r4{grid-template-columns:minmax(0,1fr) 210px minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,1.3fr);grid-template-areas:"L2 hub R1" "L1 hub R2" "bar bar bar" "me me me"}
-  main#play.r5{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,1.3fr);grid-template-areas:"L2 T R1" "L1 hub R2" "bar bar bar" "me me me"}
+  main#play.r1{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,.75fr) auto minmax(0,2fr);grid-template-areas:"T" "bar" "me"}
+  main#play.r2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,.75fr) auto minmax(0,2fr);grid-template-areas:"L R" "bar bar" "me me"}
+  main#play.r3{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,.8fr) auto minmax(0,2fr);grid-template-areas:"L T R" "bar bar bar" "me me me"}
+  main#play.r4{grid-template-columns:minmax(0,1fr) 210px minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,2.4fr);grid-template-areas:"L2 hub R1" "L1 hub R2" "bar bar bar" "me me me"}
+  main#play.r5{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,2.4fr);grid-template-areas:"L2 T R1" "L1 hub R2" "bar bar bar" "me me me"}
+  main#play.zooming #hub{visibility:hidden}
   main#play.round .opp.zoomed{position:relative;inset:auto;grid-row:1 / bar-start;grid-column:1 / -1;z-index:5}
   main#play.r4 #hub,main#play.r5 #hub{grid-area:hub;display:flex;align-items:center;justify-content:center;min-height:0}
 }
@@ -397,7 +401,8 @@ details.term a{font-size:13px;color:var(--brass)}
   #opps,#opps.many{grid-auto-flow:column;grid-template-columns:none;grid-auto-rows:auto;grid-auto-columns:minmax(78vw,1fr);overflow-x:auto;flex:0 0 32%}
   #opps.many .obf .card{--w:36px}
   .obf .card{--w:36px}
-  #side{width:128px;padding:6px;gap:6px}
+  #me{grid-template-columns:minmax(0,1fr) 128px}
+  #side{padding:6px;gap:6px}
   .lifebox output{font-size:30px}
   .pile .card,.pile .ph{--w:34px;width:34px}
   .opile .card,.opile .ph{--w:36px;width:36px}.opilelbl{font-size:10px}
@@ -407,7 +412,7 @@ details.term a{font-size:13px;color:var(--brass)}
   #handWrap>.hint{display:none}
 }
 @media (max-width:560px){
-  #me{flex-direction:column}
+  #me{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto;grid-template-areas:"bf" "side" "hand"}
   #side{width:auto;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;border-left:0;border-top:1px solid var(--felt-edge);align-items:center;flex:0 0 auto}
   #side>*{flex:0 0 auto}
   .piles{grid-template-columns:repeat(3,44px)}
@@ -520,6 +525,7 @@ details.term a{font-size:13px;color:var(--brass)}
     <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
+      <div id="handWrap"><div class="hint">Hand</div><div id="hand" data-drop="hand" aria-label="Your hand"></div></div>
       <div id="side">
         <div id="myBadges"></div>
         <div class="lifebox"><button id="lifeMinus" aria-label="Lose 1 life">&minus;</button><output id="lifeOut" aria-label="Your life"></output><button id="lifePlus" aria-label="Gain 1 life">+</button></div>
@@ -535,7 +541,6 @@ details.term a{font-size:13px;color:var(--brass)}
       </div>
     </div>
   </main>
-  <div id="handWrap"><div class="hint">Hand</div><div id="hand" data-drop="hand" aria-label="Your hand"></div></div>
   <aside id="panel"><button class="btn small" id="panelClose">Close</button>
     <div id="zoom"><img id="zoomImg" alt=""><div class="ztext" id="zoomText">Point at a card to see it here.</div></div>
     <div id="logWrap"><ul id="log" aria-live="polite"></ul></div>
@@ -621,10 +626,11 @@ function textOf(c, face = 0){
 }
 
 /* Decklists: "1 Sol Ring", "1x Sol Ring (CMR) 472", "4 Lightning Bolt", sections like "Commander", "Deck", "Sideboard"
-   (MTG Arena and Moxfield exports), and Archidekt's "[Commander]" or "*CMDR*" marks. The sideboard (and a companion,
+   (MTG Arena and Moxfield exports), and Archidekt's "1x Rhystic Study (pcy) 77 [Draw]" lines with their "[Commander]",
+   "[Sideboard]" and "[Maybeboard]" categories, or "*CMDR*" marks. The sideboard (and a companion,
    or "SB:" lines) is kept apart for sideboarding between games; maybeboard and token sections are left out. */
 function parseDeck(text){
-  const out = { main:[], cmdrs:[], side:[] }; let section = "main";
+  const out = { main:[], cmdrs:[], side:[], prints:{} }; let section = "main";
   for (let line of String(text).split(/\r?\n/)) {
     line = line.trim(); if (!line || line.startsWith("#")) continue;
     const head = /^(?:\/\/\s*)?([a-z ]+?)\s*:?\s*(?:\(\d+\))?$/i.exec(line);
@@ -638,13 +644,20 @@ function parseDeck(text){
     let sb = false;
     if (/^sb:\s*/i.test(line)) { sb = true; line = line.replace(/^sb:\s*/i, ""); }
     const cmdrMark = /\*cmdr\*|\[commander/i.test(line);
+    // (Archidekt's categories, like "[Ramp,Artifact]": a Sideboard one is the sideboard; Maybeboard, and any category
+    // marked {noDeck}, isn't in the deck)
+    const cat = /\[([^\]]*)\]/.exec(line)?.[1] || "", catSide = /^sideboard\b/i.test(cat);
+    if (!catSide && !cmdrMark && (/^maybe(board)?\b/i.test(cat) || /\{nodeck\}/i.test(cat))) continue;
     const m = /^(\d+)\s*x?\s+(.+)$/i.exec(line);
     let n = m ? +m[1] : 1, name = (m ? m[2] : line)
-      .replace(/\s+\*[a-z]+\*/gi, "").replace(/\s+\[[^\]]*\]/g, "").replace(/\s+\^[^^]*\^/g, "").replace(/\s+#\S+/g, "")
-      .replace(/\s+\([A-Za-z0-9]{2,6}\)(\s+[A-Za-z0-9★\-]+)?\s*$/, "").trim();
+      .replace(/\s+\*[a-z]+\*/gi, "").replace(/\s+\[[^\]]*\]/g, "").replace(/\s+\^[^^]*\^/g, "").replace(/\s+#\S+/g, "").trim();
+    // (the printing: "(CMR) 472", "(pcy) 77", "(plst) SLD-63"; kept to look the card up by if its name isn't found)
+    const pr = /\s+\(([A-Za-z0-9]{2,6})\)(?:\s+([A-Za-z0-9★\-]+))?\s*$/.exec(name), set = pr ? pr[1].toLowerCase() : "", num = pr?.[2] || "";
+    if (pr) name = name.slice(0, pr.index).trim();
     if (!name || section === "skip") continue;
     n = clamp(n, 1, 250);
-    if (section === "side" || sb) out.side.push({ n, name });
+    if (set) out.prints[name] = { set, num };
+    if (section === "side" || sb || catSide) out.side.push({ n, name });
     else if (section === "cmdr" || cmdrMark) out.cmdrs.push(name); else out.main.push({ n, name });
   }
   return out;
@@ -656,14 +669,31 @@ async function resolveDeck(parsed){
   for (let i = 0; i < names.length; i += 75) {
     const part = names.slice(i, i + 75);
     const r = await scry("/cards/collection", { identifiers:part.map(name => ({ name:name.split(" // ")[0] })) });
-    if (!r) { missing.push(...part); continue; }
+    if (!r) continue;  // (tried again one by one below)
     for (const c of r.data || []) {
       keep(c);
       const want = part.find(n => norm(n.split(" // ")[0]) === norm(c.name.split(" // ")[0]) || norm(n) === norm(c.name)) || c.name;
       found.set(norm(want), c);
     }
-    for (const nf of r.not_found || []) if (nf?.name) missing.push(part.find(n => norm(n.split(" // ")[0]) === norm(nf.name)) || nf.name);
   }
+  // Names Scryfall didn't match exactly: by the printing the list gave (set and collector number), then a forgiving
+  // name search (typos, missing punctuation, a different face's name)
+  const have = n => found.has(norm(n)) || [...found.values()].some(c => norm(c.name.split(" // ")[0]) === norm(n.split(" // ")[0]));
+  const byPrint = names.filter(n => !have(n) && parsed.prints?.[n]?.num);
+  for (let i = 0; i < byPrint.length; i += 75) {
+    const part = byPrint.slice(i, i + 75);
+    const r = await scry("/cards/collection", { identifiers:part.map(n => ({ set:parsed.prints[n].set, collector_number:parsed.prints[n].num })) });
+    for (const c of r?.data || []) {
+      keep(c);
+      const n = part.find(n => parsed.prints[n].set === c.set && parsed.prints[n].num === c.collector_number); if (n) found.set(norm(n), c);
+    }
+  }
+  for (const n of names.filter(n => !have(n)).slice(0, 40)) {
+    const set = parsed.prints?.[n]?.set;
+    const c = (set && await scry(`/cards/named?fuzzy=${encodeURIComponent(n)}&set=${encodeURIComponent(set)}`)) || await scry(`/cards/named?fuzzy=${encodeURIComponent(n)}`);
+    if (c?.id) { keep(c); found.set(norm(n), c); }
+  }
+  missing.push(...names.filter(n => !have(n)));
   const get = n => found.get(norm(n)) || [...found.values()].find(c => norm(c.name.split(" // ")[0]) === norm(n.split(" // ")[0]));
   const main = [], cmdrs = [], side = [];
   for (const { n, name } of parsed.main) { const c = get(name); if (c) for (let k = 0; k < n; k++) main.push(c.id); }
@@ -748,6 +778,7 @@ $("#savedSel").onchange = e => { const n = e.target.value; if (!n) return; $("#d
 $("#saveDeck").onclick = () => {
   const n = $("#deckName").value.trim() || "My deck", t = $("#deckIn").value.trim(); if (!t) return;
   decks[n] = t; store.set("kt-dig-decks", JSON.stringify(decks)); fillSaved(); $("#savedSel").value = n; toast(`Saved "${n}".`);
+  loaded = null; checkDeck();  // (and look its cards up now, so anything not found shows right away)
 };
 $("#delDeck").onclick = () => {
   const n = $("#savedSel").value; if (!n || !confirm(`Delete the saved deck "${n}"?`)) return;
@@ -890,7 +921,7 @@ $("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown
 let peer = null, mySeat = 0, roomCode = "", me = null, localStream = null;
 const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
-let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
+let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, order:[], at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1", logPop:store.get("kt-dig-logpop", "1") === "1",
                    stackLands:store.get("kt-dig-stack", "1") === "1" };
@@ -1204,6 +1235,7 @@ function takeTable(t){
   const before = { ...table };
   table = { tv:+t.tv || 0, at:+t.at || 0, fmt:FORMATS[t.fmt] ? t.fmt : "cmdr", started:!!t.started, gameId:String(t.gameId || "").slice(0, 30), startAt:+t.startAt || 0,
             turnSeat:clamp(+t.turnSeat || 0, 0, MAX), turnNum:clamp(+t.turnNum || 0, 0, 9999), phase:clamp(+t.phase || 0, 0, PHASES.length - 1), firstSeat:clamp(+t.firstSeat || 0, 0, MAX),
+            order:Array.isArray(t.order) ? t.order.map(Number).filter((s, i, a) => Number.isInteger(s) && s >= 1 && s <= MAX && a.indexOf(s) === i) : [],
             monarch:clamp(+t.monarch || 0, 0, MAX), initiative:clamp(+t.initiative || 0, 0, MAX), day:t.day === "day" || t.day === "night" ? t.day : "", spells:clamp(+t.spells || 0, 0, 999), turnAt:+t.turnAt || 0, round:clamp(+t.round || 0, 0, 9999), rules:cleanRules(t.rules) };
   afterTable(before);
 }
@@ -1237,9 +1269,14 @@ function afterTable(before){
 }
 function presentSeats(){ return Object.keys(players).map(Number).filter(s => s === mySeat || (players[s] && !players[s].away)).sort((a, b) => a - b); }
 const isOut = s => s === mySeat ? !!me?.out : !!players[s]?.out;
+// Turn order: shuffled once when a game starts (table.order); anyone who sat down after that comes after, by seat
+const orderRank = s => { const i = (table.order || []).indexOf(s); return i >= 0 ? i : MAX + s; };
+const inTurnOrder = seats => [...seats].sort((a, b) => orderRank(a) - orderRank(b));
+// The seats in turn order starting just after s (for laying out the table around you)
+function seatsAfter(s, seats){ const o = inTurnOrder([...new Set([...seats, s])]), i = o.indexOf(s); return [...o.slice(i + 1), ...o.slice(0, i)]; }
 // The next player in turn order, skipping anyone who's out of the game
 function nextSeat(s){
-  const seats = presentSeats(), i = seats.indexOf(s);
+  const seats = inTurnOrder(presentSeats()), i = seats.indexOf(s);
   for (let k = 1; k <= seats.length; k++) { const c = seats[(i + k + seats.length) % seats.length]; if (!isOut(c)) return c; }
   return s;
 }
@@ -1308,9 +1345,12 @@ function rulesDialog(onStart){
 }
 $("#rulesBtn").onclick = () => rulesDialog(null);
 function startGame(){
-  const seats = presentSeats(), first = seats[rnd(seats.length) - 1];
-  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"", spells:0, turnAt:Date.now(), round:1 });
-  const msg = `A new game started. ${nm(first)} goes first (chosen at random). House rules: ${rulesSummary()}.`; log(msg); broadcast({ type:"log", text:msg });
+  // (a random turn order for the game, once; the first player in it goes first)
+  const order = presentSeats();
+  for (let i = order.length - 1; i > 0; i--) { const j = rnd(i + 1) - 1; [order[i], order[j]] = [order[j], order[i]]; }
+  const first = order[0];
+  changeTable({ started:true, gameId:uid(), turnSeat:first, firstSeat:first, order, turnNum:1, phase:0, startAt:Date.now(), monarch:0, initiative:0, day:"", spells:0, turnAt:Date.now(), round:1 });
+  const msg = `A new game started. Turn order (chosen at random): ${order.map(nm).join(", ")}. ${nm(first)} goes first. House rules: ${rulesSummary()}.`; log(msg); broadcast({ type:"log", text:msg });
 }
 /* Game records: kept in each player's browser, and shown under Stats (wins per player, deck and commander, game
    length, and how often the first player wins) */
@@ -1403,7 +1443,7 @@ $("#nextTurn").onclick = () => {
     const was = table.turnSeat, spells = table.spells || 0, before = table.day, day = dayAfter(before, spells);
     const to = nextSeat(table.turnSeat);
     // (a new round starts when the turn comes back around to the first player)
-    const pos = x => (x - (table.firstSeat || 1) + 99) % 99, round = (table.round || 1) + (pos(to) <= pos(table.turnSeat) ? 1 : 0);
+    const pos = x => (orderRank(x) - orderRank(table.firstSeat || 1) + 99) % 99, round = (table.round || 1) + (pos(to) <= pos(table.turnSeat) ? 1 : 0);
     changeTable({ turnSeat:to, turnNum:table.turnNum + 1, phase:0, spells:0, day, turnAt:Date.now(), round });
     if (day !== before) { const t = `It becomes ${day} (${nm(was)} cast ${spells === 1 ? "1 spell" : spells ? spells + " spells" : "no spells"} last turn).`; log(t); broadcast({ type:"log", text:t }); }
   };
@@ -2035,13 +2075,13 @@ addEventListener("resize", () => requestAnimationFrame(drawArrows));
 function place(e, c){ e.style.left = (c.x * 100) + "%"; e.style.top = (c.y * 100) + "%"; }
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
-  const order = [...seats.filter(s => s > mySeat), ...seats.filter(s => s < mySeat)];
+  const order = seatsAfter(mySeat, seats).filter(s => s !== mySeat);
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
   const round = !!POS && !me.watch;
   if (!order.includes(zoomSeat)) zoomSeat = 0;
-  $("#play").className = round ? `round r${order.length}` : "";
+  $("#play").className = round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
@@ -2150,7 +2190,7 @@ function renderCombat(){
 function renderHub(){
   const hub = $("#hub"); if (!/\br[45]\b/.test($("#play").className)) { hub.innerHTML = ""; return; }
   const seats = Object.keys(players).map(Number).filter(s => s !== mySeat).sort((a, b) => a - b);
-  const ring = [mySeat, ...seats.filter(s => s > mySeat), ...seats.filter(s => s < mySeat)];
+  const ring = [mySeat, ...seatsAfter(mySeat, seats).filter(s => s !== mySeat)];
   const sig = JSON.stringify([ring.map(s => [nm(s), players[s]?.out]), table.started, table.turnSeat, table.turnNum, table.round]);
   if (hub.dataset.sig === sig) return; hub.dataset.sig = sig;
   const mid = el("div", { className:"hubmid" });
