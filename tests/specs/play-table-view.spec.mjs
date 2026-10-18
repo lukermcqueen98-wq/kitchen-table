@@ -313,6 +313,7 @@ test("digital table: card names in the log and chat are links that pop the card 
   await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "hand"); ktPlay.move(c.iid, "bf"); });
   const link = b.locator("#log li", { hasText:"Luke played Gamma Card" }).locator("a.clink", { hasText:"Gamma Card" });
   await expect(link).toHaveCount(1);
+  await b.click("#logBtn");
   await link.hover();
   await expect(b.locator("#pop")).toBeVisible();
   await expect(b.locator("#zoomText")).toContainText("Gamma Card");
@@ -320,7 +321,7 @@ test("digital table: card names in the log and chat are links that pop the card 
   await expect(b.locator(".modal-card h2")).toHaveText("Gamma Card");
   await button(b, "Close");
   // Chat too
-  await a.fill("#chatIn", "watch out for my Gamma Card"); await a.press("#chatIn", "Enter");
+  await a.click("#logBtn"); await a.fill("#chatIn", "watch out for my Gamma Card"); await a.press("#chatIn", "Enter");
   await expect(b.locator("#log li.chat a.clink", { hasText:"Gamma Card" })).toHaveCount(1);
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();

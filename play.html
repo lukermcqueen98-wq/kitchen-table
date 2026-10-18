@@ -87,7 +87,7 @@ button{cursor:pointer}
 #resume{border:1px solid var(--brass);border-radius:10px;padding:10px 12px;margin-bottom:16px}
 
 /* Table: top bar, opponents, your board, hand, side panel */
-#table{height:100%;display:grid;grid-template-columns:1fr 300px;grid-template-rows:auto minmax(0,1fr) auto}
+#table{height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
 header{grid-column:1/-1;display:flex;flex-direction:column;border-bottom:1px solid var(--felt-edge)}
 header .topbar{display:flex;align-items:center;gap:8px 14px;padding:6px 12px;flex-wrap:wrap}
 header .title{font:700 18px var(--serif)}
@@ -224,9 +224,21 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 #hand{flex:1;display:flex;min-height:134px;align-items:flex-end;overflow-x:auto;overflow-y:visible;padding-top:10px}
 #hand .card{--w:124px;position:relative;margin-right:-26px;transition:transform .12s}
 #hand .card:hover{transform:translateY(-10px);z-index:5}
-aside#panel{grid-row:2 / span 2;grid-column:2;border-left:1px solid var(--felt-edge);display:flex;flex-direction:column;min-height:0}
+/* The log, chat and card view: a drawer from the Log button, so the table gets the whole width */
+aside#panel{display:none;flex-direction:column;min-height:0;position:fixed;right:0;top:0;bottom:0;width:min(88vw,380px);z-index:60;background:var(--felt-deep);border-left:1px solid var(--felt-edge);box-shadow:-6px 0 24px rgba(0,0,0,.6)}
+body.panel-open aside#panel{display:flex}
+#panelClose{align-self:flex-end;margin:6px 8px 0}
+#logNew{margin-left:4px;background:var(--brass);color:#1b1608;border-radius:999px;padding:0 6px;font-size:11px;font-weight:700}
+/* What just happened, while the log is closed: the newest lines pop up for a few seconds (bottom left, over your
+   battlefield, and clicks go through them) */
+#feed{position:fixed;left:16px;bottom:200px;z-index:42;display:flex;flex-direction:column;gap:4px;max-width:min(460px,70vw);pointer-events:none}
+#feed li{list-style:none;background:rgba(13,32,29,.92);border:1px solid var(--felt-edge);border-radius:8px;padding:5px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.5);animation:feedIn .2s ease-out}
+#feed li.chat{border-color:var(--brass)}
+#feed li.fade{opacity:0;transition:opacity .6s}
+#feed .t{display:none}
+@keyframes feedIn{from{opacity:0;transform:translateY(6px)}}
 #zoom{padding:8px;border-bottom:1px solid var(--felt-edge)}
-#zoom img{width:100%;border-radius:4.75%/3.5%;display:block;background:#000;aspect-ratio:63/88}
+#zoom img{width:auto;height:34vh;max-width:100%;margin:0 auto;border-radius:4.75%/3.5%;display:block;background:#000;aspect-ratio:63/88}
 #zoom .ztext{font-size:12px;white-space:pre-wrap;color:var(--muted);max-height:110px;overflow:auto;margin-top:6px}
 #logWrap{flex:1;overflow:auto;padding:6px 10px}
 #log li.chat{color:var(--parchment);background:rgba(201,164,76,.08)}
@@ -333,9 +345,42 @@ details.term a{font-size:13px;color:var(--brass)}
 .mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
 .modal input[type=search],.modal input[type=text],.modal input[type=number]{padding:7px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
 #toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:var(--felt-deep);border:1px solid var(--brass);border-radius:10px;padding:9px 14px;z-index:95;display:flex;gap:10px;align-items:center;max-width:92vw}
-/* Tablets and phones: one column; the log, chat and card view open as a drawer from the Log button; other players
-   scroll sideways; smaller cards */
-#logBtn,#panelClose{display:none}
+/* Round table: the other players sit around you in turn order (clockwise from your left), your board along the
+   bottom; with 4 or 5 opponents the middle of the table shows whose turn it is and the turn order */
+#hub{display:none}
+@media (min-width:901px){
+  main#play.round{display:grid;gap:8px;padding:8px}
+  main#play.round #opps{display:contents}
+  main#play.round .opp{min-height:0;min-width:0}
+  main#play.round #combatBar{grid-area:bar;margin:0}
+  main#play.round #me{grid-area:me;margin:0}
+  main#play.round .opp[data-pos="L"]{grid-area:L} main#play.round .opp[data-pos="R"]{grid-area:R} main#play.round .opp[data-pos="T"]{grid-area:T}
+  main#play.round .opp[data-pos="L1"]{grid-area:L1} main#play.round .opp[data-pos="L2"]{grid-area:L2}
+  main#play.round .opp[data-pos="R1"]{grid-area:R1} main#play.round .opp[data-pos="R2"]{grid-area:R2}
+  main#play.r1{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,.75fr) auto minmax(0,1.25fr);grid-template-areas:"T" "bar" "me"}
+  main#play.r2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,.75fr) auto minmax(0,1.25fr);grid-template-areas:"L R" "bar bar" "me me"}
+  main#play.r3{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,.8fr) auto minmax(0,1.2fr);grid-template-areas:"L T R" "bar bar bar" "me me me"}
+  main#play.r4{grid-template-columns:minmax(0,1fr) 210px minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,1.3fr);grid-template-areas:"L2 hub R1" "L1 hub R2" "bar bar bar" "me me me"}
+  main#play.r5{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,1.3fr);grid-template-areas:"L2 T R1" "L1 hub R2" "bar bar bar" "me me me"}
+  main#play.round .opp.zoomed{position:relative;inset:auto;grid-row:1 / bar-start;grid-column:1 / -1;z-index:5}
+  main#play.r4 #hub,main#play.r5 #hub{grid-area:hub;display:flex;align-items:center;justify-content:center;min-height:0}
+}
+/* Zoomed in on one player's battlefield (click its empty space): it covers the other boards, bigger cards */
+.opp.zoomed{position:fixed;inset:12px;z-index:45;background:var(--felt-deep);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.opp.zoomed .obf{container-type:size}
+#opps .opp.zoomed .obf .card{--w:min(110px,28cqh)}  /* (as big as fits: the same share of the height as on a small board) */
+.ozoom{margin-left:auto;font-size:12px;padding:2px 8px}
+.ozoom + .olife{margin-left:0}
+.obf{cursor:zoom-in}
+.opp.zoomed .obf{cursor:zoom-out}
+.hubring{position:relative;height:min(100%,210px);aspect-ratio:1;border-radius:50%;border:2px dashed var(--felt-edge);display:flex;align-items:center;justify-content:center}
+.hubmid{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;max-width:62%}
+.hubmid .who{font:700 20px/1.1 var(--serif)}
+.hubmid .hint{font-size:12px}
+.hubdot{position:absolute;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;overflow:hidden;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.6)}
+.hubdot.now{box-shadow:0 0 0 4px var(--brass)}
+.hubdot.out{opacity:.4}
+/* Tablets and phones: other players scroll sideways; smaller cards */
 @media (max-width:900px){
   :root{--cw:62px}
   #table{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
@@ -348,10 +393,7 @@ details.term a{font-size:13px;color:var(--brass)}
   header .grp{flex-wrap:nowrap}
   header .grp.mid{justify-content:flex-start}
   .phases{display:none}
-  #logBtn{display:inline-block}
-  aside#panel{display:none;position:fixed;right:0;top:0;bottom:0;width:min(88vw,360px);z-index:60;background:var(--felt-deep);box-shadow:-6px 0 24px rgba(0,0,0,.6)}
-  body.panel-open aside#panel{display:flex}
-  #panelClose{display:block;align-self:flex-end;margin:6px 8px 0}
+  #feed{bottom:150px}
   #opps,#opps.many{grid-auto-flow:column;grid-template-columns:none;grid-auto-rows:auto;grid-auto-columns:minmax(78vw,1fr);overflow-x:auto;flex:0 0 32%}
   #opps.many .obf .card{--w:36px}
   .obf .card{--w:36px}
@@ -445,7 +487,7 @@ details.term a{font-size:13px;color:var(--brass)}
         </span>
         <button class="chip hidden" id="dayChip" title="Day and night: click to switch"></button>
       </span>
-      <span class="grp"><button class="btn small" id="micBtn">Mic on</button><button class="btn small" id="logBtn" aria-controls="panel">Log</button><button class="btn small" id="helpBtn">Help</button><button class="btn small" id="leaveBtn">Leave</button></span>
+      <span class="grp"><button class="btn small" id="micBtn">Mic on</button><button class="btn small" id="logBtn" aria-controls="panel">Log &amp; chat<span id="logNew" class="hidden"></span></button><button class="btn small" id="helpBtn">Help</button><button class="btn small" id="leaveBtn">Leave</button></span>
     </div>
     <!-- Toolbar: grouped by what you're doing -->
     <nav class="toolbar" aria-label="Game actions">
@@ -474,6 +516,7 @@ details.term a{font-size:13px;color:var(--brass)}
   </header>
   <main id="play">
     <div id="opps"></div>
+    <div id="hub" aria-label="Turn order"></div>
     <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
@@ -500,6 +543,7 @@ details.term a{font-size:13px;color:var(--brass)}
   </aside>
 </section>
 
+<ul id="feed" aria-hidden="true"></ul>
 <div id="menu" class="hidden" role="menu"></div>
 <div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""></div>
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
@@ -848,9 +892,10 @@ const players = {};  // seat -> public state (yours too, kept current)
 const conns = {}, calls = {};
 let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
-                   turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1",
+                   turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1", logPop:store.get("kt-dig-logpop", "1") === "1",
                    stackLands:store.get("kt-dig-stack", "1") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
+let zoomSeat = 0;  // the player whose battlefield is zoomed in on (0: none)
 const watchers = {};  // seat -> name, for people watching (seats 7 to 10)  // (commanders taken out of the decklist go back if you pick another)
 
 function blankMe(name){
@@ -1734,7 +1779,10 @@ function clearArrows(){
 }
 $("#clearArrowsBtn").onclick = clearArrows;
 $("#undoBtn").onclick = undo;
-$("#logBtn").onclick = () => { document.body.classList.toggle("panel-open"); $("#logWrap").scrollTop = $("#logWrap").scrollHeight; };
+$("#logBtn").onclick = () => {
+  document.body.classList.toggle("panel-open"); $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
+  unread = 0; $("#logNew").classList.add("hidden"); $("#feed").replaceChildren();
+};
 $("#panelClose").onclick = () => document.body.classList.remove("panel-open");
 function sendAct(seat, card, act, extra = {}, text = ""){
   if (!conns[seat]?.open) { toast(`${nm(seat)} isn't connected.`); return; }
@@ -1989,6 +2037,11 @@ function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = [...seats.filter(s => s > mySeat), ...seats.filter(s => s < mySeat)];
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
+  // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
+  const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
+  const round = !!POS && !me.watch;
+  if (!order.includes(zoomSeat)) zoomSeat = 0;
+  $("#play").className = round ? `round r${order.length}` : "";
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
@@ -2013,15 +2066,26 @@ function renderOpps(){
       p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
       p.picking ? el("span", { className:"badge", textContent:"Choosing a deck..." }) : null,
       p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
+      el("button", { type:"button", className:"btn small ozoom", textContent:s === zoomSeat ? "Back to the table" : "Zoom in",
+        title:s === zoomSeat ? "Back to everyone's boards (Esc)" : `See ${p.name}'s battlefield up close (or click its empty space)`, onclick:() => zoomTo(s === zoomSeat ? 0 : s) }),
       el("span", { className:"olife", title:"Life", textContent:p.life })));
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
     o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false))));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
+    if (round) o.dataset.pos = POS[order.indexOf(s)];
+    o.classList.toggle("zoomed", s === zoomSeat);
     box.append(o);
   }
 }
+// Zooming in on one player's battlefield: click its empty space (or Zoom in); click again, Back, or Esc to go back
+function zoomTo(s){ zoomSeat = s; render(); }
+document.addEventListener("click", e => {
+  if (e.button !== 0 || targeting) return;
+  const b = e.target.closest?.(".opp .obf"); if (!b || e.target.closest(".card")) return;
+  const s = +b.closest(".opp").dataset.seat; zoomTo(zoomSeat === s ? 0 : s);
+});
 function renderMine(){
   const z = me.zones;
   $("#me").classList.toggle("turn", table.turnSeat === mySeat);
@@ -2081,6 +2145,29 @@ function renderCombat(){
   lastAtMe = atMe.length;
   note.textContent = atMe.length ? `${atMe.length} attacking you: right-click your creature, Block..., to block with an arrow` : attackers.length ? `${attackers.length} attacking` : "";
 }
+// The middle of a round table (4 or 5 opponents): whose turn it is, and the turn order as seats around a circle,
+// starting with you at the bottom and going clockwise (the next player is on your left)
+function renderHub(){
+  const hub = $("#hub"); if (!/\br[45]\b/.test($("#play").className)) { hub.innerHTML = ""; return; }
+  const seats = Object.keys(players).map(Number).filter(s => s !== mySeat).sort((a, b) => a - b);
+  const ring = [mySeat, ...seats.filter(s => s > mySeat), ...seats.filter(s => s < mySeat)];
+  const sig = JSON.stringify([ring.map(s => [nm(s), players[s]?.out]), table.started, table.turnSeat, table.turnNum, table.round]);
+  if (hub.dataset.sig === sig) return; hub.dataset.sig = sig;
+  const mid = el("div", { className:"hubmid" });
+  if (table.started && table.turnSeat) mid.append(el("span", { className:"hint", textContent:`Turn ${table.turnNum}${table.round ? ` · Round ${table.round}` : ""}` }),
+    el("span", { className:"who", textContent:table.turnSeat === mySeat ? "Your turn" : `${nm(table.turnSeat)}'s turn` }));
+  else mid.append(el("span", { className:"who", textContent:"Waiting to start" }));
+  mid.append(el("span", { className:"hint", textContent:"Turn order goes clockwise" }));
+  const circle = el("div", { className:"hubring" }, mid);
+  ring.forEach((s, i) => {
+    const a = -i * 2 * Math.PI / ring.length, name = nm(s);
+    const d = el("span", { className:"hubdot" + (table.started && table.turnSeat === s ? " now" : "") + (players[s]?.out ? " out" : ""), textContent:s === mySeat ? "You" : name.slice(0, 4), title:s === mySeat ? "You" : name });
+    d.style.left = (50 + 50 * Math.sin(a)) + "%"; d.style.top = (50 + 50 * Math.cos(a)) + "%"; d.style.background = SEAT_HEX[s - 1];
+    if (s === 1) d.style.color = "#1b1608";
+    circle.append(d);
+  });
+  hub.replaceChildren(circle);
+}
 function renderTurn(){
   const f = FORMATS[table.fmt];
   $("#roomLabel").textContent = `Table ${roomCode} · ${f.short}`;
@@ -2098,6 +2185,7 @@ function renderTurn(){
   $("#sideBtn").classList.toggle("hidden", f.cmdr || !sideIds.length || !!me.watch);
   $("#undoBtn").classList.toggle("hidden", !!rule("noUndo"));
   const nRules = Object.keys(table.rules || {}).length; $("#rulesBtn").textContent = nRules ? `House rules (${nRules})` : "House rules";
+  renderHub();
   const dc = $("#dayChip"); dc.className = `chip${table.day ? " " + table.day : " hidden"}`;
   dc.textContent = table.day === "night" ? "☾ Night" : "☀ Day";
 }
@@ -2267,6 +2355,7 @@ document.addEventListener("keydown", e => {
   if (!me || e.target.matches("input,textarea,select") || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape" && targeting) { stopTargeting(); return; }
   if (e.key === "Escape" && $("#inspect")) { closeInspect(); return; }
+  if (e.key === "Escape" && zoomSeat && $("#modal").classList.contains("hidden") && $("#menu").classList.contains("hidden")) { zoomTo(0); return; }
   if (e.key === "Escape") { closeMenu(); if (!$("#modal").classList.contains("hidden") && modalClosable) closeModal(); return; }
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
@@ -3155,7 +3244,7 @@ $("#leaveBtn").onclick = () => {
   setTimeout(() => { try { peer.destroy(); } catch {} location.href = location.pathname; }, 400);
 };
 $("#helpBtn").onclick = () => {
-  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop", sounds:"sounds", stackLands:"stack" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); if (key === "stackLands") render(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
+  const s = (key, label) => { const cb = el("input", { type:"checkbox", checked:settings[key] }); cb.onchange = () => { settings[key] = cb.checked; store.set(`kt-dig-${{ autoUntap:"untap", autoDraw:"draw", autoMana:"mana", turnAlert:"alert", hoverPop:"pop", logPop:"logpop", sounds:"sounds", stackLands:"stack" }[key]}`, cb.checked ? "1" : "0"); if (key === "turnAlert") askAlerts(); if (key === "stackLands") render(); }; return el("label", { style:"display:flex;gap:8px;align-items:center;margin:4px 0" }, cb, label); };
   openModal("How to play", el("div", {},
     el("p", { innerHTML:"<b>Drag</b> cards between your hand, battlefield, library, graveyard, exile and command zone (hold Shift when dropping on the library to put it on the bottom). <b>Click</b> a card on the battlefield to tap or untap it. <b>Double-click</b> a card in hand to play it. <b>Right-click</b> (or press and hold) a card or your library for everything else: counters, transform, face down, tokens, scry, surveil, mill, search, reveal." }),
     el("p", { innerHTML:"<b>Keys:</b> U untap all, T tap the card you're pointing at. (Drawing is a double-click on your library, so it can't happen by accident.)" }),
@@ -3166,10 +3255,11 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
     el("p", { innerHTML:"<b>Combat</b> is by hand: right-click a creature, <b>Attack</b> a player, and an arrow shows it to everyone; to block, right-click your creature, <b>Block...</b>, and click the attacker (or right-click the attacker). Tap, deal damage and change life yourself. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
-    el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. Chat is under the log (the <b>Log</b> button on a phone). Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
+    el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. The log and chat open from <b>Log &amp; chat</b> at the top; while it's closed, new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
     s("hoverPop", "Enlarge a card when I point at it"),
+    s("logPop", "Pop up new log and chat lines for a few seconds while the log is closed"),
     s("stackLands", "Stack basic lands of the same kind (click a stack to tap one, right-click for more)"),
     s("sounds", "Sounds: my turn, being attacked, being targeted, and chat"),
     s("turnAlert", "Alert me (a chime and a notification) when my turn starts and this tab is in the background")));
@@ -3181,7 +3271,7 @@ function chatLine(who, text, seat){
   li.dataset.raw = String(text); li.dataset.pre = li.childNodes.length; li.append(...linkCards(String(text)));
   const ul = $("#log"); ul.append(li); while (ul.children.length > 300) ul.firstChild.remove();
   $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
-  if (seat && seat !== mySeat && getComputedStyle($("#panel")).display === "none") toast(`${who}: ${text}`);
+  feed(li);
   if (seat && seat !== mySeat) cue("chat");
 }
 $("#chatForm").onsubmit = e => {
@@ -3190,6 +3280,16 @@ $("#chatForm").onsubmit = e => {
   $("#chatIn").value = "";
   broadcast({ type:"chat", text }); chatLine("You", text, mySeat);
 };
+// A new log or chat line while the log is closed: counted on the Log button, and shown for a few seconds
+let unread = 0;
+function feed(li){
+  if (document.body.classList.contains("panel-open") || !me) return;
+  unread++; const n = $("#logNew"); n.textContent = unread > 99 ? "99+" : unread; n.classList.remove("hidden");
+  if (!settings.logPop) return;
+  const box = $("#feed"), copy = li.cloneNode(true); box.append(copy);
+  while (box.children.length > 4) box.firstChild.remove();
+  setTimeout(() => copy.classList.add("fade"), 6000); setTimeout(() => copy.remove(), 6700);
+}
 function log(text, seat){
   const li = el("li"), t = new Date();
   li.append(el("span", { className:"t", textContent:t.toTimeString().slice(0, 5) }));
@@ -3198,6 +3298,7 @@ function log(text, seat){
   li.append(...(typeof text === "string" ? linkCards(text) : [text]));
   const ul = $("#log"); ul.append(li); while (ul.children.length > 300) ul.firstChild.remove();
   $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
+  feed(li);
 }
 /* Playmats: each player picks one for their side of the table, and everyone sees it (behind your battlefield, and
    behind your area on the other players' screens). Built-in mats, a picture from an https link, or a picture from
