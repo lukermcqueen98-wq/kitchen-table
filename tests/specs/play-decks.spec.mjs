@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer } from "../support/players.mjs";
+import { launchBrowser, newPlayer, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 // A small stand-in for precons.json (the real one is built from MTGJSON and Scryfall when the site is published)
@@ -60,10 +60,10 @@ test("digital table: picking an official deck (Commander and 60-card), with desc
   await expect(a.locator("#bf .card")).toHaveCount(1);
   await expect(a.locator("#bf .card .tax")).toHaveCount(0);
   await a.locator("#bf .card").click({ button:"right" });
-  await a.getByRole("menuitem", { name:"To command zone" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Command zone", exact:true }).click();
   await expect(a.locator("#czone .card .tax")).toHaveText("Tax +2");
   // Magic terms: the Terms window lists them (the same list as the webcam table's), searchable
-  await a.click("#termsBtn");
+  await tool(a, "#termsBtn");
   await expect(a.locator(".modal-card h2")).toHaveText("Magic terms");
   // (every term with its meaning showing, A to Z, filters by group, and no links to other sites)
   await expect(a.locator(".modal .ktt-item").first()).toBeVisible();

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 const opp = (page, name) => page.locator(".opp", { hasText:name });
@@ -59,7 +59,7 @@ test("digital table: players who are out are skipped in turn order (0 life, or c
   expect(seen).toEqual([2, 1, 2, 1]);
 
   // Rick concedes: Luke is the last one standing
-  await b.click("#outBtn");
+  await tool(b, "#outBtn");
   await expect(opp(a, "Rick").locator(".badge.out")).toHaveText("Out");
   await expect(a.locator("#log")).toContainText("Luke is the last one standing.");
   await pass();

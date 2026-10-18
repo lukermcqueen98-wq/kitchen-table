@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 const DECK_A = `Commander
@@ -135,19 +135,19 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await b.locator("#hand .card").first().dblclick();
   await expect(opp(a, "Rick").locator(".obf .card")).toHaveCount(1);
   await a.locator("#bf .card").first().click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Target with an arrow..." }).click();
+  await a.locator(".modal").getByRole("button", { name:"Target with an arrow..." }).click();
   await opp(a, "Rick").locator(".obf .card").first().click();
   for (const p of [a, b]) await expect(p.locator("#arrows > path")).toHaveCount(1);
   await expect(b.locator("#log li").last()).toContainText("Luke pointed");
 
   // Attaching: Luke plays another card and attaches it to his first; it tucks behind it, on both screens
   // (two Forests would stack into one pile: Help turns stacking off)
-  await a.click("#helpBtn"); await a.locator(".modal label", { hasText:"Stack basic lands of the same kind" }).locator("input").uncheck(); await a.locator(".modal").getByRole("button", { name:"Close" }).click();
+  await tool(a, "#helpBtn"); await a.locator(".modal label", { hasText:"Stack basic lands of the same kind" }).locator("input").uncheck(); await a.locator(".modal").getByRole("button", { name:"Close" }).click();
   await a.locator("#hand .card").first().dblclick();
   await expect(a.locator("#bf .card")).toHaveCount(2);
   const second = await a.locator("#bf .card").nth(1).getAttribute("data-iid");
   await a.locator(`#bf .card[data-iid="${second}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Attach to..." }).click();
+  await a.locator(".modal").getByRole("button", { name:"Attach to..." }).click();
   await a.locator("#bf .card:not(.attached)").first().click();
   await expect(a.locator("#bf .card.attached")).toHaveCount(1);
   await expect(opp(b, "Luke").locator(".obf .card.attached")).toHaveCount(1);
@@ -161,7 +161,7 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await expect(a.locator("#bf .card.attached")).toHaveCount(0);  // (the equipment stays behind on Luke's side)
   const gyBefore = +(await a.locator("#gyPile").textContent()).match(/\d+/)[0];
   await b.locator(`#bf .card[data-iid="${host}"]`).click({ button:"right" });
-  await b.getByRole("menuitem", { name:"To graveyard" }).click();
+  await b.locator(".modal").getByRole("button", { name:"Graveyard", exact:true }).click();
   await expect(a.locator("#gyPile")).toContainText(`Graveyard ${gyBefore + 1}`);
   await expect(b.locator(`#bf .card[data-iid="${host}"]`)).toHaveCount(0);
   // ...and Rick can tap Luke's remaining card from his screen

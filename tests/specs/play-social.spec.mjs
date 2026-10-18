@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 const DECK = `12 Gamma Card
@@ -66,7 +66,7 @@ test("digital table: chat, watching, a dropped connection, and game records", as
   // (each player is asked: the same deck or a new one; both keep theirs)
   for (const p of [a, b]) { await p.locator(".modal").getByRole("button", { name:/^Same deck/ }).click(); await p.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click(); }
   for (const p of [a, b]) {
-    await p.click("#statsBtn");
+    await tool(p, "#statsBtn");
     await expect(p.locator(".modal")).toContainText("1 game recorded");
     await expect(p.locator(".modal")).toContainText(`The first player won ${lukeFirst ? 1 : 0} of 1`);
     await expect(p.locator(".modal table.stats").first().locator("tr", { hasText:"Luke" })).toContainText("100%");
@@ -74,11 +74,11 @@ test("digital table: chat, watching, a dropped connection, and game records", as
     await p.locator(".modal").getByRole("button", { name:"Close", exact:true }).click();
   }
   // Records on another device: a backup file restores them, and sitting down with the group shares them
-  const [dl] = await Promise.all([a.waitForEvent("download"), (async () => { await a.click("#statsBtn"); await a.locator(".modal").getByRole("button", { name:"Back up (file)" }).click(); })()]);
+  const [dl] = await Promise.all([a.waitForEvent("download"), (async () => { await tool(a, "#statsBtn"); await a.locator(".modal").getByRole("button", { name:"Back up (file)" }).click(); })()]);
   const backup = await dl.path();
   const d = await newPlayer(browser);  // (a new device, at a table of its own: nothing recorded yet)
   await join(d, "Luke", "");
-  await d.click("#statsBtn");
+  await tool(d, "#statsBtn");
   await expect(d.locator(".modal")).toContainText("No games recorded yet");
   const [chooser] = await Promise.all([d.waitForEvent("filechooser"), d.locator(".modal").getByRole("button", { name:"Restore from a file" }).click()]);
   await chooser.setFiles(backup);
@@ -87,7 +87,7 @@ test("digital table: chat, watching, a dropped connection, and game records", as
   await join(e, "Luke", room);
   await expect(e.locator("#log")).toContainText("Added 1 of your past games", { timeout:15000 });
   await e.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();  // (a game is on: this Luke gets a hand)
-  await e.click("#statsBtn");
+  await tool(e, "#statsBtn");
   await expect(e.locator(".modal")).toContainText("1 game recorded");
   await e.locator(".modal").getByRole("button", { name:"Close", exact:true }).click();
 

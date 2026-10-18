@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 // Gamma Card is a 3/4 creature in the test cards
@@ -28,7 +28,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   // Undo: playing a card and undoing it puts it back in hand, on both screens
   await a.locator("#hand .card").first().dblclick();
   await expect(opp(b, "Luke").locator(".obf .card")).toHaveCount(1);
-  await a.click("#undoBtn");
+  await tool(a, "#undoBtn");
   await expect(a.locator("#hand .card")).toHaveCount(7);
   await expect(a.locator("#bf .card")).toHaveCount(0);
   await expect(opp(b, "Luke").locator(".obf .card")).toHaveCount(0);
@@ -50,7 +50,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   if (turn !== 1) { await b.click("#nextTurn"); await expect(a.locator("#turnInfo")).toContainText("Your turn"); }
   await expect(a.locator("#attackBtn")).toHaveCount(0); await expect(a.locator("#dmgBtn")).toHaveCount(0); await expect(a.locator("#combatBtn")).toHaveCount(0);
   await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Attack Rick" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Attack Rick" }).click();
   await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);
   await expect(a.locator(`#bf .card[data-iid="${bear}"].tapped`)).toHaveCount(0);
   for (const p of [a, b]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(1);
@@ -68,11 +68,11 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
   await expect(a.locator("#arrows > path:not(.blockline)")).toHaveCount(0);
   await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Attack Rick" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Attack Rick" }).click();
   await expect(b.locator("#combatNote")).toContainText("1 attacking you");
   // ...a blocker can also pick the attacker by clicking it (Block...)
   await b.locator(`#bf .card[data-iid="${wall}"]`).click({ button:"right" });
-  await b.getByRole("menuitem", { name:"Block... (click the attacker)" }).click();
+  await b.locator(".modal").getByRole("button", { name:"Block... (click the attacker)" }).click();
   await opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`).click();
   await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
   await a.click("#nextTurn");

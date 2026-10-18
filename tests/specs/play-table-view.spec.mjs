@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 const opp = (page, name) => page.locator(".opp", { hasText:name });
@@ -22,7 +22,7 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
 
   // A d20: it tumbles over Luke's side on both screens, then lands on the number the log shows
   // One "Roll dice" button with every die
-  await a.click("#rollBtn");
+  await tool(a, "#rollBtn");
   for (const d of ["Flip a coin", "Roll a d3", "Roll a d4", "Roll a d6", "Roll a d8", "Roll a d10", "Roll a d12", "Roll a d20", "Roll a d100", "Several dice...", "Roll the planar die (Planechase)"])
     await expect(a.getByRole("menuitem", { name:d, exact:true })).toBeVisible();
   await a.getByRole("menuitem", { name:"Roll a d20", exact:true }).click();
@@ -36,11 +36,11 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   expect(onRick).toBe(true);
   await expect(b.locator(".rollfx")).toHaveCount(0, { timeout:8000 });
   // ...and a coin
-  await b.click("#rollBtn"); await b.getByRole("menuitem", { name:"Flip a coin", exact:true }).click();
+  await tool(b, "#rollBtn"); await b.getByRole("menuitem", { name:"Flip a coin", exact:true }).click();
   await expect(a.locator(".rollfx.landed .rolllabel")).toHaveText(/^Rick flipped (heads|tails)$/, { timeout:5000 });
   await expect(a.locator(".rollfx")).toHaveCount(0, { timeout:8000 });
   // Several dice at once: 3d6 shows three dice and the total
-  await b.click("#rollBtn"); await b.getByRole("menuitem", { name:"Several dice...", exact:true }).click();
+  await tool(b, "#rollBtn"); await b.getByRole("menuitem", { name:"Several dice...", exact:true }).click();
   await b.fill(".modal input[aria-label='How many']", "3"); await b.selectOption(".modal select[aria-label='Which die']", "d6");
   await button(b, "Roll");
   await expect(a.locator(".rollfx .rolldie")).toHaveCount(3);
@@ -50,7 +50,7 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   await expect(a.locator("#log")).toContainText(`Rick rolled 3d6: ${x} + ${y} + ${z} = ${sum}.`);
   await expect(a.locator(".rollfx")).toHaveCount(0, { timeout:8000 });
   // The planar die
-  await b.click("#rollBtn"); await b.getByRole("menuitem", { name:"Roll the planar die (Planechase)", exact:true }).click();
+  await tool(b, "#rollBtn"); await b.getByRole("menuitem", { name:"Roll the planar die (Planechase)", exact:true }).click();
   await expect(a.locator("#log")).toContainText(/Rick rolled the planar die: (blank|chaos|planeswalk)\./, { timeout:5000 });
 
   // Luke's graveyard and exile show their top card on Rick's screen, with counts; a click shows them all
@@ -69,7 +69,7 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   await expect(b.locator(".omana")).toHaveCount(0);
 
   // Drop-downs are dark with light words (the Group effects ones were light on light)
-  await a.click("#fxBtn");
+  await tool(a, "#fxBtn");
   const colors = await a.locator(".modal select").first().evaluate(e => { const s = getComputedStyle(e); return [s.color, s.backgroundColor]; });
   expect(colors).toEqual(["rgb(239, 230, 207)", "rgb(13, 32, 29)"]);
   await button(a, "Cancel");
@@ -102,7 +102,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
 
   // Luke takes the initiative: he ventures into the Undercity (Secret Entrance), and its card shows under his mana and
   // next to his graveyard and exile on Rick's screen
-  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"Take the initiative", exact:true }).click();
+  await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"Take the initiative", exact:true }).click();
   await expect(a.locator(".modal-card h2")).toHaveText("Secret Entrance");
   await expect(a.locator(".modal")).toContainText("Search your library for a basic land card");
   await button(a, "I'll do it myself");
@@ -114,7 +114,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom; })).toBe(true);
 
   // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
-  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
+  await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
   await expect(b.locator("#dayChip")).toHaveText("☀ Day");
   await pass(b);
   await expect(a.locator("#log")).toContainText("It becomes night (Rick cast no spells last turn).");
@@ -135,7 +135,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   await expect(b.locator("#dayChip")).toHaveText("☀ Day");
 
   // Rick hits Luke (combat is by hand) and takes the initiative: he ventures into his own Undercity
-  await b.click("#desigBtn"); await b.getByRole("menuitem", { name:"Take the initiative", exact:true }).click();
+  await tool(b, "#desigBtn"); await b.getByRole("menuitem", { name:"Take the initiative", exact:true }).click();
   await expect(b.locator(".modal-card h2")).toHaveText("Secret Entrance");
   await button(b, "I'll do it myself");
   await expect(b.locator("#dungeonBox .dungeon")).toContainText("🗝 Initiative");
@@ -147,9 +147,9 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
       card_faces:[face("Test Pup", "Daybound"), face("Test Wolf", "Nightbound")] });
     ktPlay.me.zones.bf.push({ iid:"daybcard", id:"dayb-0000", x:0.5, y:0.5, tapped:false, fd:false, face:0, ctr:{} });
   });
-  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes night", exact:true }).click();
+  await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"It becomes night", exact:true }).click();
   await expect.poll(() => ktp(a, () => ktPlay.me.zones.bf.find(c => c.iid === "daybcard").face)).toBe(1);
-  await a.click("#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
+  await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
   await expect.poll(() => ktp(a, () => ktPlay.me.zones.bf.find(c => c.iid === "daybcard").face)).toBe(0);
   // (Luke keeps his place in his own Undercity, without the initiative)
   await expect(a.locator("#dungeonBox .dungeon .droom.here")).toHaveText("Lost Well");
@@ -336,7 +336,7 @@ test("digital table: playmats everyone sees, including players who sit down late
   await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
   const room = new URL(a.url()).searchParams.get("room"); await settle(a);
   // Luke picks the Island mat before Rick arrives
-  await a.click("#matBtn"); await a.locator(".modal .matpick", { hasText:"Island" }).click();
+  await tool(a, "#matBtn"); await a.locator(".modal .matpick", { hasText:"Island" }).click();
   await expect(a.locator("#bf")).toHaveClass(/mat/);
   expect(await a.locator("#bf").evaluate(e => e.style.background)).toContain("gradient");
   await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
@@ -345,7 +345,7 @@ test("digital table: playmats everyone sees, including players who sit down late
   await expect(opp(b, "Luke").locator(".obody")).toHaveClass(/mat/);
   // A picture from a link
   // (the picture is checked, then adjusted: move it and zoom in, with previews of both views)
-  await a.click("#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://cards.scryfall.io/art_crop/0.png"); await button(a, "Use this picture");
+  await tool(a, "#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://cards.scryfall.io/art_crop/0.png"); await button(a, "Use this picture");
   await expect(a.locator(".modal-card h2")).toHaveText("Adjust your playmat");
   await expect(a.locator(".modal .matprev .matlayer img")).toHaveCount(2);
   await a.locator(".modal").getByRole("button", { name:"Move right" }).click();
@@ -365,11 +365,11 @@ test("digital table: playmats everyone sees, including players who sit down late
   await expect(b.locator("#log")).toContainText("Luke put down a new playmat.");
   expect(await a.locator("#bf > .matlayer img").evaluate(i => i.style.objectPosition)).toBe(look[0]);
   // A link that doesn't load is caught before it's used
-  await a.click("#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://pictures.example.invalid/mat.png"); await button(a, "Use this picture");
+  await tool(a, "#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://pictures.example.invalid/mat.png"); await button(a, "Use this picture");
   await expect(a.locator("#toast")).toContainText("That picture didn't load.");
   await button(a, "Close");
   // ...and back to plain felt
-  await a.click("#matBtn"); await a.locator(".modal .matpick", { hasText:"Felt (plain)" }).click();
+  await tool(a, "#matBtn"); await a.locator(".modal .matpick", { hasText:"Felt (plain)" }).click();
   await expect(opp(b, "Luke").locator(".obody")).not.toHaveClass(/mat/);
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
@@ -396,7 +396,7 @@ test("digital table: no mana question for lands that make several colors; mana s
   // Mana symbols on a card: green and blue on Gamma Card, seen by Rick; clicking one taps it
   const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; });
   await a.locator(`#bf .card[data-iid="${gamma}"]`).click({ button:"right" });
-  await a.getByRole("menuitem", { name:"Mana symbols (what it can make)...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"Mark the mana it makes...", exact:true }).click();
   await a.locator(".modal").getByRole("button", { name:"G mana" }).click();
   await a.locator(".modal").getByRole("button", { name:"U mana" }).click();
   await button(a, "Done");
@@ -430,7 +430,7 @@ test("digital table: key terms on cards, for everyone, and until end of turn", a
   const mine = await fetch(a); await fetch(b);
   const card = a.locator(`#bf .card[data-iid="${mine}"]`);
   // Luke gives his Gamma Card flying until end of turn, and Prowess for good
-  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Key terms (flying, haste...)...", exact:true }).click();
+  await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"+ Add a key term", exact:true }).click();
   await a.locator(".modal").getByRole("button", { name:"Flying", exact:true }).click();
   await a.locator(".modal input[aria-label='Until end of turn']").uncheck();
   await a.fill(".modal input[aria-label='Another key term']", "prowess"); await a.locator(".modal").getByRole("button", { name:"Add", exact:true }).click();
@@ -505,7 +505,7 @@ test("digital table: attacking by hand, each creature at its own opponent (arrow
   await a.click("#startBtn"); await button(a, "Start the game");
   for (const p of [a, b, c]) await button(p, "Keep");
   const three = await ktp(a, () => [0, 1, 2].map(() => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; }));
-  const attack = async (iid, who) => { await a.locator(`#bf .card[data-iid="${iid}"]`).click({ button:"right" }); await a.getByRole("menuitem", { name:`Attack ${who}`, exact:true }).click(); };
+  const attack = async (iid, who) => { await a.locator(`#bf .card[data-iid="${iid}"]`).click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:`Attack ${who}`, exact:true }).click(); };
   // One at Rick, one at Sam, one stays home: an arrow for each, on every screen
   await attack(three[0], "Rick"); await attack(three[1], "Sam");
   expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk || 0), three)).toEqual([2, 3, 0]);
@@ -518,7 +518,7 @@ test("digital table: attacking by hand, each creature at its own opponent (arrow
   await expect(b.locator("#combatNote")).toContainText("2 attacking you");
   for (const p of [a, b, c]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(3);
   // ...and one comes back out of combat
-  await a.locator(`#bf .card[data-iid="${three[0]}"]`).click({ button:"right" }); await a.getByRole("menuitem", { name:"Out of combat (remove its arrow)", exact:true }).click();
+  await a.locator(`#bf .card[data-iid="${three[0]}"]`).click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Out of combat (remove its arrow)", exact:true }).click();
   await expect(b.locator("#combatNote")).toContainText("1 attacking you");
   await expect(a.locator("#arrows > path:not(.blockline)")).toHaveCount(2);
   expect([...a.errors, ...b.errors, ...c.errors]).toEqual([]);
@@ -546,7 +546,7 @@ test("digital table: inspecting shows both sides of a two-sided card, and cards 
     ktPlay.draw(1);  // (anything that redraws the table)
   });
   await a.locator('#bf .card[data-iid="dfccard"]').click({ button:"right" });
-  await a.getByRole("menuitem", { name:"View card", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"View card (rules text, both sides)", exact:true }).click();
   const pics = a.locator(".modal .inspectpics figure");
   await expect(pics).toHaveCount(2);
   await expect(pics.nth(0)).toContainText("Test Pup");
@@ -593,7 +593,7 @@ test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and tou
   const card = a.locator(`#bf .card[data-iid="${gamma}"]`);
   await expect(card.locator(".pt")).toHaveText("3/4");
   // Luke: two +1/+0 counters and a -0/-1 counter: 3/4 becomes 5/3
-  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Counters...", exact:true }).click();
+  await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
   for (let i = 0; i < 2; i++) await a.locator(".modal").getByRole("button", { name:"+1/+0 plus" }).click();
   await a.locator(".modal").getByRole("button", { name:"-0/-1 plus" }).click();
   await button(a, "Done");
@@ -606,7 +606,7 @@ test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and tou
   await b.getByRole("menuitem", { name:"Put a +0/+1 counter on it", exact:true }).click();
   await expect(card.locator(".pt")).toHaveText("5/4");
   // ...and a -1/-0: 4/4
-  await card.click({ button:"right" }); await a.getByRole("menuitem", { name:"Counters...", exact:true }).click();
+  await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
   await a.locator(".modal").getByRole("button", { name:"-1/-0 plus" }).click(); await button(a, "Done");
   await expect(card.locator(".pt")).toHaveText("4/4");
   expect([...a.errors, ...b.errors]).toEqual([]);

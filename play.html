@@ -93,9 +93,26 @@ header .topbar{display:flex;align-items:center;gap:8px 14px;padding:6px 12px;fle
 header .title{font:700 18px var(--serif)}
 header .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 header .grp.mid{flex:1;justify-content:center;gap:10px}
-header .toolbar{display:flex;gap:6px 18px;align-items:center;padding:5px 12px;flex-wrap:wrap;background:rgba(0,0,0,.18);border-top:1px solid var(--felt-edge)}
-.tgroup{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.tgroup+.tgroup{padding-left:14px;border-left:1px solid var(--felt-edge)}
+/* The Turn, Table and Game menus in the top bar */
+.tmenu{position:relative}
+.tmenu>summary{list-style:none;cursor:pointer}
+.tmenu>summary::-webkit-details-marker{display:none}
+.tmenu>summary::after{content:" \25BE";opacity:.7}
+.tmenu[open]>summary{border-color:var(--brass);background:rgba(201,164,76,.14)}
+.tmenu-pop{position:absolute;left:0;top:calc(100% + 6px);z-index:70;min-width:230px;display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--felt-deep);border:1px solid var(--brass);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.6)}
+.tmenu-pop .mitem{display:block;width:100%;text-align:left;border:0;background:none;border-radius:8px;padding:8px 10px;font-size:14px;white-space:nowrap}
+.tmenu-pop .mitem:hover,.tmenu-pop .mitem:focus-visible{background:rgba(255,255,255,.08)}
+.tmenu-pop .mitem.hidden{display:none}
+.tmenu-pop .phases{display:block;padding:6px 10px 4px;border-top:1px solid var(--felt-edge);margin-top:4px;white-space:normal}
+.tmenu-pop .mhead{display:block;padding:4px 10px 6px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--felt-edge);margin-bottom:4px}
+/* Whose turn it is, with the clocks and Next turn, in one pill (gold on your turn) */
+.turnpill{display:flex;align-items:center;gap:10px;border:1px solid var(--felt-edge);border-radius:999px;padding:3px 3px 3px 14px;white-space:nowrap}
+.turnpill #turnInfo,.turnpill #turnInfo.mine{border:0;padding:0;box-shadow:none;animation:none;background:none;color:inherit;font-size:15px}
+.turnpill.mine{background:var(--brass);border-color:var(--brass);color:#1b1608;box-shadow:0 0 0 4px rgba(201,164,76,.25),0 0 24px rgba(201,164,76,.35);animation:myturn 2.4s ease-in-out infinite}
+.turnpill.mine .clabel{color:rgba(27,22,8,.7)}
+.turnpill.mine #nextTurn{background:#1b1608;color:var(--brass);border-color:#1b1608;font-weight:700}
+.turnpill #nextTurn{border-radius:999px}
+.turnpill .clocks{display:flex;gap:10px;border:0;background:none;padding:0}
 .tlabel{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:2px}
 .clocks{display:flex;gap:10px;align-items:center;border:1px solid var(--felt-edge);border-radius:10px;padding:2px 10px;background:rgba(0,0,0,.2)}
 .clock{display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
@@ -158,6 +175,7 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .opile .card{--w:60px}
 .pile .card.peek{outline:2px solid var(--brass)}
 .card .kwtags{position:absolute;left:2px;top:2px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:calc(100% - 4px);z-index:2;pointer-events:none}
+.card .kwtags span{pointer-events:auto;cursor:help}
 .card .kwtags span{font:700 9px/1.3 var(--sans);background:rgba(13,32,29,.92);color:var(--parchment);border:1px solid var(--brass);border-radius:4px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .card .kwtags span.eot{border-style:dashed}
 .card .manatags{position:absolute;left:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;max-width:calc(100% - 6px);z-index:2}
@@ -328,6 +346,28 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .fout{margin:6px 0 0;font-size:14px;color:#d9e2dc}
 .fsum{font-size:16px;font-weight:600;margin:12px 0 4px;color:var(--parchment)}
 .termlist{max-height:60vh;overflow:auto}
+/* A card's action panel (click or right-click your card on the battlefield): its picture, and everything you can do
+   with it in plain view */
+.cpanel{display:flex;gap:20px;align-items:flex-start}
+.cp-pic{width:250px;flex:none;display:flex;flex-direction:column;gap:6px}
+.cp-pic img{width:100%;border-radius:4.75%/3.5%;display:block;background:#000;aspect-ratio:63/88}
+.cp-back{aspect-ratio:63/88;border-radius:12px;background:#2a2016;display:grid;place-items:center;color:var(--muted)}
+.cp-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.cp-sec h3{margin:0 0 6px;font:600 12px/1.2 var(--sans);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.cp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cp-row .btn{min-height:36px}
+.cp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cp-grid .btn{min-height:40px}
+.cp-ctr{display:flex;align-items:center;gap:8px;border:1px solid var(--felt-edge);border-radius:8px;padding:4px 8px;background:rgba(255,255,255,.03)}
+.cp-ctr b{min-width:22px;text-align:center;font-size:16px}
+.cp-ctr button{width:34px;height:34px;border-radius:8px;border:1px solid var(--felt-edge);background:none;font-size:17px}
+.cp-kw{position:relative;border-radius:999px;border:1px solid var(--brass);background:rgba(201,164,76,.12);padding:4px 10px;font-size:13px;cursor:help}
+.cp-kw.eot{border-style:dashed}
+.cp-kw .x{margin-left:6px;border:0;background:none;padding:0 2px;color:var(--muted);cursor:pointer}
+.cp-def{position:absolute;left:0;top:calc(100% + 6px);z-index:5;width:min(320px,70vw);background:var(--felt-deep);border:1px solid var(--brass);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.45;color:var(--parchment);box-shadow:0 10px 24px rgba(0,0,0,.6);cursor:auto}
+.cp-def b{display:block;margin-bottom:2px}
+.cp-seat{border-width:2px}
+@media (max-width:700px){.cpanel{flex-direction:column}.cp-pic{width:160px;align-self:center}.cp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .term{border-bottom:1px solid var(--felt-edge);padding:6px 2px}
 .term p{margin:3px 0 4px;font-size:14px}
 .modal-card.wide .gcard{width:164px}
@@ -386,7 +426,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 @media (max-width:900px){
   :root{--cw:62px}
   #table{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
-  header .topbar,header .toolbar{flex-wrap:nowrap;overflow-x:auto;padding:5px 8px;gap:6px;min-width:0}
+  header .topbar{flex-wrap:nowrap;overflow-x:auto;padding:5px 8px;gap:6px;min-width:0}
+  .tmenu-pop{position:fixed;left:8px;right:8px;top:52px}
   .tlabel,.clabel{display:none}
   header .btn,#turnInfo{white-space:nowrap}
   .piles{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -477,45 +518,51 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 
 <section id="table" class="hidden">
   <header>
-    <!-- Top bar: where you are, whose turn it is with the clocks, and your own buttons -->
+    <!-- One row: menus on the left (Turn, Table, Game), whose turn it is in the middle (with the clocks and Next turn),
+         your mic and the log on the right -->
     <div class="topbar">
-      <span class="grp"><span class="title">Kitchen Table</span><span id="roomLabel" class="hint"></span><span id="watchers" class="hint"></span><button class="btn small" id="copyLink">Copy invite link</button></span>
+      <span class="grp"><span class="title">Kitchen Table</span>
+        <details class="tmenu playonly"><summary class="btn small">Turn</summary><div class="tmenu-pop" role="menu" aria-label="Turn">
+          <button role="menuitem" class="btn small mitem playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
+          <button role="menuitem" class="btn small mitem" id="untapAllBtn" title="Untap everything you control (U)">Untap everything</button>
+          <span class="phases" id="phases" title="The steps of a turn">Untap · Upkeep · Draw · Main 1 · Combat · Main 2 · End</span>
+        </div></details>
+        <details class="tmenu playonly"><summary class="btn small">Table</summary><div class="tmenu-pop" role="menu" aria-label="Table">
+          <button role="menuitem" class="btn small mitem playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
+          <button role="menuitem" class="btn small mitem playonly" id="tokenBtn">Tokens</button>
+          <button role="menuitem" class="btn small mitem playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
+          <button role="menuitem" class="btn small mitem playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
+        </div></details>
+        <details class="tmenu"><summary class="btn small">Game</summary><div class="tmenu-pop" role="menu" aria-label="Game">
+          <span class="mhead"><span id="roomLabel"></span> <span id="watchers"></span></span>
+          <button role="menuitem" class="btn small mitem" id="copyLink">Copy invite link</button>
+          <button role="menuitem" class="btn small mitem" id="rulesBtn" title="House rules for this table">House rules</button>
+          <button role="menuitem" class="btn small mitem hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
+          <button role="menuitem" class="btn small mitem" id="matBtn" title="Pick a playmat for your side of the table (everyone sees it)">Playmat</button>
+          <button role="menuitem" class="btn small mitem" id="termsBtn" title="Magic terms and what they mean">Terms</button>
+          <button role="menuitem" class="btn small mitem" id="statsBtn">Stats</button>
+          <button role="menuitem" class="btn small mitem playonly" id="outBtn" title="Concede: you're out of this game (the others play on)">Concede</button>
+          <button role="menuitem" class="btn small mitem" id="helpBtn">Help</button>
+          <button role="menuitem" class="btn small mitem" id="leaveBtn">Leave</button>
+        </div></details>
+      </span>
       <span class="grp mid">
-        <span id="turnInfo" role="status"></span>
-        <span class="clocks" id="clocks" title="Game time, this turn's time, and turn counts">
+        <span class="turnpill" id="turnPill">
+          <span id="turnInfo" role="status"></span>
+          <span class="clocks" id="clocks" title="Game time, this turn's time, and turn counts">
           <span class="clock"><span class="clabel">Game</span><b id="gameClock">0:00</b></span>
           <span class="clock" id="turnClockBox"><span class="clabel">Turn</span><b id="turnClock">0:00</b><span id="turnLimit" class="hint"></span></span>
           <span class="clock"><span class="clabel">Turn #</span><b id="turnCount">0</b></span>
           <span class="clock"><span class="clabel">Round</span><b id="roundCount">0</b></span>
         </span>
+          <button class="btn small playonly" id="nextTurn">Next turn</button>
+        </span>
+        <button class="btn small primary playonly" id="startBtn">Start game</button>
+        <button class="btn small playonly" id="clearArrowsBtn" title="Take back your arrows and attack/block marks (they also clear when the turn passes)">Clear arrows</button>
         <button class="chip hidden" id="dayChip" title="Day and night: click to switch"></button>
       </span>
-      <span class="grp"><button class="btn small" id="micBtn">Mic on</button><button class="btn small" id="logBtn" aria-controls="panel">Log &amp; chat<span id="logNew" class="hidden"></span></button><button class="btn small" id="helpBtn">Help</button><button class="btn small" id="leaveBtn">Leave</button></span>
+      <span class="grp"><button class="btn small" id="micBtn">Mic on</button><button class="btn small" id="logBtn" aria-controls="panel">Log &amp; chat<span id="logNew" class="hidden"></span></button></span>
     </div>
-    <!-- Toolbar: grouped by what you're doing -->
-    <nav class="toolbar" aria-label="Game actions">
-      <span class="tgroup" aria-label="Your turn"><span class="tlabel">Turn</span>
-        <button class="btn small primary playonly" id="startBtn">Start game</button>
-        <button class="btn small playonly" id="nextTurn">Next turn</button>
-        <button class="btn small playonly" id="clearArrowsBtn" title="Take back your arrows and attack/block marks (they also clear when the turn passes)">Clear arrows</button>
-        <button class="btn small playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
-        <span class="phases" id="phases" title="The steps of a turn">Untap · Upkeep · Draw · Main 1 · Combat · Main 2 · End</span>
-      </span>
-      <span class="tgroup" aria-label="On the table"><span class="tlabel">Table</span>
-        <button class="btn small playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
-        <button class="btn small playonly" id="tokenBtn">Tokens</button>
-        <button class="btn small playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
-        <button class="btn small playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
-      </span>
-      <span class="tgroup" aria-label="The game"><span class="tlabel">Game</span>
-        <button class="btn small" id="rulesBtn" title="House rules for this table">House rules</button>
-        <button class="btn small hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
-        <button class="btn small" id="matBtn" title="Pick a playmat for your side of the table (everyone sees it)">Playmat</button>
-        <button class="btn small" id="termsBtn" title="Magic terms and what they mean">Terms</button>
-        <button class="btn small" id="statsBtn">Stats</button>
-        <button class="btn small playonly" id="outBtn" title="Concede: you're out of this game (the others play on)">Concede</button>
-      </span>
-    </nav>
   </header>
   <main id="play">
     <div id="opps"></div>
@@ -1994,8 +2041,10 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:PT_CTRS[k] && v > 0 ? k.replace(/1/g, v) : `${v} ${k}` }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
   const kwl = cleanKw(c.kw);
-  if (kwl.length) e.append(el("div", { className:"kwtags", title:kwl.map(x => x.n + (x.eot ? " (until end of turn)" : "")).join(", ") },
-    ...kwl.slice(0, 4).map(x => el("span", { className:x.eot ? "eot" : "", textContent:x.n })), ...(kwl.length > 4 ? [el("span", { textContent:`+${kwl.length - 4}` })] : [])));
+  // (each key term shows what it means when you point at it)
+  if (kwl.length) e.append(el("div", { className:"kwtags" },
+    ...kwl.slice(0, 4).map(x => el("span", { className:x.eot ? "eot" : "", textContent:x.n, title:`${x.n}${x.eot ? " (until end of turn)" : ""}: ${termDef(x.n) || "a key term given on the table."}` })),
+    ...(kwl.length > 4 ? [el("span", { textContent:`+${kwl.length - 4}`, title:kwl.slice(4).map(x => `${x.n}: ${termDef(x.n) || ""}`).join("\n") })] : [])));
   const mt = (c.mana || []).filter(k => COLORS.includes(k));
   if (mt.length && !c.fd) e.append(el("div", { className:"manatags", title:`Can make ${mt.map(k => MANA_NAME[k]).join(", ")} mana${mine ? " (click to tap it)" : ""}` },
     ...mt.map(k => { const t = el("img", { className:"mtag", src:`https://svgs.scryfall.io/card-symbols/${k}.svg`, alt:k }); t.dataset.mana = k; return t; })));
@@ -2109,7 +2158,7 @@ function renderOpps(){
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
-  const round = !!POS && !me.watch;
+  const round = order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
   if (!order.includes(zoomSeat)) zoomSeat = 0;
   $("#play").className = round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
   for (const s of order) {
@@ -2246,7 +2295,8 @@ function renderTurn(){
   const mine_ = table.started && table.turnSeat === mySeat;
   $("#turnInfo").textContent = table.started && table.turnSeat ? (mine_ ? `Your turn (${table.turnNum})` : `${nm(table.turnSeat)}'s turn (${table.turnNum})`) : "Waiting to start";
   $("#turnInfo").classList.toggle("mine", mine_);
-  $("#turnInfo").style.borderColor = table.started && !mine_ && table.turnSeat ? SEAT_HEX[table.turnSeat - 1] : "";
+  $("#turnPill").classList.toggle("mine", mine_);
+  $("#turnPill").style.borderColor = table.started && !mine_ && table.turnSeat ? SEAT_HEX[table.turnSeat - 1] : "";
   document.body.classList.toggle("myturn", mine_);
   $("#clocks").classList.toggle("hidden", !table.started);
   tickClocks();
@@ -2449,8 +2499,103 @@ function openMenu(x, y, items){
   m.querySelector("button")?.focus();
 }
 function closeMenu(){ $("#menu").classList.add("hidden"); }
+// What a key term means (from terms.js): "Protection from red" finds Protection, "Hexproof from black" Hexproof from
+function termDef(name){
+  const words = norm(String(name).replace(/\(.*?\)/g, "")).split(" ");
+  for (let n = words.length; n > 0; n--) { const t = TERMS.get(words.slice(0, n).join(" ")); if (t) return t.def; }
+  return "";
+}
+/* Your card on the battlefield: a panel with its picture and everything you can do with it. Small changes (tap,
+   counters, flip) happen right in the panel; anything that needs the table (an arrow, moving it) closes it first. */
+function cardPanel(iid){
+  const body = el("div", { className:"cpanel" });
+  const btn = (label, fn, cls = "") => { const b = el("button", { type:"button", className:`btn small ${cls}`, textContent:label }); b.onclick = fn; return b; };
+  const sec = (title, ...kids) => el("section", { className:"cp-sec" }, el("h3", { textContent:title }), ...kids);
+  let openDef = null;
+  const draw_ = () => {
+    const f = findCard(iid); if (!f || f.z !== "bf") { closeModal(); return; }
+    const c = f.c, k = cardOf(c), act = fn => () => { closeModal(); fn(); }, here = fn => () => { fn(); draw_(); };
+    const to = (label, zone, opt) => btn(label, act(() => move(iid, zone, opt)));
+    $("#modal .modal-card h2") && ($("#modal .modal-card h2").textContent = nameOf(c));
+    // Its picture, and what it is right now
+    const src = c.fd ? "" : imgOf(k, c.face || 0), pt = showPt(c);
+    const pic = el("div", { className:"cp-pic" }, src ? el("img", { src, alt:nameOf(c) }) : el("div", { className:"cp-back", textContent:"Face down" }),
+      el("p", { className:"hint", style:"margin:0", textContent:[pt ? `Power/toughness ${pt.str}` : "", c.tapped ? "Tapped" : "Untapped", c.tok ? "Token" : "", c.atk ? `Attacking ${nm(c.atk)}` : c.blk ? "Blocking" : ""].filter(Boolean).join(" · ") }),
+      btn("View card (rules text, both sides)", act(() => viewCard(c))));
+    const right = el("div", { className:"cp-right" });
+    // Quick
+    const quick = el("div", { className:"cp-row" }, btn(c.tapped ? "Untap" : "Tap", here(() => toggleTap(c)), "primary"),
+      faces(k) ? btn("Transform", here(() => { c.face = c.face ? 0 : 1; say(`transformed ${nameOf(c)}.`); changed(); })) : null,
+      btn(c.fd ? "Turn face up" : "Turn face down", here(() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); })),
+      btn("Create a token copy", here(() => copyCard(c))));
+    const rel = related(k); if (rel.length) quick.append(btn(`Create its token${rel.length > 1 ? "s" : ""}...`, act(() => tokenDialog(rel))));
+    quick.append(btn("Reveal to the table", act(() => reveal([c], ""))));
+    right.append(quick);
+    // Counters: the ones on it with - and +, and the usual ones to add
+    const ctrs = el("div", { className:"cp-row" });
+    for (const [t, v] of Object.entries(c.ctr || {}).filter(([, v]) => v)) {
+      const m = el("button", { type:"button", innerHTML:"&minus;", ariaLabel:`Remove a ${t} counter` }), p = el("button", { type:"button", textContent:"+", ariaLabel:`Add a ${t} counter` });
+      m.onclick = here(() => { c.ctr[t] = Math.max(0, v - 1); if (!c.ctr[t]) delete c.ctr[t]; changed(); });
+      p.onclick = here(() => { c.ctr[t] = v + 1; changed(); });
+      ctrs.append(el("div", { className:"cp-ctr" }, el("span", { textContent:t }), m, el("b", { textContent:v }), p));
+    }
+    for (const t of ["+1/+1", "-1/-1", "Loyalty", "Shield"].filter(t => !c.ctr?.[t])) ctrs.append(btn(`+ ${t}`, here(() => { c.ctr[t] = 1; say(`put a ${t} counter on ${nameOf(c)}.`); changed(); })));
+    ctrs.append(btn("Other counters...", act(() => counterDialog(c))));
+    right.append(sec("Counters", ctrs));
+    // Key terms: printed ones and ones given on the table; point at (or click) one to see what it means
+    const kws = el("div", { className:"cp-row" }), printed = c.fd ? [] : (k?.keywords || []).filter(n => !(c.kw || []).some(x => x.n === n));
+    const chip = (n, given) => {
+      const b = el("button", { type:"button", className:"cp-kw" + (given?.eot ? " eot" : ""), textContent:n + (given?.eot ? " (this turn)" : "") });
+      b.setAttribute("aria-expanded", String(openDef === n));
+      const show = () => { openDef = n; b.setAttribute("aria-expanded", "true"); kws.querySelectorAll(".cp-def").forEach(d => d.remove());
+        b.append(el("span", { className:"cp-def", role:"tooltip" }, el("b", { textContent:n }), termDef(n) || "A key term given on the table. The card's own text says what it does.")); };
+      b.onmouseenter = show; b.onfocus = show; b.onclick = show;
+      b.onmouseleave = () => { if (openDef === n) { openDef = null; b.querySelector(".cp-def")?.remove(); } };
+      if (given) { const x = el("span", { className:"x", textContent:"×", title:`Take ${n} away`, role:"button", tabIndex:0 });
+        x.onclick = e => { e.stopPropagation(); c.kw = (c.kw || []).filter(y => y.n !== n); if (!c.kw.length) delete c.kw; say(`took ${n} away from ${nameOf(c)}.`); changed(); draw_(); };
+        b.append(x); }
+      if (openDef === n) show();
+      return b;
+    };
+    kws.append(...printed.map(n => chip(n, null)), ...(c.kw || []).map(x => chip(x.n, x)), btn("+ Add a key term", act(() => kwDialog(c))));
+    right.append(sec("Key terms", kws));
+    // Mana it makes, and power/toughness
+    const mana = el("div", { className:"cp-row" }, ...(c.mana || []).filter(x => COLORS.includes(x)).map(x => el("img", { src:`https://svgs.scryfall.io/card-symbols/${x}.svg`, alt:`${MANA_NAME[x]} mana`, style:"width:22px;height:22px" })),
+      btn(c.mana?.length ? "Change..." : "Mark the mana it makes...", act(() => manaDialog(c))));
+    const ptRow = el("div", { className:"cp-row" }, el("span", { textContent:pt ? pt.str : "None" }),
+      btn("Change...", act(() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }))));
+    right.append(el("div", { style:"display:flex;gap:18px;flex-wrap:wrap" }, el("div", { style:"flex:1;min-width:180px" }, sec("Mana it makes", mana)), el("div", { style:"flex:1;min-width:160px" }, sec("Power/toughness", ptRow))));
+    // Combat and arrows
+    const fight = el("div", { className:"cp-row" });
+    if (isCreature(c)) {
+      for (const s of presentSeats().filter(s => s !== mySeat && s !== c.atk && !isOut(s))) { const b = btn(`Attack ${nm(s)}`, act(() => attackWith(c, s)), "cp-seat"); b.style.borderColor = SEAT_HEX[s - 1]; fight.append(b); }
+      fight.append(btn("Block... (click the attacker)", act(() => startTargeting("block", iid))));
+    }
+    if (c.atk || c.blk) fight.append(btn("Out of combat (remove its arrow)", act(() => outOfCombat(c))));
+    fight.append(btn("Target with an arrow...", act(() => startTargeting("arrow", iid))),
+      c.att ? btn("Unattach", here(() => { c.att = null; c.x = clamp(c.x + 0.02, 0, 0.94); say(`unattached ${nameOf(c)}.`); changed(); })) : btn("Attach to...", act(() => startTargeting("attach", iid))));
+    if (me.arrows.some(a => a.from === iid)) fight.append(btn("Remove its arrows", here(() => { me.arrows = me.arrows.filter(a => a.from !== iid); changed(); })));
+    right.append(sec(isCreature(c) ? "Combat and arrows" : "Arrows", fight));
+    // Who controls it
+    const others = presentSeats().filter(s => s !== mySeat), ctl = el("div", { className:"cp-row" });
+    if (c.owner && c.owner !== mySeat) ctl.append(btn(`Give back to ${nm(c.owner)}`, act(() => { if (giveCard(iid, c.owner)) say(`gave ${nameOf(c)} back to ${nm(c.owner)}.`); })));
+    for (const s of others.filter(s => s !== c.owner)) ctl.append(btn(`Give control to ${nm(s)}`, act(() => { if (giveCard(iid, s)) say(`gave control of ${nameOf(c)} to ${nm(s)}.`); })));
+    if (ctl.childElementCount) right.append(sec("Control", ctl));
+    // Move it
+    right.append(sec("Move it to", el("div", { className:"cp-grid" }, to("Hand", "hand"), to("Graveyard", "gy"), to("Exile", "ex"), to("Top of library", "lib"), to("Bottom of library", "lib", { bottom:true }),
+      ...(c.cmdr ? [to("Command zone", "cz")] : []))));
+    // What it does to other players (from its text)
+    const fx = !c.fd ? cardEffects(k) : [];
+    if (fx.length) right.append(sec("What it does to other players", el("div", { className:"cp-row" }, ...fx.map(x => btn(x.label, act(x.fn))))));
+    body.replaceChildren(pic, right);
+  };
+  const f = findCard(iid); if (!f) return;
+  openModal(nameOf(f.c), body, [{ label:"Close" }], { wide:true });
+  draw_();
+}
 function cardMenu(iid, x, y){
   const f = findCard(iid); if (!f) return;
+  if (f.z === "bf") { cardPanel(iid); return; }
   const { z, c } = f, k = cardOf(c), items = [{ head:nameOf(c) }, { label:"View card", fn:() => viewCard(c) }];
   const to = (label, zone, opt) => ({ label, fn:() => move(iid, zone, opt) });
   if (z === "bf") {
@@ -3085,6 +3230,12 @@ function termsIn(text){
   return out.filter((v, i) => out.findIndex(o => o.name === v.name) === i).slice(0, 12);
 }
 function termEl(k){ return el("div", { className:"term" }, el("b", { textContent:k.name }), el("p", { textContent:k.def })); }
+// The top bar's menus: a choice closes its menu; clicking elsewhere, or Escape, closes any open one
+document.addEventListener("click", e => {
+  for (const d of document.querySelectorAll(".tmenu[open]")) if (!d.contains(e.target) || e.target.closest(".tmenu-pop .mitem")) d.open = false;
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".tmenu[open]").forEach(d => { d.open = false; }); });
+$("#untapAllBtn").onclick = () => untapAll();
 $("#termsBtn").onclick = () => {
   const ui = window.KT_termsUI();
   openModal("Magic terms", ui.el);
