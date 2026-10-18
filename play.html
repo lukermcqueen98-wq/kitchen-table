@@ -594,13 +594,24 @@ function fmtTime(ms){ const t = Math.max(0, Math.floor(ms / 1000)), h = Math.flo
 const SCRY = "https://api.scryfall.com";
 const cards = new Map();  // Scryfall id -> card
 let scryQueue = Promise.resolve();
-// Scryfall asks for no more than about 10 requests a second
+// Scryfall's limits: about 10 requests a second, and 2 a second for card lookups and searches (collection, named,
+// search, random). Going over gets "429 Too Many Requests" (and for a while every lookup fails, so a whole decklist
+// came back "not found"), so lookups are spaced out, and a 429 or a busy server waits and tries again.
+// scry.down: the last request got no answer at all (busy, offline, or blocked), unlike a card that doesn't exist
 function scry(path, body){
+  const slow = /^\/cards\/(collection|named|search|random)/.test(path);
   const run = scryQueue.then(async () => {
-    try {
-      const r = await fetch(SCRY + path, body ? { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) } : {});
-      return r.ok ? await r.json() : null;
-    } catch { return null; } finally { await sleep(100); }
+    for (let tries = 0; ; tries++) {
+      let r = null;
+      try { r = await fetch(SCRY + path, body ? { method:"POST", headers:{ "Content-Type":"application/json", Accept:"application/json" }, body:JSON.stringify(body) } : { headers:{ Accept:"application/json" } }); } catch {}
+      await sleep(slow ? 550 : 120);
+      scry.status = r ? r.status : 0;
+      if (r?.ok) { scry.down = false; return await r.json().catch(() => null); }
+      if (r && r.status === 404) { scry.down = false; return null; }  // (no such card)
+      if (r && r.status !== 429 && r.status < 500) { scry.down = false; return null; }  // (a request Scryfall won't take)
+      if (tries >= 2) { scry.down = true; return null; }
+      await sleep(Math.min(8, +r?.headers.get("Retry-After") || 1.5 * 2 ** tries) * 1000);
+    }
   });
   scryQueue = run.catch(() => {});
   return run;
@@ -662,14 +673,23 @@ function parseDeck(text){
   }
   return out;
 }
+// Scryfall's collection lookup (up to 75 cards). If Scryfall turns the request down (one odd line can do that), it's
+// split in half and each half tried, so the rest of the list is still found; null only when Scryfall didn't answer
+async function collection(identifiers){
+  const r = await scry("/cards/collection", { identifiers });
+  if (r || scry.down) return r;
+  if (identifiers.length === 1) return { data:[], not_found:identifiers };
+  const h = Math.ceil(identifiers.length / 2), a = await collection(identifiers.slice(0, h)), b = a && await collection(identifiers.slice(h));
+  return a && b ? { data:[...(a.data || []), ...(b.data || [])], not_found:[...(a.not_found || []), ...(b.not_found || [])] } : null;
+}
 // Every name in a decklist, looked up on Scryfall 75 at a time
 async function resolveDeck(parsed){
   const names = [...new Set([...parsed.main.map(x => x.name), ...parsed.side.map(x => x.name), ...parsed.cmdrs])];
-  const found = new Map(), missing = [];
+  const found = new Map(), missing = []; let unreachable = false;
   for (let i = 0; i < names.length; i += 75) {
     const part = names.slice(i, i + 75);
-    const r = await scry("/cards/collection", { identifiers:part.map(name => ({ name:name.split(" // ")[0] })) });
-    if (!r) continue;  // (tried again one by one below)
+    const r = await collection(part.map(name => ({ name:name.split(" // ")[0] })));
+    if (!r) { unreachable = true; continue; }
     for (const c of r.data || []) {
       keep(c);
       const want = part.find(n => norm(n.split(" // ")[0]) === norm(c.name.split(" // ")[0]) || norm(n) === norm(c.name)) || c.name;
@@ -682,13 +702,13 @@ async function resolveDeck(parsed){
   const byPrint = names.filter(n => !have(n) && parsed.prints?.[n]?.num);
   for (let i = 0; i < byPrint.length; i += 75) {
     const part = byPrint.slice(i, i + 75);
-    const r = await scry("/cards/collection", { identifiers:part.map(n => ({ set:parsed.prints[n].set, collector_number:parsed.prints[n].num })) });
+    const r = await collection(part.map(n => ({ set:parsed.prints[n].set, collector_number:parsed.prints[n].num })));
     for (const c of r?.data || []) {
       keep(c);
       const n = part.find(n => parsed.prints[n].set === c.set && parsed.prints[n].num === c.collector_number); if (n) found.set(norm(n), c);
     }
   }
-  for (const n of names.filter(n => !have(n)).slice(0, 40)) {
+  for (const n of unreachable ? [] : names.filter(n => !have(n)).slice(0, 15)) {
     const set = parsed.prints?.[n]?.set;
     const c = (set && await scry(`/cards/named?fuzzy=${encodeURIComponent(n)}&set=${encodeURIComponent(set)}`)) || await scry(`/cards/named?fuzzy=${encodeURIComponent(n)}`);
     if (c?.id) { keep(c); found.set(norm(n), c); }
@@ -699,7 +719,7 @@ async function resolveDeck(parsed){
   for (const { n, name } of parsed.main) { const c = get(name); if (c) for (let k = 0; k < n; k++) main.push(c.id); }
   for (const { n, name } of parsed.side) { const c = get(name); if (c) for (let k = 0; k < n; k++) side.push(c.id); }
   for (const name of parsed.cmdrs) { const c = get(name); if (c) cmdrs.push(c.id); }
-  return { main, cmdrs, side, missing:[...new Set(missing)] };
+  return { main, cmdrs, side, missing:[...new Set(missing)], unreachable };
 }
 
 /* Deck check: warnings (never a block) from Scryfall's card data. Commander: exactly 100 cards with the commander,
@@ -791,15 +811,24 @@ navigator.mediaDevices?.enumerateDevices?.().then(ds => ds.filter(d => d.kind ==
   .forEach((d, i) => $("#micSel").append(el("option", { value:d.deviceId, textContent:d.label || `Microphone ${i + 1}` })))).catch(() => {});
 
 let loaded = null;  // { main:[ids], cmdrs:[ids], missing, text }
-async function checkDeck(){
+let checking = null;  // (the lookup in progress, so a second click doesn't start another)
+function checkDeck(){
   const text = $("#deckIn").value;
-  if (loaded && loaded.text === text) return loaded;
+  if (loaded && loaded.text === text) return Promise.resolve(loaded);
+  if (checking?.text === text) return checking.run;
+  const run = checkDeck_(text).finally(() => { if (checking?.run === run) checking = null; });
+  checking = { text, run }; return run;
+}
+async function checkDeck_(text){
   const parsed = parseDeck(text);
   if (!parsed.main.length && !parsed.cmdrs.length && !parsed.side.length) { $("#deckInfo").innerHTML = '<span class="bad">Paste a decklist first.</span>'; return null; }
   $("#deckInfo").textContent = "Looking up your cards...";
-  const r = await resolveDeck(parsed);
+  let r = await resolveDeck(parsed);
+  // (Scryfall busy: wait a moment and try once more before giving up)
+  if (r.unreachable) { $("#deckInfo").textContent = "Scryfall is busy. Trying again..."; await sleep(4000); r = await resolveDeck(parsed); }
   loaded = { ...r, text };
   showDeck();
+  if (r.unreachable) { const l = loaded; loaded = { ...l, text:null }; return l; }  // (not kept: the next check asks Scryfall again)
   return loaded;
 }
 function showDeck(){
@@ -807,7 +836,9 @@ function showDeck(){
   info.append(`${loaded.main.length + loaded.cmdrs.length} cards found.`);
   if (loaded.cmdrs.length) info.append(` Commander: ${loaded.cmdrs.map(id => cards.get(id)?.name).join(" and ")}.`);
   if (loaded.side.length) info.append(` Sideboard: ${loaded.side.length}.`);
-  if (loaded.missing.length) info.append(" ", el("span", { className:"bad", textContent:`Not found (left out): ${loaded.missing.slice(0, 8).join(", ")}${loaded.missing.length > 8 ? "..." : ""}` }));
+  if (loaded.unreachable && loaded.missing.length) info.append(" ", el("span", { className:"bad", textContent:`Scryfall (the card database) didn't answer, so ${loaded.missing.length} card${loaded.missing.length === 1 ? "" : "s"} couldn't be looked up. Your list is fine: wait a few seconds and click Check deck.` }));
+  else if (loaded.missing.length) info.append(" ", el("span", { className:"bad", textContent:`Not found (left out): ${loaded.missing.slice(0, 8).join(", ")}${loaded.missing.length > 8 ? "..." : ""}` }));
+  if (loaded.unreachable) return;  // (no deck check on a list that couldn't be looked up)
   const fmt = $("#fmtSel").value, probs = deckProblems(loaded, fmt, $("#legalSel").value);
   if (probs.length) info.append(el("div", { className:"bad", textContent:"Deck check:" }), problemList(probs));
   else info.append(el("div", { className:"good", textContent:`Deck check: no problems found for ${FORMATS[fmt].cmdr ? FORMATS[fmt].short : LEGAL_FMTS[$("#legalSel").value] || "60-card play"}.` }));
@@ -1058,6 +1089,7 @@ async function sitDown(resume){
   else if (!resume) {
     btn.textContent = "Looking up your cards...";
     const d = await checkDeck();
+    if (d?.unreachable) { err.textContent = "Scryfall (the card database) didn't answer, so your cards couldn't be looked up. Wait a few seconds and click Sit down again."; btn.disabled = false; btn.textContent = "Sit down"; return; }
     if (!d || !d.main.length) { err.textContent = "Load a decklist with at least one card Scryfall knows."; btn.disabled = false; btn.textContent = "Sit down"; return; }
     deckIds = d.main.slice(); cmdrIds = d.cmdrs.slice(); cmdrFromDeck = d.cmdrs.slice(); sideIds = d.side.slice();
     deckName = ($("#deckName").value.trim() || $("#savedSel").value || "").slice(0, 40);
