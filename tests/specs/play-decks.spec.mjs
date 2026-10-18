@@ -93,3 +93,37 @@ test("digital table: an Archidekt export, with printings, categories, a sideboar
   expect(a.errors).toEqual([]);
   await browser.close();
 });
+
+test("digital table: Scryfall saying 'too many requests' or not answering doesn't turn a deck into 'not found'", async () => {
+  test.setTimeout(90000);
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.selectOption("#fmtSel", "cmdr");
+  const list = "Commander\n1 Gamma Card\n\nDeck\n1 Sol Ring\n98 Forest";
+  // Two "429 Too Many Requests" first: it waits and tries again
+  let calls = 0;
+  await a.route(/cards\/collection/, r => ++calls <= 2 ? r.fulfill({ status:429, headers:{ "Retry-After":"1" }, body:"" }) : r.fallback());
+  await a.fill("#deckIn", list); await a.click("#loadDeck");
+  await expect(a.locator("#deckInfo")).toContainText("100 cards found. Commander: Gamma Card.", { timeout:30000 });
+  expect(calls).toBe(3);
+  // No answer at all: says so (not "not found"), and Sit down waits for a real lookup
+  await a.unroute(/cards\/collection/);
+  await a.route(/cards\/collection/, r => r.fulfill({ status:503, body:"" }));
+  await a.fill("#deckIn", list + "\n1 Alpha Card"); await a.click("#loadDeck");
+  await expect(a.locator("#deckInfo")).toContainText("Scryfall (the card database) didn't answer", { timeout:40000 });
+  await expect(a.locator("#deckInfo")).not.toContainText("Not found");
+  await a.fill("#nameIn", "Luke"); await a.click("#joinBtn");
+  await expect(a.locator("#lobbyErr")).toContainText("didn't answer", { timeout:40000 });
+  // Scryfall back: Check deck works again
+  await a.unroute(/cards\/collection/);
+  await a.click("#loadDeck");
+  await expect(a.locator("#deckInfo")).toContainText("101 cards found", { timeout:30000 });
+  // One line Scryfall turns down (a request it rejects): the rest of the list is still found
+  await a.route(/cards\/collection/, r => /Weird Card/.test(r.request().postData() || "") ? r.fulfill({ status:422, body:"" }) : r.fallback());
+  await a.fill("#deckIn", list + "\n1 Weird Card"); await a.click("#loadDeck");
+  await expect(a.locator("#deckInfo")).toContainText("100 cards found. Commander: Gamma Card.", { timeout:40000 });
+  await expect(a.locator("#deckInfo")).toContainText("Not found (left out): Weird Card");
+  expect(a.errors).toEqual([]);
+  await browser.close();
+});
