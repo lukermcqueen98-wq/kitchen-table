@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool, dragTo } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 // Gamma Card is a 3/4 creature in the test cards
@@ -45,36 +45,49 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(a.locator(`#bf .card[data-iid="${bear}"]`)).toHaveCount(1);
   await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`)).toHaveCount(1);
 
-  // Combat by hand: Luke attacks Rick from the creature's menu; an arrow points at Rick on both screens, nothing taps
+  // Attacking: on his turn Luke has an Attack button at the top; he sends the creature at Rick. It taps (no vigilance),
+  // and an arrow points at Rick on both screens
   const turn = await ktp(a, () => ktPlay.table.turnSeat);
   if (turn !== 1) { await b.click("#nextTurn"); await expect(a.locator("#turnInfo")).toContainText("Your turn"); }
-  await expect(a.locator("#attackBtn")).toHaveCount(0); await expect(a.locator("#dmgBtn")).toHaveCount(0); await expect(a.locator("#combatBtn")).toHaveCount(0);
-  await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.locator(".modal").getByRole("button", { name:"Attack Rick" }).click();
+  await expect(b.locator("#attackBtn")).toBeHidden();
+  const wall = await fetchTo(b, "Gamma Card", "bf");
+  // (Attack shows a box for each player above Luke's battlefield: he drags the creature onto Rick's, then Attack)
+  const attack = async () => {
+    await a.click("#attackBtn");
+    await dragTo(a, a.locator(`#bf .card[data-iid="${bear}"]`), a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" }));
+    await expect(a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" })).toContainText("Gamma Card");
+    await a.locator("#atkBar").getByRole("button", { name:"Attack (1)", exact:true }).click();
+    await expect(a.locator("#atkBar")).toBeHidden();
+  };
+  await attack();
   await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(1);
-  await expect(a.locator(`#bf .card[data-iid="${bear}"].tapped`)).toHaveCount(0);
+  await expect(a.locator(`#bf .card[data-iid="${bear}"].tapped`)).toHaveCount(1);
   for (const p of [a, b]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(1);
   await expect(b.locator("#combatNote")).toContainText("1 attacking you");
   await expect(b.locator("#log")).toContainText("Luke attacked Rick with Gamma Card.");
-  // Rick blocks from the attacker's menu: an arrow from his creature to it; damage and life are by hand
-  const wall = await fetchTo(b, "Gamma Card", "bf");
-  await opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await b.getByRole("menuitem", { name:"Gamma Card" }).click();
+  // Rick gets a box at the top: he responds and blocks with his creature, so he takes nothing
+  const box = b.locator("#defendBox");
+  await expect(box).toContainText("You're being attacked");
+  await expect(box).toContainText("3 damage to you if you take it.");
+  await box.getByRole("button", { name:"Respond", exact:true }).click();
+  await box.locator("select").selectOption({ label:"Block with Gamma Card (3/4)" });
+  await expect(box).toContainText("0 damage to you from the ones not blocked.");
+  await box.getByRole("button", { name:"Done: take the damage", exact:true }).click();
+  await expect(box).toBeHidden();
   await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
   for (const p of [a, b]) await expect(p.locator("#arrows > path.blockline")).toHaveCount(1);
   await expect(b.locator("#lifeOut")).toHaveText("20");
-  // Clear arrows takes back Luke's attack; a new one, then the turn passing clears it
+  await expect(b.locator("#log")).toContainText("You took no combat damage.");
+  // Clear arrows takes back Luke's attack; he untaps and attacks again, and this time Rick takes the damage
   await a.click("#clearArrowsBtn");
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
   await expect(a.locator("#arrows > path:not(.blockline)")).toHaveCount(0);
-  await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.locator(".modal").getByRole("button", { name:"Attack Rick" }).click();
-  await expect(b.locator("#combatNote")).toContainText("1 attacking you");
-  // ...a blocker can also pick the attacker by clicking it (Block...)
-  await b.locator(`#bf .card[data-iid="${wall}"]`).click({ button:"right" });
-  await b.locator(".modal").getByRole("button", { name:"Block... (click the attacker)" }).click();
-  await opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`).click();
-  await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
+  await tool(a, "#untapAllBtn");
+  await attack();
+  await expect(box).toBeVisible();
+  await box.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await expect(b.locator("#lifeOut")).toHaveText("17");
+  await expect(a.locator("#log")).toContainText("Rick took 3 combat damage from Gamma Card.");
   await a.click("#nextTurn");
   // (ending the turn with more than 7 cards asks for discards: keep them)
   const keep = a.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
