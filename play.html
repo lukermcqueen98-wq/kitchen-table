@@ -6,19 +6,19 @@
 <title>Kitchen Table: digital Magic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --felt:#15302b; --felt-deep:#0d201d; --felt-edge:#244a42;
-  --parchment:#efe6cf; --muted:#a9b8ae; --brass:#c9a44c; --danger:#e0765c;
-  --serif:"Spectral", Georgia, "Times New Roman", serif;
-  --sans:"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --felt:#1a1030; --felt-deep:#120b22; --felt-edge:#3a2d5c;
+  --parchment:#efe9ff; --muted:#b3a6d6; --brass:#ffcf5a; --danger:#ff7d9c;
+  --serif:"Cinzel", Georgia, "Times New Roman", serif;
+  --sans:"Sora", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --cw:108px;  /* a card on your battlefield */
   box-sizing:border-box;
 }
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0}
-body{background:radial-gradient(ellipse at 50% 30%, var(--felt) 0%, var(--felt-deep) 80%);color:var(--parchment);font:15px/1.5 var(--sans);overflow:hidden}
+body{background:radial-gradient(1100px 700px at 70% -10%, #3a2463 0%, var(--felt) 55%, #0f0a1d 100%) fixed;color:var(--parchment);font:15px/1.5 var(--sans);overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 /* Drop-downs: dark with light words everywhere (the browser's own light box hid the light words) */
 :root{color-scheme:dark}
@@ -29,19 +29,66 @@ button{cursor:pointer}
 .hidden{display:none !important}
 .hint{font-size:13px;color:var(--muted)}
 .btn{padding:8px 14px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.2)}
-.btn.primary{background:var(--brass);border-color:var(--brass);color:#1b1608;font-weight:600}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:#241602;font-weight:600}
 .btn.small{padding:4px 9px;font-size:13px}
 .btn:disabled{opacity:.5;cursor:default}
 .btn.off{border-color:var(--danger);color:var(--danger)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
 /* Lobby */
-#lobby{height:100%;overflow:auto;padding:24px;display:grid;place-items:center}
-.lobby-card{width:min(100%,1100px)}
-.lobby-card h1{font:700 clamp(36px,7vw,58px)/1 var(--serif);margin:0 0 8px}
-.lede{color:var(--muted);margin:0 0 22px;max-width:60ch}
+#lobby{height:100%;overflow:auto;padding:clamp(16px,4vh,40px) 20px;display:flex;justify-content:center;align-items:flex-start}
+.lobby-card{width:min(100%,1120px)}
+.lhead{text-align:center;margin-bottom:16px}
+.lobby-card h1{font:700 clamp(32px,5vw,50px)/1.05 var(--serif);margin:0 0 6px;letter-spacing:.02em}
+.lede{color:var(--muted);margin:0 auto 6px;max-width:72ch}
+.lede a{color:#c7a8ff}
 .cols{display:grid;grid-template-columns:1fr 1.2fr;gap:0 32px;align-items:start}
 @media (max-width:860px){.cols{grid-template-columns:1fr}}
+/* The steps: 1 You, 2 Table, 3 Deck; one at a time, with a ready check beside them */
+.lsteps{list-style:none;margin:6px 0 18px;padding:0;display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.lsteps button{display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--muted);font-weight:600;padding:4px 8px}
+.lsteps b{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--felt-edge);font-size:14px}
+.lsteps li+li::before{content:"";display:inline-block;width:44px;height:1px;background:var(--felt-edge);vertical-align:middle;margin-right:10px}
+.lsteps li{display:flex;align-items:center}
+.lsteps .now{color:var(--parchment)}
+.lsteps .now b{background:var(--brass);color:#241602;border-color:var(--brass)}
+.lsteps .done b{background:#8ef0b4;color:#052414;border-color:#8ef0b4}
+.lgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
+@media (max-width:900px){.lgrid{grid-template-columns:1fr}}
+.lstep{display:none;background:rgba(176,140,255,.07);border:1px solid rgba(176,140,255,.25);border-radius:20px;padding:clamp(18px,2.4vw,28px)}
+.lstep.now{display:block}
+.lstep h2{margin:0 0 16px;font:700 24px var(--serif)}
+.lnav{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.lnav .btn{min-height:44px;padding:10px 20px}
+/* (the tests see every step at once; "&steps" in the address shows them one at a time like everyone else) */
+#lobby.allsteps .lstep{display:block;margin-bottom:14px}
+#lobby.allsteps .lnav{display:none}
+#lobby.allsteps .joinOnly{display:block !important}
+.hostjoin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;background:rgba(0,0,0,.25);border-radius:14px;padding:6px;margin-bottom:16px}
+.hostjoin button{border:0;border-radius:10px;background:none;color:var(--muted);padding:13px 10px;font-weight:600;font-size:15px;min-height:46px}
+.hostjoin button[aria-checked="true"]{background:var(--brass);color:#241602;font-weight:800}
+.hostjoin #joinPick[aria-checked="true"]{background:#7cc4ff;color:#04182a}
+.lstep[data-step="2"]:not(.joining) .joinOnly{display:none}
+#roomIn{letter-spacing:.12em;font-weight:700;font-size:18px}
+.ready{background:rgba(176,140,255,.05);border:1px solid rgba(176,140,255,.22);border-radius:20px;padding:20px;position:sticky;top:12px}
+.ready h2{margin:0 0 10px;font:700 18px var(--serif)}
+.ready dl{margin:0 0 14px}
+.ready dt{font-size:12px;color:var(--muted);margin-top:10px}
+.ready dd{margin:2px 0 0;font-weight:600}
+.ready dd.todo{color:var(--muted);font-weight:500}
+.ready .bigbtn{width:100%}
+/* The deck gallery: your saved decks, each with its commander's art */
+.dgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:12px}
+.dtile{display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:14px;border:1px solid rgba(176,140,255,.25);background:rgba(176,140,255,.07);color:var(--parchment);text-align:left;transition:transform .15s,box-shadow .15s}
+.dtile:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.dtile.on{border:2px solid var(--brass);box-shadow:0 0 24px rgba(255,207,90,.25)}
+.dtile .art{height:96px;background:linear-gradient(135deg,#3a2463,#120b22) center/cover no-repeat}
+.dtile .txt{display:flex;flex-direction:column;gap:3px;padding:9px 11px}
+.dtile .txt b{font-size:15px}
+.dtile .txt small{font-size:12px;color:var(--muted)}
+.dtile.new .art{display:grid;place-items:center;font-size:30px;color:var(--brass);background:rgba(0,0,0,.2)}
+.editor{margin-top:6px}
+.editor>summary{cursor:pointer;color:var(--muted);font-size:13.5px;margin-bottom:8px}
 .field{display:block;margin-bottom:14px}
 .field>span{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
 .field input,.field select,.field textarea{width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
@@ -73,8 +120,8 @@ button{cursor:pointer}
 .pcmeta img{width:15px;height:15px;display:inline-block;vertical-align:-3px;margin-left:2px}
 #pcList{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto;padding-right:4px}
 .pc{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:start;border:1px solid var(--felt-edge);border-radius:10px;padding:8px;background:rgba(0,0,0,.18)}
-.pc.on{border-color:var(--brass);background:rgba(201,164,76,.1)}
-.pc .art{width:92px;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#0a1714}
+.pc.on{border-color:var(--brass);background:rgba(255,207,90,.1)}
+.pc .art{width:92px;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#0e0920}
 .pc h4{margin:0;font-size:15px}
 .pcmeta{font-size:12px;color:var(--muted);margin:1px 0 3px}
 .pcmeta .tag{border:1px solid #7fd08a;color:#aef0b6;border-radius:9px;padding:0 6px;margin-left:4px}
@@ -98,7 +145,7 @@ header .grp.mid{flex:1;justify-content:center;gap:10px}
 .tmenu>summary{list-style:none;cursor:pointer}
 .tmenu>summary::-webkit-details-marker{display:none}
 .tmenu>summary::after{content:" \25BE";opacity:.7}
-.tmenu[open]>summary{border-color:var(--brass);background:rgba(201,164,76,.14)}
+.tmenu[open]>summary{border-color:var(--brass);background:rgba(255,207,90,.14)}
 .tmenu-pop{position:absolute;left:0;top:calc(100% + 6px);z-index:70;min-width:230px;display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--felt-deep);border:1px solid var(--brass);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.6)}
 .tmenu-pop .mitem{display:block;width:100%;text-align:left;border:0;background:none;border-radius:8px;padding:8px 10px;font-size:14px;white-space:nowrap}
 .tmenu-pop .mitem:hover,.tmenu-pop .mitem:focus-visible{background:rgba(255,255,255,.08)}
@@ -108,9 +155,9 @@ header .grp.mid{flex:1;justify-content:center;gap:10px}
 /* Whose turn it is, with the clocks and Next turn, in one pill (gold on your turn) */
 .turnpill{display:flex;align-items:center;gap:10px;border:1px solid var(--felt-edge);border-radius:999px;padding:3px 3px 3px 14px;white-space:nowrap}
 .turnpill #turnInfo,.turnpill #turnInfo.mine{border:0;padding:0;box-shadow:none;animation:none;background:none;color:inherit;font-size:15px}
-.turnpill.mine{background:var(--brass);border-color:var(--brass);color:#1b1608;box-shadow:0 0 0 4px rgba(201,164,76,.25),0 0 24px rgba(201,164,76,.35);animation:myturn 2.4s ease-in-out infinite}
+.turnpill.mine{background:var(--brass);border-color:var(--brass);color:#241602;box-shadow:0 0 0 4px rgba(255,207,90,.25),0 0 24px rgba(255,207,90,.35);animation:myturn 2.4s ease-in-out infinite}
 .turnpill.mine .clabel{color:rgba(27,22,8,.7)}
-.turnpill.mine #nextTurn{background:#1b1608;color:var(--brass);border-color:#1b1608;font-weight:700}
+.turnpill.mine #nextTurn{background:#241602;color:var(--brass);border-color:#241602;font-weight:700}
 .turnpill #nextTurn{border-radius:999px}
 .turnpill .clocks{display:flex;gap:10px;border:0;background:none;padding:0}
 .tlabel{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:2px}
@@ -123,17 +170,17 @@ header .grp.mid{flex:1;justify-content:center;gap:10px}
 @keyframes blink{50%{opacity:.35}}
 /* Whose turn: a big badge; on your turn it's gold, your board glows, and Next turn stands out */
 #turnInfo{font-weight:700;border-radius:999px;padding:3px 12px;border:1px solid var(--felt-edge);white-space:nowrap}
-#turnInfo.mine{background:var(--brass);color:#1b1608;border-color:var(--brass);font-size:16px;letter-spacing:.02em;box-shadow:0 0 0 4px rgba(201,164,76,.25);animation:myturn 2.4s ease-in-out infinite}
-@keyframes myturn{50%{box-shadow:0 0 0 7px rgba(201,164,76,.12)}}
-body.myturn #me{border-color:var(--brass);box-shadow:0 0 0 3px var(--brass),0 0 28px rgba(201,164,76,.35)}
+#turnInfo.mine{background:var(--brass);color:#241602;border-color:var(--brass);font-size:16px;letter-spacing:.02em;box-shadow:0 0 0 4px rgba(255,207,90,.25);animation:myturn 2.4s ease-in-out infinite}
+@keyframes myturn{50%{box-shadow:0 0 0 7px rgba(255,207,90,.12)}}
+body.myturn #me{border-color:var(--brass);box-shadow:0 0 0 3px var(--brass),0 0 28px rgba(255,207,90,.35)}
 body.myturn #nextTurn{font-weight:700}
-#turnSplash{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:70;pointer-events:none;font:700 54px/1 var(--serif);color:#1b1608;background:var(--brass);padding:18px 40px;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:splash 1.8s ease-out forwards}
+#turnSplash{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:70;pointer-events:none;font:700 54px/1 var(--serif);color:#241602;background:var(--brass);padding:18px 40px;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:splash 1.8s ease-out forwards}
 @keyframes splash{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}25%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
 .phases{font-size:12px;color:var(--muted);white-space:nowrap}  /* (the steps of a turn, as a reminder) */
 main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 #opps{display:grid;gap:8px;padding:8px 8px 0;grid-auto-flow:column;grid-auto-columns:1fr;flex:0 0 38%;min-height:0}
 .opp{border:1px solid var(--felt-edge);border-radius:10px;display:flex;flex-direction:column;min-height:0;background:rgba(0,0,0,.15);overflow:hidden}
-.opp.turn,.me.turn{border-color:var(--brass);box-shadow:0 0 0 3px rgba(201,164,76,.22)}
+.opp.turn,.me.turn{border-color:var(--brass);box-shadow:0 0 0 3px rgba(255,207,90,.22)}
 .ohead{display:flex;align-items:center;gap:8px;padding:4px 8px;font-size:13px;border-bottom:1px solid var(--felt-edge);flex-wrap:wrap}
 .pip{display:inline-block;width:10px;height:10px;border-radius:50%}
 .oname{font-weight:600}
@@ -155,7 +202,7 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .ocz{display:flex;flex-direction:column;gap:4px;padding:4px;border-right:1px solid var(--felt-edge)}
 .obf{flex:1;position:relative;min-height:0}
 .atkrow{display:flex;align-items:center;gap:10px;padding:6px;border:1px solid var(--felt-edge);border-radius:8px;margin-bottom:5px;flex-wrap:wrap}
-.atkrow.on{border-color:var(--brass);background:rgba(201,164,76,.08)}
+.atkrow.on{border-color:var(--brass);background:rgba(255,207,90,.08)}
 .atkrow img,.atkrow .atkph{width:44px;aspect-ratio:63/88;border-radius:4px;object-fit:cover;background:#111}
 .atkname{flex:1;min-width:140px;font-weight:600}
 .atkopts{display:flex;flex-wrap:wrap;gap:4px}
@@ -176,15 +223,15 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .pile .card.peek{outline:2px solid var(--brass)}
 .card .kwtags{position:absolute;left:2px;top:2px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:calc(100% - 4px);z-index:2;pointer-events:none}
 .card .kwtags span{pointer-events:auto;cursor:help}
-.card .kwtags span{font:700 9px/1.3 var(--sans);background:rgba(13,32,29,.92);color:var(--parchment);border:1px solid var(--brass);border-radius:4px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.card .kwtags span{font:700 9px/1.3 var(--sans);background:rgba(18,11,34,.92);color:var(--parchment);border:1px solid var(--brass);border-radius:4px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .card .kwtags span.eot{border-style:dashed}
 .card .manatags{position:absolute;left:3px;bottom:3px;display:flex;flex-wrap:wrap;gap:2px;max-width:calc(100% - 6px);z-index:2}
 .card .manatags .mtag{width:16px;height:16px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.7);cursor:pointer;pointer-events:auto}  /* (card pictures ignore the pointer so cards drag; these are clickable) */
 .card.mine .manatags .mtag:hover{transform:scale(1.25)}
 .card .marks{position:absolute;left:2px;right:2px;top:22%;display:flex;flex-direction:column;gap:2px;align-items:center;pointer-events:none}
 .card .marks span{font-size:9px;font-weight:700;background:rgba(224,118,92,.92);color:#fff;border-radius:4px;padding:0 4px;white-space:nowrap}
-.card.landstack{box-shadow:4px -4px 0 -1px #0d201d,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #0d201d,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
-.card.landstack .stackn{position:absolute;right:-6px;top:-10px;min-width:26px;padding:1px 6px;border-radius:999px;background:var(--brass);color:#1b1608;font:700 13px/1.4 var(--sans);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6);z-index:2}
+.card.landstack{box-shadow:4px -4px 0 -1px #120b22,5px -5px 0 0 var(--felt-edge),9px -9px 0 -1px #120b22,10px -10px 0 0 var(--felt-edge),0 1px 3px rgba(0,0,0,.6)}
+.card.landstack .stackn{position:absolute;right:-6px;top:-10px;min-width:26px;padding:1px 6px;border-radius:999px;background:var(--brass);color:#241602;font:700 13px/1.4 var(--sans);text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6);z-index:2}
 .card.landstack .stackup{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:600;background:rgba(0,0,0,.72);margin:0 4px;border-radius:5px;padding:1px 0}
 .card.landstack.tapped .stackn{transform:rotate(-90deg)}
 .card.landstack.tapped .stackup{left:50%;right:auto;top:50%;bottom:auto;margin:0;padding:1px 6px;white-space:nowrap;transform:translate(-50%,-50%) rotate(-90deg)}
@@ -195,7 +242,7 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .dungeon .dinit{font:600 11px/1 var(--sans);color:var(--parchment);white-space:nowrap}
 .dungeon .drow{display:flex;gap:3px;justify-content:center}
 .dungeon .droom{flex:1;text-align:center;font-size:10px;line-height:1.15;padding:3px 2px;border:1px solid var(--felt-edge);border-radius:5px;background:rgba(0,0,0,.3);color:var(--muted);cursor:help}
-.dungeon .droom.here{border-color:var(--brass);background:var(--brass);color:#1b1608;font-weight:700}
+.dungeon .droom.here{border-color:var(--brass);background:var(--brass);color:#241602;font-weight:700}
 .dungeon .dfoot{font-size:11px;color:var(--parchment);text-align:center}
 .dungeon .btn{align-self:center}
 .opiles .dungeon{width:170px}
@@ -247,11 +294,11 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 aside#panel{display:none;flex-direction:column;min-height:0;position:fixed;right:0;top:0;bottom:0;width:min(88vw,380px);z-index:60;background:var(--felt-deep);border-left:1px solid var(--felt-edge);box-shadow:-6px 0 24px rgba(0,0,0,.6)}
 body.panel-open aside#panel{display:flex}
 #panelClose{align-self:flex-end;margin:6px 8px 0}
-#logNew{margin-left:4px;background:var(--brass);color:#1b1608;border-radius:999px;padding:0 6px;font-size:11px;font-weight:700}
+#logNew{margin-left:4px;background:var(--brass);color:#241602;border-radius:999px;padding:0 6px;font-size:11px;font-weight:700}
 /* What just happened, while the log is closed: the newest lines pop up for a few seconds (bottom left, over your
    battlefield, and clicks go through them) */
 #feed{position:fixed;left:16px;bottom:200px;z-index:42;display:flex;flex-direction:column;gap:4px;max-width:min(460px,70vw);pointer-events:none}
-#feed li{list-style:none;background:rgba(13,32,29,.92);border:1px solid var(--felt-edge);border-radius:8px;padding:5px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.5);animation:feedIn .2s ease-out}
+#feed li{list-style:none;background:rgba(18,11,34,.92);border:1px solid var(--felt-edge);border-radius:8px;padding:5px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.5);animation:feedIn .2s ease-out}
 #feed li.chat{border-color:var(--brass)}
 #feed li.fade{opacity:0;transition:opacity .6s}
 #feed .t{display:none}
@@ -260,7 +307,7 @@ body.panel-open aside#panel{display:flex}
 #zoom img{width:auto;height:34vh;max-width:100%;margin:0 auto;border-radius:4.75%/3.5%;display:block;background:#000;aspect-ratio:63/88}
 #zoom .ztext{font-size:12px;white-space:pre-wrap;color:var(--muted);max-height:110px;overflow:auto;margin-top:6px}
 #logWrap{flex:1;overflow:auto;padding:6px 10px}
-#log li.chat{color:var(--parchment);background:rgba(201,164,76,.08)}
+#log li.chat{color:var(--parchment);background:rgba(255,207,90,.08)}
 #log li.chat b{margin-right:4px}
 #chatForm{display:flex;gap:6px;padding:6px 8px;border-top:1px solid var(--felt-edge)}
 #chatForm input{flex:1;min-width:0;padding:6px 9px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)}
@@ -300,7 +347,7 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card .ctrs{position:absolute;left:2px;bottom:2px;display:flex;flex-direction:column;gap:1px;align-items:flex-start}
 .card .ctrs span{background:rgba(0,0,0,.8);border:1px solid var(--brass);color:var(--parchment);border-radius:8px;padding:0 4px;font-size:10px;line-height:14px;white-space:nowrap}
 .card .tok{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.75);font-size:9px;padding:0 3px;border-radius:4px}
-.card .tax{position:absolute;left:2px;top:2px;white-space:nowrap;background:var(--brass);color:#1b1608;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
+.card .tax{position:absolute;left:2px;top:2px;white-space:nowrap;background:var(--brass);color:#241602;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
 .card .lbl{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:9px;background:rgba(0,0,0,.7);padding:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .card.theirs{box-shadow:0 0 0 2px var(--own),0 1px 3px rgba(0,0,0,.6)}
 #arrows{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:40}
@@ -309,7 +356,7 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 body.targeting,body.targeting .card{cursor:crosshair !important}
 body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--brass)}
 /* Combat */
-.card.attacking{box-shadow:0 0 0 3px #e0765c,0 0 14px 3px rgba(224,118,92,.75)}
+.card.attacking{box-shadow:0 0 0 3px #ff7d9c,0 0 14px 3px rgba(224,118,92,.75)}
 .card.blocking{box-shadow:0 0 0 3px #4a86c5,0 0 14px 3px rgba(74,134,197,.75)}
 .card .atk{position:absolute;left:-2px;right:-2px;top:-15px;font-size:10px;line-height:13px;text-align:center;color:#fff;background:#b3452f;border-radius:4px;white-space:nowrap;overflow:hidden}
 .card .atk.blk{background:#2f5f94}
@@ -351,7 +398,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .cpanel{display:flex;gap:20px;align-items:flex-start}
 .cp-pic{width:250px;flex:none;display:flex;flex-direction:column;gap:6px}
 .cp-pic img{width:100%;border-radius:4.75%/3.5%;display:block;background:#000;aspect-ratio:63/88}
-.cp-back{aspect-ratio:63/88;border-radius:12px;background:#2a2016;display:grid;place-items:center;color:var(--muted)}
+.cp-back{aspect-ratio:63/88;border-radius:12px;background:#241640;display:grid;place-items:center;color:var(--muted)}
 .cp-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .cp-sec h3{margin:0 0 6px;font:600 12px/1.2 var(--sans);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .cp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -361,7 +408,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .cp-ctr{display:flex;align-items:center;gap:8px;border:1px solid var(--felt-edge);border-radius:8px;padding:4px 8px;background:rgba(255,255,255,.03)}
 .cp-ctr b{min-width:22px;text-align:center;font-size:16px}
 .cp-ctr button{width:34px;height:34px;border-radius:8px;border:1px solid var(--felt-edge);background:none;font-size:17px}
-.cp-kw{position:relative;border-radius:999px;border:1px solid var(--brass);background:rgba(201,164,76,.12);padding:4px 10px;font-size:13px;cursor:help}
+.cp-kw{position:relative;border-radius:999px;border:1px solid var(--brass);background:rgba(255,207,90,.12);padding:4px 10px;font-size:13px;cursor:help}
 .cp-kw.eot{border-style:dashed}
 .cp-kw .x{margin-left:6px;border:0;background:none;padding:0 2px;color:var(--muted);cursor:pointer}
 .cp-def{position:absolute;left:0;top:calc(100% + 6px);z-index:5;width:min(320px,70vw);background:var(--felt-deep);border:1px solid var(--brass);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.45;color:var(--parchment);box-shadow:0 10px 24px rgba(0,0,0,.6);cursor:auto}
@@ -474,24 +521,46 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 <body>
 <section id="lobby">
   <div class="lobby-card">
-    <h1>Kitchen Table: digital</h1>
-    <p class="lede">Play Magic with decklists instead of real cards. Pick an official deck or paste your own, share the table code, and play on a shared digital table with voice chat. You play by the rules as at a real table; the table handles the cards. <a href="index.html?webcam" id="webcamLink" style="color:var(--brass)">Playing with real cards on webcams? Use the webcam table.</a> · <a href="index.html" id="homeLink" style="color:var(--brass)">Back to the main screen</a></p>
+    <header class="lhead">
+      <h1>Kitchen Table</h1>
+      <p class="lede">Digital Magic: decklists instead of real cards, a shared table, and voice chat. <a href="index.html?webcam" id="webcamLink">Playing with real cards? Use the webcam table</a> · <a href="index.html" id="homeLink">Back to the main screen</a></p>
+    </header>
     <div id="resume" class="hidden"><div id="resumeText"></div><div class="row" style="margin-top:8px"><button class="btn primary" id="resumeBtn">Continue that game</button><button class="btn" id="resumeDrop">Start fresh</button></div></div>
-    <div class="cols">
-      <div>
-        <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" autocomplete="nickname"></label>
-        <label class="field"><span>Table code (leave empty to start a new table)</span><input id="roomIn" maxlength="12" autocomplete="off"></label>
-        <label class="field"><span>Format (the first player's pick is used)</span><select id="fmtSel"></select></label>
-        <label class="field" id="legalField"><span>Check my deck against</span><select id="legalSel"></select></label>
-        <label class="check" style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="watchIn"> Just watch this table (no deck needed; you won't take a seat)</label>
-        <label class="field"><span>Microphone for voice chat</span><select id="micSel"><option value="">Default microphone</option></select></label>
-        <p class="hint">Voice chat only; no webcams and no voice commands. Everything about the cards is on the table.</p>
-      </div>
-      <div>
-        <div class="tabs" role="tablist" id="deckTabs">
-          <button role="tab" id="tabOfficial" aria-selected="false" aria-controls="paneOfficial" class="hidden">Official decks</button>
-          <button role="tab" id="tabMine" aria-selected="true" aria-controls="paneMine">My decks</button>
-        </div>
+    <!-- Three short steps: you, the table (host a new one or join a friend's), your deck -->
+    <ol class="lsteps" aria-label="Steps">
+      <li><button type="button" data-go="1"><b>1</b><span>You</span></button></li>
+      <li><button type="button" data-go="2"><b>2</b><span>Table</span></button></li>
+      <li><button type="button" data-go="3"><b>3</b><span>Deck</span></button></li>
+    </ol>
+    <div class="lgrid">
+      <div class="lpanes">
+        <section class="lstep" data-step="1" aria-labelledby="step1h">
+          <h2 id="step1h">Who's playing?</h2>
+          <label class="field"><span>Your name</span><input id="nameIn" maxlength="24" autocomplete="nickname"></label>
+          <label class="field"><span>Microphone for voice chat</span><select id="micSel"><option value="">Default microphone</option></select></label>
+          <p class="hint">Voice chat only: no webcams and no voice commands. Everything about the cards is on the table.</p>
+          <div class="lnav"><span></span><button type="button" class="btn primary" data-go="2">Next: the table</button></div>
+        </section>
+        <section class="lstep" data-step="2" aria-labelledby="step2h">
+          <h2 id="step2h">Which table?</h2>
+          <div class="hostjoin" role="radiogroup" aria-label="Host or join">
+            <button type="button" role="radio" id="hostPick" aria-checked="true">Host a new table</button>
+            <button type="button" role="radio" id="joinPick" aria-checked="false">Join a friend's table</button>
+          </div>
+          <div class="joinOnly">
+            <label class="field"><span>Paste the invite link, or type the table code</span><input id="roomIn" maxlength="200" autocomplete="off" placeholder="fs3ca8"></label>
+            <label class="check" style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="watchIn"> Just watch this table (no deck needed; you won't take a seat)</label>
+          </div>
+          <label class="field"><span id="fmtLabel">Format</span><select id="fmtSel"></select></label>
+          <label class="field" id="legalField"><span>Check my deck against</span><select id="legalSel"></select></label>
+          <div class="lnav"><button type="button" class="btn" data-go="1">Back</button><button type="button" class="btn primary" id="toDeck" data-go="3">Next: your deck</button></div>
+        </section>
+        <section class="lstep" data-step="3" aria-labelledby="step3h">
+          <h2 id="step3h">Pick your deck</h2>
+          <div class="tabs" role="tablist" id="deckTabs">
+            <button role="tab" id="tabMine" aria-selected="true" aria-controls="paneMine">My decks</button>
+            <button role="tab" id="tabOfficial" aria-selected="false" aria-controls="paneOfficial" class="hidden">Official decks</button>
+          </div>
         <div id="paneOfficial" role="tabpanel" class="hidden">
           <p class="hint" style="margin:0 0 8px">Every official preconstructed deck. Pick one to play it as it comes out of the box.</p>
           <div class="pcbar">
@@ -503,16 +572,26 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
           <div id="pcCount"></div>
           <div id="pcList"></div>
         </div>
-        <div id="paneMine" role="tabpanel">
-        <div class="deckbar"><select id="savedSel" aria-label="Saved decks"><option value="">Saved decks...</option></select><button class="btn small" id="delDeck">Delete</button></div>
-        <label class="field"><span>Decklist (paste from Moxfield, Archidekt, MTG Arena or any "1 Sol Ring" list; mark your commander with a "Commander" heading or *CMDR*)</span><textarea id="deckIn" spellcheck="false" placeholder="Commander&#10;1 Atraxa, Praetors' Voice&#10;&#10;Deck&#10;1 Sol Ring&#10;1 Arcane Signet&#10;35 Forest"></textarea></label>
-        <div class="deckbar"><input id="deckName" placeholder="Deck name" maxlength="40"><button class="btn small" id="saveDeck">Save deck</button><button class="btn small" id="loadDeck">Check deck</button></div>
-        </div>
-        <div id="deckInfo" aria-live="polite"></div>
+          <div id="paneMine" role="tabpanel">
+            <div id="deckGallery" class="dgal" aria-label="Your saved decks"></div>
+            <details class="editor" id="deckEditor" open>
+              <summary>Your list (paste one here, or edit the deck you picked)</summary>
+              <div class="deckbar"><select id="savedSel" aria-label="Saved decks"><option value="">Saved decks...</option></select><button class="btn small" id="delDeck">Delete</button></div>
+              <label class="field"><span>Decklist (from Moxfield, Archidekt, MTG Arena or any "1 Sol Ring" list; mark your commander with a "Commander" heading or *CMDR*)</span><textarea id="deckIn" spellcheck="false" placeholder="Commander&#10;1 Atraxa, Praetors' Voice&#10;&#10;Deck&#10;1 Sol Ring&#10;1 Arcane Signet&#10;35 Forest"></textarea></label>
+              <div class="deckbar"><input id="deckName" placeholder="Deck name" maxlength="40"><button class="btn small" id="saveDeck">Save deck</button><button class="btn small" id="loadDeck">Check deck</button></div>
+            </details>
+          </div>
+          <div id="deckInfo" aria-live="polite"></div>
+        </section>
       </div>
+      <aside class="ready" aria-label="Ready check">
+        <h2>Ready check</h2>
+        <dl id="readyList"></dl>
+        <button class="btn primary bigbtn" id="joinBtn">Sit down</button>
+        <div id="lobbyErr" role="alert"></div>
+        <p class="hint">Your name, mic and decks are saved in this browser, so next time you're a click or two from sitting down.</p>
+      </aside>
     </div>
-    <button class="btn primary bigbtn" id="joinBtn">Sit down</button>
-    <div id="lobbyErr" role="alert"></div>
   </div>
 </section>
 
@@ -837,9 +916,38 @@ const decks = (() => { try { return JSON.parse(store.get("kt-dig-decks", "{}")) 
 function fillSaved(){
   const sel = $("#savedSel"); sel.length = 1;
   for (const n of Object.keys(decks).sort()) sel.append(el("option", { value:n, textContent:n }));
+  drawGallery();
+}
+/* The deck gallery: each saved deck as a tile with its commander's art (or its first card's), its size and kind.
+   Picking one loads it (and checks it); the last tile starts a new list. Art comes from Scryfall, a few at a time. */
+const artCache = new Map();  // card name -> art url
+function deckSummary(text){
+  const d = parseDeck(text), n = d.main.reduce((a, x) => a + x.n, 0) + d.cmdrs.length;
+  const lead = d.cmdrs[0] || [...d.main].sort((a, b) => a.n - b.n)[0]?.name || "";
+  return { n, lead, cmdr:!!d.cmdrs.length, cmdrs:d.cmdrs };
+}
+function drawGallery(){
+  const g = $("#deckGallery"); if (!g) return;
+  g.replaceChildren();
+  Object.keys(decks).sort().forEach((n, i) => {
+    const sm = deckSummary(decks[n]), art = el("span", { className:"art" });
+    if (sm.lead) {
+      const url = `${SCRY}/cards/named?exact=${encodeURIComponent(sm.lead.split(" // ")[0])}&format=image&version=art_crop`;
+      if (artCache.has(sm.lead)) art.style.backgroundImage = `url("${artCache.get(sm.lead)}")`;
+      else setTimeout(() => { artCache.set(sm.lead, url); art.style.backgroundImage = `url("${url}")`; }, 400 * i);
+    }
+    const b = el("button", { type:"button", className:"dtile" + ($("#deckName").value === n && $("#deckIn").value === decks[n] ? " on" : ""), title:`Play ${n}` }, art,
+      el("span", { className:"txt" }, el("b", { textContent:n }), el("small", { textContent:sm.cmdr ? `Commander: ${sm.cmdrs.join(" and ")}` : "60-card or other" }), el("small", { textContent:`${sm.n} cards` })));
+    b.onclick = () => { $("#savedSel").value = n; $("#deckIn").value = decks[n]; $("#deckName").value = n; loaded = null; checkDeck(); drawGallery(); renderReady(); };
+    g.append(b);
+  });
+  const add = el("button", { type:"button", className:"dtile new", title:"Paste a new decklist" }, el("span", { className:"art", textContent:"+" }),
+    el("span", { className:"txt" }, el("b", { textContent:"New deck" }), el("small", { textContent:"Paste a list from Moxfield, Archidekt..." })));
+  add.onclick = () => { $("#savedSel").value = ""; $("#deckIn").value = ""; $("#deckName").value = ""; loaded = null; $("#deckInfo").textContent = ""; $("#deckEditor").open = true; $("#deckIn").focus(); drawGallery(); renderReady(); };
+  g.append(add);
 }
 fillSaved();
-$("#savedSel").onchange = e => { const n = e.target.value; if (!n) return; $("#deckIn").value = decks[n]; $("#deckName").value = n; loaded = null; checkDeck(); };
+$("#savedSel").onchange = e => { const n = e.target.value; if (!n) return; $("#deckIn").value = decks[n]; $("#deckName").value = n; loaded = null; checkDeck(); drawGallery(); renderReady(); };
 $("#saveDeck").onclick = () => {
   const n = $("#deckName").value.trim() || "My deck", t = $("#deckIn").value.trim(); if (!t) return;
   decks[n] = t; store.set("kt-dig-decks", JSON.stringify(decks)); fillSaved(); $("#savedSel").value = n; toast(`Saved "${n}".`);
@@ -847,8 +955,55 @@ $("#saveDeck").onclick = () => {
 };
 $("#delDeck").onclick = () => {
   const n = $("#savedSel").value; if (!n || !confirm(`Delete the saved deck "${n}"?`)) return;
-  delete decks[n]; store.set("kt-dig-decks", JSON.stringify(decks)); fillSaved();
+  delete decks[n]; store.set("kt-dig-decks", JSON.stringify(decks)); fillSaved(); renderReady();
 };
+/* The lobby's steps: 1 who's playing, 2 which table (host a new one, or join a friend's by its link or code), 3 your
+   deck; with a ready check of all of it beside them and Sit down there */
+const allSteps = params.has("kt-test") && !params.has("steps");  // (the tests fill in every step at once)
+if (allSteps) $("#lobby").classList.add("allsteps");
+let lstep = 1;
+function goStep(n){
+  lstep = n;
+  document.querySelectorAll(".lstep").forEach(x => x.classList.toggle("now", +x.dataset.step === n));
+  document.querySelectorAll(".lsteps button").forEach(b => { const k = +b.dataset.go; b.classList.toggle("now", k === n); b.classList.toggle("done", k < n); b.setAttribute("aria-current", k === n ? "step" : "false"); });
+  if (n === 3) drawGallery();
+  renderReady();
+  if (!allSteps) document.querySelector(`.lstep[data-step="${n}"] input:not([type=checkbox]), .lstep[data-step="${n}"] .dtile`)?.focus();
+}
+document.querySelectorAll("[data-go]").forEach(b => { b.onclick = () => goStep(+b.dataset.go); });
+const joining = () => $("#joinPick").getAttribute("aria-checked") === "true";
+function setJoin(on){
+  $("#hostPick").setAttribute("aria-checked", String(!on)); $("#joinPick").setAttribute("aria-checked", String(on));
+  document.querySelector('.lstep[data-step="2"]').classList.toggle("joining", on);
+  $("#fmtLabel").textContent = on ? "Format of your deck (the table uses the host's)" : "Format";
+  if (!on) { $("#roomIn").value = ""; $("#watchIn").checked = false; }
+  watchLabel(); renderReady();
+}
+const watchLabel = () => { $("#toDeck").textContent = $("#watchIn").checked ? "Watch this table" : "Next: your deck"; };
+$("#hostPick").onclick = () => setJoin(false);
+$("#joinPick").onclick = () => { setJoin(true); if (!allSteps) $("#roomIn").focus(); };
+// (an invite link pasted in becomes its table code; typing a code means joining)
+$("#roomIn").addEventListener("input", () => {
+  const v = $("#roomIn").value, m = /[?&]room=([a-z0-9]+)/i.exec(v);
+  if (m) $("#roomIn").value = m[1].toLowerCase();
+  if ($("#roomIn").value.trim() && !joining()) setJoin(true);
+  renderReady();
+});
+$("#watchIn").addEventListener("change", () => { watchLabel(); renderReady(); });
+$("#toDeck").onclick = () => { if ($("#watchIn").checked) $("#joinBtn").click(); else goStep(3); };
+for (const id of ["#nameIn", "#deckIn", "#deckName"]) $(id).addEventListener("input", () => renderReady());
+for (const id of ["#micSel", "#fmtSel"]) $(id).addEventListener("change", () => renderReady());
+function renderReady(){
+  const dl = $("#readyList"); if (!dl) return;
+  const code = $("#roomIn").value.trim(), watch = $("#watchIn").checked, f = FORMATS[$("#fmtSel").value];
+  const text = $("#deckIn").value.trim(), sm = text ? deckSummary(text) : null;
+  const rows = [["Name", $("#nameIn").value.trim(), "Not set yet"],
+    ["Microphone", $("#micSel").selectedOptions[0]?.textContent || "Default microphone", ""],
+    ["Table", watch ? `Watching table ${code}` : joining() ? (code ? `Joining table ${code}` : "") : `Hosting a new ${f?.short || ""} table`, "Type your friend's table code"],
+    ["Deck", watch ? "Not needed (watching)" : sm ? `${$("#deckName").value.trim() || "Your pasted list"} (${sm.n} cards)` : "", "Not picked yet"]];
+  dl.replaceChildren(...rows.flatMap(([k, v, todo]) => [el("dt", { textContent:k }), el("dd", { className:v ? "" : "todo", textContent:v || todo })]));
+  $("#joinBtn").textContent = watch ? "Watch this table" : "Sit down";
+}
 $("#deckIn").addEventListener("input", () => { loaded = null; $("#deckInfo").textContent = ""; });
 $("#fmtSel").onchange = () => { showLegal(); if (loaded) showDeck(); };
 $("#legalSel").onchange = () => { store.set("kt-dig-legal", $("#legalSel").value); if (loaded) showDeck(); };
@@ -988,7 +1143,14 @@ function savedGame(room){ try { const s = JSON.parse(store.get(saveKey(room), "n
     $("#resumeDrop").onclick = () => { store.del(saveKey(room)); $("#resume").classList.add("hidden"); };
   }
 }
-$("#joinBtn").onclick = () => { if (!$("#watchIn").checked) askAlerts(); sitDown(null); };
+$("#joinBtn").onclick = () => {
+  if (joining() && !$("#roomIn").value.trim()) { $("#lobbyErr").textContent = "Type your friend's table code, or pick Host a new table."; goStep(2); return; }
+  if (!$("#watchIn").checked) askAlerts(); sitDown(null);
+};
+// Where to start: a new player at step 1; with a name, at the table step; with an invite link too, at the deck
+setJoin(!!params.get("room"));
+$("#deckEditor").open = allSteps || !Object.keys(decks).length || !!$("#deckIn").value.trim() && !Object.values(decks).includes($("#deckIn").value);
+goStep(!$("#nameIn").value.trim() ? 1 : params.get("room") ? 3 : 2);
 
 
 /* =====================================================================
@@ -2282,7 +2444,7 @@ function renderHub(){
     const a = -i * 2 * Math.PI / ring.length, name = nm(s);
     const d = el("span", { className:"hubdot" + (table.started && table.turnSeat === s ? " now" : "") + (players[s]?.out ? " out" : ""), textContent:s === mySeat ? "You" : name.slice(0, 4), title:s === mySeat ? "You" : name });
     d.style.left = (50 + 50 * Math.sin(a)) + "%"; d.style.top = (50 + 50 * Math.cos(a)) + "%"; d.style.background = SEAT_HEX[s - 1];
-    if (s === 1) d.style.color = "#1b1608";
+    if (s === 1) d.style.color = "#241602";
     circle.append(d);
   });
   hub.replaceChildren(circle);
@@ -3392,7 +3554,7 @@ function showRoll(seat, kind, values){
   const fx = el("div", { className:"rollfx" + (kind === "coin" ? " coin" : ""), role:"status" });
   fx.dataset.seat = seat;
   fx.style.left = `${r.left + r.width / 2}px`; fx.style.top = `${r.top + Math.min(r.height / 2, 140)}px`;
-  const fill = SEAT_HEX[seat - 1] || "#efe6cf", ink = seat === 1 ? "#1b1608" : "#fff", sides = sidesOf(kind);
+  const fill = SEAT_HEX[seat - 1] || "#efe9ff", ink = seat === 1 ? "#241602" : "#fff", sides = sidesOf(kind);
   const shown = v => kind === "coin" ? (v === 1 ? "H" : "T") : kind === "planar" ? { Blank:"", Chaos:"✺", Planeswalk:"PW" }[PLANAR[v - 1]] : v;
   const size = kind === "coin" ? 20 : kind === "d100" ? 26 : 32, y = kind === "d3" || kind === "d4" ? 72 : kind === "coin" ? 58 : 61;
   const row = el("div", { className:"rolldice" + (values.length > 4 ? " many" : "") });
@@ -3503,14 +3665,22 @@ function log(text, seat){
    your computer (made smaller first, so it's quick to send). Saved in this browser for next time. */
 const MATS = {
   felt:{ name:"Felt (plain)", css:"" },
-  forest:{ name:"Forest", css:"radial-gradient(ellipse at 30% 20%,rgba(120,180,90,.35),transparent 60%),radial-gradient(ellipse at 80% 90%,rgba(40,90,40,.5),transparent 55%),linear-gradient(160deg,#1d3a22,#0f2415)" },
-  island:{ name:"Island", css:"radial-gradient(ellipse at 70% 10%,rgba(140,190,240,.35),transparent 55%),radial-gradient(ellipse at 20% 100%,rgba(20,60,120,.6),transparent 60%),linear-gradient(170deg,#173a5c,#0b1f36)" },
-  swamp:{ name:"Swamp", css:"radial-gradient(ellipse at 50% 0%,rgba(150,110,170,.28),transparent 55%),radial-gradient(ellipse at 10% 90%,rgba(40,20,50,.7),transparent 60%),linear-gradient(170deg,#2a1f30,#120c16)" },
-  mountain:{ name:"Mountain", css:"radial-gradient(ellipse at 80% 20%,rgba(240,140,80,.3),transparent 55%),radial-gradient(ellipse at 20% 100%,rgba(90,25,15,.6),transparent 60%),linear-gradient(165deg,#4a1d14,#1f0c08)" },
-  plains:{ name:"Plains", css:"radial-gradient(ellipse at 50% 0%,rgba(255,240,190,.35),transparent 60%),linear-gradient(170deg,#6b5a35,#2f2716)" },
-  stars:{ name:"Starfield", css:"radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(1px 1px at 75% 80%,#fff,transparent),radial-gradient(1px 1px at 90% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 90%,#ddf,transparent),radial-gradient(ellipse at 60% 40%,rgba(90,60,160,.35),transparent 60%),linear-gradient(#070814,#0d1030)" },
-  wood:{ name:"Wood", css:"repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,transparent 2px 38px),repeating-linear-gradient(90deg,rgba(255,220,170,.05) 0 1px,transparent 1px 13px),linear-gradient(180deg,#5a3a22,#3a2414)" },
-  parchment:{ name:"Parchment", css:"radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(80,50,20,.45)),linear-gradient(170deg,#8a7650,#5b4c30)" }
+  arcane:{ name:"Arcane circle", css:"repeating-radial-gradient(circle at 50% 55%,rgba(255,207,90,.13) 0 1px,transparent 1px 44px),conic-gradient(from 30deg at 50% 55%,rgba(124,196,255,.16),rgba(255,125,156,.16),rgba(142,240,180,.14),rgba(255,207,90,.16),rgba(124,196,255,.16)),radial-gradient(circle at 50% 55%,rgba(176,140,255,.45),transparent 58%),linear-gradient(160deg,#24154a,#0c0720)" },
+  nebula:{ name:"Nebula", css:"radial-gradient(1.5px 1.5px at 12% 18%,#fff,transparent),radial-gradient(1px 1px at 28% 72%,#fff,transparent),radial-gradient(1.5px 1.5px at 66% 30%,#fff,transparent),radial-gradient(1px 1px at 84% 80%,#fff,transparent),radial-gradient(1px 1px at 46% 50%,#dff,transparent),radial-gradient(ellipse 45% 35% at 30% 40%,rgba(255,90,180,.45),transparent 70%),radial-gradient(ellipse 40% 45% at 70% 60%,rgba(80,140,255,.45),transparent 70%),radial-gradient(ellipse 30% 25% at 55% 30%,rgba(180,110,255,.5),transparent 70%),linear-gradient(#090418,#140a2e)" },
+  aurora:{ name:"Aurora", css:"linear-gradient(165deg,transparent 20%,rgba(80,255,190,.28) 32%,transparent 46%),linear-gradient(150deg,transparent 35%,rgba(110,140,255,.30) 48%,transparent 62%),linear-gradient(175deg,transparent 50%,rgba(200,100,255,.25) 62%,transparent 76%),radial-gradient(1px 1px at 20% 15%,#fff,transparent),radial-gradient(1px 1px at 75% 10%,#fff,transparent),linear-gradient(#050b1d,#0b1532 60%,#081025)" },
+  mana:{ name:"Mana weave", css:"radial-gradient(circle at 50% 14%,rgba(249,240,200,.55),transparent 22%),radial-gradient(circle at 86% 40%,rgba(80,150,255,.55),transparent 22%),radial-gradient(circle at 72% 86%,rgba(170,120,200,.55),transparent 22%),radial-gradient(circle at 28% 86%,rgba(255,110,70,.55),transparent 22%),radial-gradient(circle at 14% 40%,rgba(90,210,120,.55),transparent 22%),repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.05) 0 6deg,transparent 6deg 12deg),radial-gradient(circle at 50% 50%,#2b1b4f,#0d0820 75%)" },
+  gilded:{ name:"Gilded filigree", css:"repeating-linear-gradient(45deg,rgba(255,207,90,.16) 0 2px,transparent 2px 30px),repeating-linear-gradient(-45deg,rgba(255,207,90,.16) 0 2px,transparent 2px 30px),radial-gradient(circle at 50% 50%,rgba(255,207,90,.28),transparent 60%),linear-gradient(160deg,#2a1a08,#120a02)" },
+  neon:{ name:"Neon grid", css:"radial-gradient(ellipse 30% 22% at 50% 38%,rgba(255,170,60,.75),rgba(255,60,160,.35) 60%,transparent 75%),linear-gradient(transparent 48%,rgba(255,60,200,.22) 49%,transparent 52%),repeating-linear-gradient(0deg,rgba(255,80,220,.35) 0 1px,transparent 1px 34px),repeating-linear-gradient(90deg,rgba(90,200,255,.30) 0 1px,transparent 1px 34px),linear-gradient(#12052b,#2a0a3d 55%,#0d0420)" },
+  crystal:{ name:"Crystal", css:"conic-gradient(from 15deg at 30% 40%,rgba(160,220,255,.22),rgba(220,160,255,.18),rgba(160,255,230,.20),rgba(160,220,255,.22)),conic-gradient(from 200deg at 72% 62%,rgba(255,255,255,.10),transparent 25%,rgba(180,200,255,.16) 50%,transparent 75%,rgba(255,255,255,.10)),linear-gradient(135deg,#1b2b52,#0e1530 50%,#24123f)" },
+  dragon:{ name:"Dragonfire", css:"radial-gradient(ellipse 60% 40% at 50% 105%,rgba(255,140,40,.75),transparent 70%),radial-gradient(ellipse 35% 30% at 25% 85%,rgba(255,60,20,.5),transparent 70%),radial-gradient(ellipse 35% 30% at 78% 80%,rgba(255,90,30,.45),transparent 70%),repeating-linear-gradient(115deg,rgba(0,0,0,.18) 0 3px,transparent 3px 22px),linear-gradient(#1a0606,#3a0d08 60%,#5a1a08)" },
+  forest:{ name:"Forest", css:"repeating-linear-gradient(100deg,rgba(255,240,170,.07) 0 16px,transparent 16px 64px),radial-gradient(ellipse at 30% 0%,rgba(255,240,170,.30),transparent 55%),radial-gradient(ellipse at 80% 100%,rgba(20,70,30,.7),transparent 60%),linear-gradient(170deg,#1f4a28,#0c2412)" },
+  island:{ name:"Island", css:"repeating-radial-gradient(ellipse at 30% 30%,rgba(160,220,255,.10) 0 2px,transparent 2px 26px),radial-gradient(ellipse at 70% 10%,rgba(150,210,255,.4),transparent 55%),radial-gradient(ellipse at 20% 100%,rgba(10,50,110,.7),transparent 60%),linear-gradient(170deg,#18487a,#081d3a)" },
+  swamp:{ name:"Swamp", css:"radial-gradient(ellipse 70% 20% at 50% 75%,rgba(190,170,210,.18),transparent 70%),radial-gradient(ellipse 60% 18% at 30% 55%,rgba(190,170,210,.12),transparent 70%),radial-gradient(circle at 80% 15%,rgba(170,255,170,.12),transparent 25%),linear-gradient(170deg,#2a1f30,#0d0811)" },
+  mountain:{ name:"Mountain", css:"linear-gradient(115deg,transparent 46%,rgba(255,120,40,.55) 48%,transparent 50%),linear-gradient(70deg,transparent 60%,rgba(255,90,30,.45) 61.5%,transparent 63%),radial-gradient(ellipse at 80% 20%,rgba(255,140,80,.35),transparent 55%),radial-gradient(ellipse at 20% 100%,rgba(90,25,15,.7),transparent 60%),linear-gradient(165deg,#4a1d14,#1a0905)" },
+  plains:{ name:"Plains", css:"radial-gradient(circle at 50% 12%,rgba(255,250,220,.9),rgba(255,220,140,.45) 18%,transparent 45%),repeating-linear-gradient(180deg,rgba(255,230,160,.08) 0 2px,transparent 2px 18px),linear-gradient(180deg,#8a6a3a 0%,#5b4320 60%,#2f2310 100%)" },
+  stars:{ name:"Starfield", css:"radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(1px 1px at 75% 80%,#fff,transparent),radial-gradient(1px 1px at 90% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 45% 90%,#ddf,transparent),radial-gradient(1px 1px at 20% 45%,#fff,transparent),radial-gradient(1px 1px at 65% 60%,#fdf,transparent),linear-gradient(160deg,transparent 35%,rgba(160,140,255,.18) 50%,transparent 65%),linear-gradient(#070814,#0d1030)" },
+  wood:{ name:"Wood", css:"repeating-linear-gradient(92deg,rgba(0,0,0,.10) 0 2px,transparent 2px 9px,rgba(0,0,0,.06) 9px 10px,transparent 10px 37px),repeating-linear-gradient(90deg,rgba(255,220,170,.06) 0 1px,transparent 1px 13px),radial-gradient(ellipse at 50% 0%,rgba(255,200,140,.18),transparent 60%),linear-gradient(180deg,#6a4426,#3a2414)" },
+  parchment:{ name:"Parchment", css:"radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(80,50,20,.5)),repeating-radial-gradient(circle at 30% 40%,rgba(90,60,20,.05) 0 2px,transparent 2px 9px),linear-gradient(170deg,#9a8458,#5b4c30)" }
 };
 const mats = {};  // seat -> { kind:"preset", v } or { kind:"img", v, x, y, zoom, dim } (https link or data: picture)
 let myMat = (() => { try { return cleanMat(JSON.parse(store.get("kt-dig-mat", "null"))); } catch { return null; } })();
