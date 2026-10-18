@@ -53,7 +53,8 @@ test("Commander on the digital table: six players, each sees five opponents in t
   await expect(ps[0].locator("#hub .hubdot")).toHaveCount(6);
   await expect(ps[0].locator("#hub")).toContainText("Waiting to start");
   await expect(ps[0].locator(".opp").first()).toContainText("Rick");
-  for (const id of ["#rollBtn", "#tokenBtn", "#libPile", "#lifeOut", "#logBtn"]) if (await ps[0].locator(id).count()) await expect(ps[0].locator(id)).toBeVisible();
+  for (const id of ["#libPile", "#lifeOut", "#logBtn", "#nextTurn"]) await expect(ps[0].locator(id)).toBeVisible();
+  await expect(ps[0].locator("details.tmenu > summary")).toHaveText(["Turn", "Table", "Game"]);  // (dice, tokens and the rest are in these)
 
   // Clicking a board's empty space zooms in on it (over the other boards, your own stays); Esc goes back
   const rick = ps[0].locator(".opp", { hasText:"Rick" });

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 // "Commander's Sphere" is a sorcery in the test cards with Cut a Deal's text: "Each opponent draws a card, then you
@@ -66,7 +66,7 @@ test("digital table: effects on other players (Cut a Deal and the like), from th
   await expect(a.locator("#gyPile")).toContainText("Graveyard 2");
 
   // Group effects: Rick makes each opponent discard 2 (Luke chooses: at random) and Luke makes Rick lose 3 life
-  await b.click("#fxBtn");
+  await tool(b, "#fxBtn");
   await b.locator(".modal select[aria-label='What happens']").selectOption("discard");
   await b.fill(".modal input[aria-label='How many']", "2");
   await button(b, "Do it");
@@ -75,7 +75,7 @@ test("digital table: effects on other players (Cut a Deal and the like), from th
   await button(a, "At random");
   await expect.poll(() => hand(a)).toBe(before - 2);
   await expect(a.locator("#gyPile")).toContainText("Graveyard 4");  // (the two spells cast and the two discards)
-  await a.click("#fxBtn");
+  await tool(a, "#fxBtn");
   await a.locator(".modal select[aria-label='What happens']").selectOption("lose");
   await a.fill(".modal input[aria-label='How many']", "3");
   await button(a, "Do it");

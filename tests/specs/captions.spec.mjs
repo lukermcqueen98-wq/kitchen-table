@@ -45,10 +45,11 @@ test("captions: status, asking, lisp matching, voice commands, voice lookup, and
   await say(a, "ok so now I cast ristic study with offspring and trample");
   await expect(a.locator("#captions li").last()).toHaveText("You:I cast Rhystic Study");
   await expect(a.locator("#captions .kwlink")).toHaveCount(0);
-  await a.click("#tab-terms"); await a.fill("#termSearch", "offspring");
-  await expect(a.locator("#termList summary")).toHaveText(["Offspring"]);
-  await a.fill("#termSearch", "trample");
-  await expect(a.locator("#termList p").first()).toContainText("combat damage beyond");
+  await a.click("#tab-terms"); await a.fill("#termsBox .ktt-search", "offspring");
+  await expect(a.locator("#termsBox .ktt-item .ktt-name b")).toHaveText(["Offspring"]);
+  await a.fill("#termsBox .ktt-search", "trample");
+  await expect(a.locator("#termsBox .ktt-def").first()).toContainText("combat damage beyond");
+  await expect(a.locator("#termsBox a")).toHaveCount(0);  // (no links to other sites)
   // Only what players do and the cards they name are captioned (not small talk), unless that's turned off.
   // A card named without "I play" pops up too, but not an everyday word that's also a card name ("order")
   await say(a, "we should order pizza after this");

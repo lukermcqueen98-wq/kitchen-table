@@ -136,3 +136,9 @@ export async function say(page, text){
   await page.waitForTimeout(1200);
 }
 export { BASE, fs };
+// A button in one of the digital table's top-bar menus (Turn, Table, Game): opens its menu first if needed
+export async function tool(page, sel){
+  const b = page.locator(sel);
+  if (!await b.isVisible()) await page.locator(`details.tmenu:has(${sel}) > summary`).click();
+  await b.click();
+}

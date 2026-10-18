@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 // Gamma Card is a 3/4 creature in the test cards; Sol Ring is banned in Modern and Gwenom in Commander (test data)
@@ -72,7 +72,7 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await expect(a.locator("#hand .card")).toHaveCount(7);  // (nothing to put on the bottom)
   await button(b, "Keep");
   await expect(a.locator("#lifeOut")).toHaveText("25");
-  await expect(a.locator("#undoBtn")).toBeHidden();
+  await expect(a.locator("#undoBtn")).toHaveClass(/hidden/);
 
   // Power/toughness: a 3/4 shows 3/4; +2/+2 until end of turn makes it 5/6 (green), on both screens
   const bear = await fetchTo(a, "Gamma Card", "bf");
@@ -81,7 +81,7 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await a.locator(`#bf .card[data-iid="${bear}"]`).hover();
   await expect(a.locator("#pop")).toBeVisible();
   await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await menu(a, "Power/toughness...");
+  await a.locator(".modal .cp-sec", { hasText:"Power/toughness" }).getByRole("button", { name:"Change..." }).click();
   await button(a, "+2/+2");
   await expect(pt).toHaveText("5/6"); await expect(pt).toHaveClass(/up/);
   await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"] .pt`)).toHaveText("5/6");
@@ -91,13 +91,13 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await expect(pt).toHaveText("4/5");
 
   // The monarch: Luke takes it; Rick hits him (combat is by hand) and takes it from the Monarch... menu
-  await a.click("#desigBtn"); await menu(a, "Become the monarch");
+  await tool(a, "#desigBtn"); await menu(a, "Become the monarch");
   await expect(opp(b, "Luke").locator(".badge")).toHaveText("👑 Monarch");
-  await b.click("#desigBtn"); await menu(b, "Become the monarch");
+  await tool(b, "#desigBtn"); await menu(b, "Become the monarch");
   await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
   await expect(opp(a, "Rick").locator(".badge")).toHaveText("👑 Monarch");
   // Day and night
-  await a.click("#desigBtn"); await menu(a, "It becomes night");
+  await tool(a, "#desigBtn"); await menu(a, "It becomes night");
   await expect(b.locator("#dayChip")).toHaveText("☾ Night");
 
   // Turns: Rick's tab is in the background, so his turn starting chimes and notifies; the monarch draws as his turn
@@ -118,7 +118,7 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await expect.poll(() => ktp(b, () => ktPlay.me.zones.hand.length)).toBe(hand + 1);
   // Rick, the monarch, leaves the game: the monarch passes to the player whose turn it is (or the next one)
   await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
-  await b.click("#leaveBtn");
+  await tool(b, "#leaveBtn");
   await expect(a.locator("#myBadges .badge")).toHaveText("👑 Monarch", { timeout:10000 });
   await expect(a.locator("#log")).toContainText("Rick left the game: Luke becomes the monarch.");
   expect([...a.errors, ...b.errors]).toEqual([]);

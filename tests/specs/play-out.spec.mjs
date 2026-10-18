@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 const opp = (page, name) => page.locator(".opp", { hasText:name });
@@ -47,19 +47,22 @@ test("digital table: players who are out are skipped in turn order (0 life, or c
   await expect(c.locator(".modal-card h2")).toHaveText("Are you out of this game?");
   await expect(c.locator(".modal")).toContainText("You're at 0 life.");
   await button(c, "I'm out");
-  await expect.poll(turn).toBe(1);
+  // (the turn order is shuffled at the start; after Sam comes whichever of Luke and Rick follows him in it)
+  const order = await ktp(a, () => ktPlay.table.order), after = s => order[(order.indexOf(s) + 1) % 3];
+  const afterSam = after(3), other = afterSam === 1 ? 2 : 1;
+  await expect.poll(turn).toBe(afterSam);
   for (const p of [a, b]) await expect(opp(p, "Sam").locator(".badge.out")).toHaveText("Out");
   await expect(c.locator("#myBadges")).toContainText("You're out");
   await expect(a.locator("#log")).toContainText("Sam is out of the game (at 0 life).");
   await expect(opp(a, "Sam").locator(".obf .card")).toHaveCount(0);  // (his cards leave the game with him)
 
-  // Turns go Luke, Rick, Luke, Rick... never Sam
+  // Turns go back and forth between Luke and Rick... never Sam
   const seen = [];
   for (let k = 0; k < 4; k++) { await pass(); seen.push(await turn()); }
-  expect(seen).toEqual([2, 1, 2, 1]);
+  expect(seen).toEqual([other, afterSam, other, afterSam]);
 
   // Rick concedes: Luke is the last one standing
-  await b.click("#outBtn");
+  await tool(b, "#outBtn");
   await expect(opp(a, "Rick").locator(".badge.out")).toHaveText("Out");
   await expect(a.locator("#log")).toContainText("Luke is the last one standing.");
   await pass();
