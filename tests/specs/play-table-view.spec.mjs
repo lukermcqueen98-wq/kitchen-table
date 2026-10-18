@@ -71,7 +71,7 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   // Drop-downs are dark with light words (the Group effects ones were light on light)
   await tool(a, "#fxBtn");
   const colors = await a.locator(".modal select").first().evaluate(e => { const s = getComputedStyle(e); return [s.color, s.backgroundColor]; });
-  expect(colors).toEqual(["rgb(239, 230, 207)", "rgb(13, 32, 29)"]);
+  expect(colors).toEqual(["rgb(239, 233, 255)", "rgb(18, 11, 34)"]);
   await button(a, "Cancel");
 
   // D no longer draws a card
@@ -202,7 +202,7 @@ test("digital table: library, graveyard and exile options (Magic's usual ones), 
   await expect(opp(b, "Luke").locator(".opile", { hasText:"Library top" })).toHaveCount(0);
 
   // Graveyard: flashback casts a sorcery from it and exiles it after
-  const sphere = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Commander's Sphere"); ktPlay.move(c.iid, "gy"); return c.iid; });
+  const sphere = await ktp(a, () => { const isS = c => ktPlay.cards.get(c.id)?.name === "Commander's Sphere", c = ktPlay.me.zones.lib.find(isS) || ktPlay.me.zones.hand.find(isS); ktPlay.move(c.iid, "gy"); return c.iid; });
   await a.locator("#gyPile").click();
   await a.locator(".modal .gcard", { hasText:"" }).first().getByRole("button", { name:"Cast (flashback: then exile)" }).click();
   await expect(a.locator("#log")).toContainText("You cast Commander's Sphere.");

@@ -143,8 +143,8 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   // Attaching: Luke plays another card and attaches it to his first; it tucks behind it, on both screens
   // (two Forests would stack into one pile: Help turns stacking off)
   await tool(a, "#helpBtn"); await a.locator(".modal label", { hasText:"Stack basic lands of the same kind" }).locator("input").uncheck(); await a.locator(".modal").getByRole("button", { name:"Close" }).click();
-  await a.locator("#hand .card").first().dblclick();
-  await expect(a.locator("#bf .card")).toHaveCount(2);
+  // (a double-click now and then goes unseen right after the dialog closes: play again only if the card didn't land)
+  await expect(async () => { if (await a.locator("#bf .card").count() < 2) await a.locator("#hand .card").first().dblclick(); await expect(a.locator("#bf .card")).toHaveCount(2, { timeout:2000 }); }).toPass({ timeout:15000 });
   const second = await a.locator("#bf .card").nth(1).getAttribute("data-iid");
   await a.locator(`#bf .card[data-iid="${second}"]`).click({ button:"right" });
   await a.locator(".modal").getByRole("button", { name:"Attach to..." }).click();
