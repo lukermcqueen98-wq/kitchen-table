@@ -72,3 +72,24 @@ test("digital table: picking an official deck (Commander and 60-card), with desc
   expect(a.errors).toEqual([]);
   await browser.close();
 });
+
+test("digital table: an Archidekt export, with printings, categories, a sideboard and a maybeboard", async () => {
+  const browser = await launchBrowser();
+  const a = await newPlayer(browser);
+  await a.goto(`${BASE}/play.html?kt-test`);
+  await a.selectOption("#fmtSel", "cmdr");
+  await a.fill("#deckIn", [
+    "1x Gamma Card (tst) 2 [Commander{top}]",
+    "1x Sol Ring (cmm) 400 *F* [Ramp,Artifact]",
+    "1x Rhystic Study (pcy) 4 [Draw] ^Have,#37d67a^",
+    "1x Alpah Card (tst) 0 [Creature]",  // (a typo: found by its printing)
+    "1x Beta Card (tst) 1 [Sideboard{noDeck}{noPrice}]",
+    "1x Commander's Sphere (tst) 6 [Maybeboard{noDeck}{noPrice}]",
+    "96x Forest (plst) SLD-63 [Land]"].join("\n"));
+  await a.click("#loadDeck");
+  await expect(a.locator("#deckInfo")).toContainText("100 cards found. Commander: Gamma Card.", { timeout:15000 });
+  await expect(a.locator("#deckInfo")).toContainText("Sideboard: 1.");
+  await expect(a.locator("#deckInfo")).not.toContainText("Not found");
+  expect(a.errors).toEqual([]);
+  await browser.close();
+});

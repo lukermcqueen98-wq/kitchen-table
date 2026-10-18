@@ -31,10 +31,17 @@ test("digital table: chat, watching, a dropped connection, and game records", as
   await expect(a.locator(".opp")).toHaveCount(1);  // (people watching aren't players)
 
   // Chat reaches everyone, including people watching
-  await b.fill("#chatIn", "good luck"); await b.press("#chatIn", "Enter");
+  // (the log and chat are a drawer from the Log & chat button; while it's closed, new lines pop up briefly)
+  await expect(b.locator("#chatIn")).toBeHidden();
+  await b.click("#logBtn"); await b.fill("#chatIn", "good luck"); await b.press("#chatIn", "Enter");
   for (const p of [a, c]) await expect(p.locator("#log li.chat").last()).toHaveText(/Rick:good luck$/);
-  await c.fill("#chatIn", "have fun"); await c.click("#chatForm button");
+  await expect(a.locator("#feed li.chat").last()).toHaveText(/Rick:good luck$/);
+  await expect(a.locator("#logNew")).toBeVisible();
+  await c.click("#logBtn"); await c.fill("#chatIn", "have fun"); await c.click("#chatForm button");
   await expect(a.locator("#log li.chat").last()).toHaveText(/Sam:have fun$/);
+  await expect(a.locator("#feed li", { hasText:"Rick:good luck" })).toHaveCount(0, { timeout:10000 });  // (gone after a few seconds)
+  await a.click("#logBtn"); await expect(a.locator("#logNew")).toBeHidden(); await expect(a.locator("#feed li")).toHaveCount(0);
+  for (const p of [a, b, c]) await p.click("#panelClose");
 
   // A game: Sam watches the cards arrive
   await a.click("#startBtn"); await a.locator(".modal").getByRole("button", { name:"Start the game" }).click();  // (house rules first)
