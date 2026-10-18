@@ -81,8 +81,7 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await a.locator(`#bf .card[data-iid="${bear}"]`).hover();
   await expect(a.locator("#pop")).toBeVisible();
   await a.locator(`#bf .card[data-iid="${bear}"]`).click({ button:"right" });
-  await a.locator(".modal .cp-sec", { hasText:"Power/toughness" }).getByRole("button", { name:"Change..." }).click();
-  await button(a, "+2/+2");
+  await a.locator(".modal .cp-eot").getByRole("button", { name:"+2/+2", exact:true }).click(); await button(a, "Close");
   await expect(pt).toHaveText("5/6"); await expect(pt).toHaveClass(/up/);
   await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"] .pt`)).toHaveText("5/6");
   // Rick puts a -1/-1 counter on it from his screen

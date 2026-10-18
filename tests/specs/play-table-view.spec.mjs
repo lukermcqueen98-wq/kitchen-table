@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle, tool } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, tool, dragTo } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 const opp = (page, name) => page.locator(".opp", { hasText:name });
@@ -505,15 +505,27 @@ test("digital table: attacking by hand, each creature at its own opponent (arrow
   await a.click("#startBtn"); await button(a, "Start the game");
   for (const p of [a, b, c]) await button(p, "Keep");
   const three = await ktp(a, () => [0, 1, 2].map(() => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; }));
-  const attack = async (iid, who) => { await a.locator(`#bf .card[data-iid="${iid}"]`).click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:`Attack ${who}`, exact:true }).click(); };
+  // (Attack at the top: a box for each player above Luke's battlefield; he drags each creature onto one)
+  const attack = async (plan) => {
+    await a.click("#attackBtn");
+    for (const [iid, who] of plan) await dragTo(a, a.locator(`#bf .card[data-iid="${iid}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${who}` }));
+    await a.locator("#atkBar").getByRole("button", { name:/^Attack \(/ }).click();
+  };
   // One at Rick, one at Sam, one stays home: an arrow for each, on every screen
-  await attack(three[0], "Rick"); await attack(three[1], "Sam");
+  // (Attack is on Luke's turn: pass to him; ending a turn with 8 cards asks for a discard, and they keep them)
+  while (await ktp(a, () => ktPlay.table.turnSeat) !== 1) {
+    const t = await ktp(a, () => ktPlay.table.turnSeat), p = [a, b, c][t - 1];
+    await p.click("#nextTurn");
+    const keep = p.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
+    await expect.poll(() => ktp(a, () => ktPlay.table.turnSeat)).not.toBe(t);
+  }
+  await attack([[three[0], "Rick"], [three[1], "Sam"]]);
   expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk || 0), three)).toEqual([2, 3, 0]);
   for (const p of [a, b, c]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(2);
   await expect(b.locator("#combatNote")).toContainText("1 attacking you");
   await expect(c.locator("#combatNote")).toContainText("1 attacking you");
   // Change of plan: the one at Sam goes at Rick (its arrow moves), and the third goes at Sam
-  await attack(three[1], "Rick"); await attack(three[2], "Sam");
+  await attack([[three[1], "Rick"], [three[2], "Sam"]]);
   expect(await ktp(a, ids => ids.map(i => ktPlay.me.zones.bf.find(c => c.iid === i).atk), three)).toEqual([2, 2, 3]);
   await expect(b.locator("#combatNote")).toContainText("2 attacking you");
   for (const p of [a, b, c]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(3);
@@ -594,9 +606,16 @@ test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and tou
   await expect(card.locator(".pt")).toHaveText("3/4");
   // Luke: two +1/+0 counters and a -0/-1 counter: 3/4 becomes 5/3
   await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
+  const rows = () => a.locator(".modal .ctrgrid span").allTextContents();
+  const order = await rows();
   for (let i = 0; i < 2; i++) await a.locator(".modal").getByRole("button", { name:"+1/+0 plus" }).click();
   await a.locator(".modal").getByRole("button", { name:"-0/-1 plus" }).click();
+  expect(await rows()).toEqual(order);  // (setting a counter doesn't move it in the list)
   await button(a, "Done");
+  // Done goes back to the card's panel, with the counters on it under Counters
+  await expect(a.locator(".modal-card h2")).toHaveText("Gamma Card");
+  await expect(a.locator(".modal .cp-ctr span")).toHaveText(["+1/+0", "-0/-1"]);
+  await button(a, "Close");
   await expect(card.locator(".pt")).toHaveText("5/3");
   await expect(card.locator(".ctrs span")).toHaveText(["+2/+0", "-0/-1"]);
   await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .pt`)).toHaveText("5/3");
@@ -607,8 +626,39 @@ test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and tou
   await expect(card.locator(".pt")).toHaveText("5/4");
   // ...and a -1/-0: 4/4
   await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
-  await a.locator(".modal").getByRole("button", { name:"-1/-0 plus" }).click(); await button(a, "Done");
+  await a.locator(".modal").getByRole("button", { name:"-1/-0 plus" }).click(); await button(a, "Done"); await button(a, "Close");
   await expect(card.locator(".pt")).toHaveText("4/4");
+  // Until end of turn, from the Counters section: +2/+2 makes it 6/6, and it can be taken away again
+  await card.click({ button:"right" }); await a.locator(".modal .cp-eot").getByRole("button", { name:"+2/+2", exact:true }).click();
+  await expect(card.locator(".pt")).toHaveText("6/6");
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .pt`)).toHaveText("6/6");
+  await a.locator(".modal").getByRole("button", { name:"Take away the until end of turn change" }).click();
+  await expect(card.locator(".pt")).toHaveText("4/4");
+  // ...or with the steppers in the counters list
+  await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"Power until end of turn plus" }).click();
+  await button(a, "Done");
+  await expect(card.locator(".pt")).toHaveText("5/4");
+  await expect(a.locator(".modal .cp-eot")).toContainText("+1/+0 this turn");
+  // Base power/toughness: 0/1 in place of the printed 3/4 (its counters and this turn's change still count): 2/1
+  await a.locator(".modal").locator(".cp-sec", { hasText:"Base power/toughness" }).getByRole("button", { name:"Change", exact:true }).click();
+  await a.fill(".modal input[aria-label='Base power']", "0"); await a.fill(".modal input[aria-label='Base toughness']", "1"); await button(a, "OK");
+  await expect(card.locator(".pt")).toHaveText("2/1");
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .pt`)).toHaveText("2/1");
+  await expect(a.locator(".modal-card h2")).toHaveText("Gamma Card");  // (back on its panel)
+  await a.locator(".modal").locator(".cp-sec", { hasText:"Base power/toughness" }).getByRole("button", { name:"Change", exact:true }).click(); await button(a, "Back to printed");
+  await expect(card.locator(".pt")).toHaveText("5/4");
+  // Counters from this card on each other creature: two more creatures get a +1/+1 counter, and lose it when it goes
+  const others = await ktp(a, () => [0, 1].map(() => { const c = [...ktPlay.me.zones.lib, ...ktPlay.me.zones.hand].find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; }));
+  await a.locator(".modal").getByRole("button", { name:"Counters on all your creatures...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"+1/+1 plus" }).click(); await button(a, "Give them");
+  for (const i of others) await expect(a.locator(`#bf .card[data-iid="${i}"] .pt`)).toHaveText("4/5");
+  await expect(card.locator(".pt")).toHaveText("5/4");  // (not itself)
+  await expect(a.locator(".modal .cp-lend")).toContainText("It gave 2 +1/+1 to 2 creatures");
+  await a.locator(".modal").getByRole("button", { name:"Graveyard", exact:true }).click();
+  for (const i of others) await expect(a.locator(`#bf .card[data-iid="${i}"] .pt`)).toHaveText("3/4");
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${others[0]}"] .pt`)).toHaveText("3/4");
+  await expect(a.locator("#log")).toContainText("Gamma Card left the battlefield: took back the counters it gave.");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });

@@ -142,3 +142,13 @@ export async function tool(page, sel){
   if (!await b.isVisible()) await page.locator(`details.tmenu:has(${sel}) > summary`).click();
   await b.click();
 }
+
+// Drags one element onto another with the mouse (the table's drag and drop uses pointer events)
+export async function dragTo(page, from, to){
+  // (the table redraws often: measure again if an element was just replaced)
+  const box = async l => { for (let i = 0; i < 40; i++) { const r = await l.boundingBox().catch(() => null); if (r) return r; await page.waitForTimeout(50); } throw new Error("dragTo: element not visible"); };
+  const a = await box(from), b = await box(to);
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2 + 20, a.y + a.height / 2 + 20, { steps:3 });
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps:6 }); await page.mouse.up();
+}

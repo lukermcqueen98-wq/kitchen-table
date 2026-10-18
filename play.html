@@ -406,6 +406,30 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .cp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .cp-grid .btn{min-height:40px}
 .cp-ctr{display:flex;align-items:center;gap:8px;border:1px solid var(--felt-edge);border-radius:8px;padding:4px 8px;background:rgba(255,255,255,.03)}
+.cp-eot,.cp-lend{margin-top:8px}
+.cp-add{margin-right:2px}
+.atkrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--felt-edge)}
+.atkrow img{width:46px;border-radius:4px}
+.atkname{display:flex;flex-direction:column;min-width:150px}
+.atkname small{color:var(--muted)}
+#defendBox{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;width:min(620px,calc(100vw - 32px));max-height:60vh;overflow:auto;
+  background:rgba(20,12,40,.97);border:2px solid var(--danger);border-radius:14px;padding:12px 16px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+#defendBox h2{margin:0 0 6px;font-size:20px}
+#defendBox .atkrow img{width:40px}
+#defendBox .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+#atkBar{position:fixed;z-index:55;display:flex;gap:8px;align-items:stretch;padding:8px;border-radius:12px;background:rgba(20,12,40,.95);border:2px solid var(--brass);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#atkBar .atkdrop{flex:1;min-width:120px;min-height:64px;border:2px dashed var(--felt-edge);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
+#atkBar .atkdrop.drop{background:rgba(255,207,90,.15);border-style:solid}
+#atkBar .atkdrop b{font-size:14px}
+#atkBar .atkdrop .chips{display:flex;flex-wrap:wrap;gap:4px}
+#atkBar .atkdrop .chips button{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--felt-edge);background:rgba(255,255,255,.06);color:var(--parchment)}
+#atkBar .atkside{display:flex;flex-direction:column;gap:6px;justify-content:center}
+#atkBar .hint{font-size:12px}
+.card.planatk{outline:3px solid var(--brass);outline-offset:2px}
+.ptbase{display:flex;align-items:center;gap:8px;font-size:22px}
+.ptbase input{width:80px;font-size:20px;text-align:center}
+.ctrgrid{display:grid !important;justify-content:start !important;grid-template-columns:120px 34px 44px 34px;align-items:center;gap:6px;margin-bottom:4px;max-width:none}
+.ctrgrid b{text-align:center}
 .cp-ctr b{min-width:22px;text-align:center;font-size:16px}
 .cp-ctr button{width:34px;height:34px;border-radius:8px;border:1px solid var(--felt-edge);background:none;font-size:17px}
 .cp-kw{position:relative;border-radius:999px;border:1px solid var(--brass);background:rgba(255,207,90,.12);padding:4px 10px;font-size:13px;cursor:help}
@@ -624,6 +648,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
           <button role="menuitem" class="btn small mitem" id="helpBtn">Help</button>
           <button role="menuitem" class="btn small mitem" id="leaveBtn">Leave</button>
         </div></details>
+        <button class="btn small primary playonly hidden" id="attackBtn" title="Pick which of your creatures attack, and who">Attack</button>
       </span>
       <span class="grp mid">
         <span class="turnpill" id="turnPill">
@@ -647,6 +672,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
     <div id="opps"></div>
     <div id="hub" aria-label="Turn order"></div>
     <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
+    <div id="defendBox" class="hidden" role="dialog" aria-label="You're being attacked"></div>
+    <div id="atkBar" class="hidden" role="region" aria-label="Attack: drag your creatures onto a player"></div>
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
       <div id="handWrap"><div class="hint">Hand</div><div id="hand" data-drop="hand" aria-label="Your hand"></div></div>
@@ -1932,14 +1959,14 @@ function move(iid, to, opt = {}){
   // A card you control but another player owns goes to its owner's hand, graveyard, exile or library
   if (c.owner && c.owner !== mySeat && to !== "bf" && !c.tok) {
     if (!conns[c.owner]?.open) { toast(`${nm(c.owner)} isn't connected, so their card can't go back to them yet.`); return; }
-    me.zones[from].splice(f.i, 1); detachFrom(c);
+    me.zones[from].splice(f.i, 1); detachFrom(c); if (c.gave) removeGiven(c, true);
     send(conns[c.owner], { type:"return", card:wireCard(c), zone:to, bottom:!!opt.bottom });
     if (!opt.quiet) say(`put ${nm(c.owner)}'s ${nameOf(c)} into ${to === "lib" ? `their library (${opt.bottom ? "bottom" : "top"})` : `their ${ZONE_NAME[to]}`}.`);
     withoutUndo(changed); undoStack = []; return;
   }
   me.zones[from].splice(f.i, 1);
-  if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); }
-  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; if (to !== "lib") c.fd = false; }
+  if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); if (c.gave) removeGiven(c, true); }
+  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; delete c.base; if (to !== "lib") c.fd = false; }
   if (to === "st") c.at = Date.now();
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
@@ -2038,11 +2065,6 @@ const isCreature = c => c.fd || /\bCreature\b/.test(typeOf(cardOf(c), c.face || 
 // (a card's keywords: printed ones, plus key terms given to it on the table, "until end of turn" or for as long as it's out)
 const kwGiven = c => (c.kw || []).map(x => typeof x === "string" ? x : x.n).filter(Boolean);
 const kwOf = c => { const k = cards.get(c.id); return c.fd ? kwGiven(c) : [...(k?.card_faces?.[c.face || 0]?.keywords || k?.keywords || []), ...kwGiven(c)]; };
-function attackWith(c, seat){
-  me.arrows = (me.arrows || []).filter(a => a.from !== c.iid);
-  c.atk = seat; c.blk = ""; me.arrows.push({ from:c.iid, player:seat });
-  say(`attacked ${nm(seat)} with ${nameOf(c)}.`); changed();
-}
 function setBlock(b, atk, seat){
   me.arrows = (me.arrows || []).filter(a => a.from !== b.iid);
   b.blk = atk.iid; b.atk = 0;  // (drawn as an arrow from the blocker to the attacker)
@@ -2183,7 +2205,8 @@ function ptCounters(c){
 }
 function ptOf(c){
   const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
-  const bp = c.fd ? "2" : f?.power ?? k?.power, bt = c.fd ? "2" : f?.toughness ?? k?.toughness;
+  // (base: a base power/toughness set on the table, in place of the printed one)
+  const bp = c.base ? String(c.base[0]) : c.fd ? "2" : f?.power ?? k?.power, bt = c.base ? String(c.base[1]) : c.fd ? "2" : f?.toughness ?? k?.toughness;
   const [np, nt] = ptCounters(c);
   const dp = np + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = nt + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
   if (bp == null && !dp && !dt && !c.mod && !c.eot) return null;
@@ -2191,7 +2214,7 @@ function ptOf(c){
   if (isNaN(p0) || isNaN(t0)) return { p:(isNaN(p0) ? 0 : p0) + dp, t:(isNaN(t0) ? 0 : t0) + dt, str:`${bp}/${bt}${dp || dt ? ` ${sg(dp)}/${sg(dt)}` : ""}`, dir:Math.sign(dp + dt) };
   return { p:p0 + dp, t:t0 + dt, str:`${p0 + dp}/${t0 + dt}`, dir:Math.sign(dp + dt) };
 }
-const showPt = c => { const pt = ptOf(c); return pt && (isCreature(c) || pt.dir || c.mod || c.eot) ? pt : null; };
+const showPt = c => { const pt = ptOf(c); return pt && (isCreature(c) || pt.dir || c.mod || c.eot || c.base) ? pt : null; };
 function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const e = el("div", { className:"card" + (c.tapped ? " tapped" : "") + (c.fd ? " fd" : "") + (mine ? " mine" : "") });
   e.dataset.iid = c.iid; if (zone) e.dataset.zone = zone;
@@ -2424,7 +2447,8 @@ function renderCombat(){
   $("#combatBar").classList.toggle("hidden", !attackers.length);
   if (atMe.length > lastAtMe) cue("attack");
   lastAtMe = atMe.length;
-  note.textContent = atMe.length ? `${atMe.length} attacking you: right-click your creature, Block..., to block with an arrow` : attackers.length ? `${attackers.length} attacking` : "";
+  note.textContent = atMe.length ? `${atMe.length} attacking you` : attackers.length ? `${attackers.length} attacking` : "";
+  renderDefend(); renderAtkBar();
 }
 // The middle of a round table (4 or 5 opponents): whose turn it is, and the turn order as seats around a circle,
 // starting with you at the bottom and going clockwise (the next player is on your left)
@@ -2463,6 +2487,7 @@ function renderTurn(){
   $("#clocks").classList.toggle("hidden", !table.started);
   tickClocks();
   $("#nextTurn").classList.toggle("primary", table.started && table.turnSeat === mySeat);
+  $("#attackBtn").classList.toggle("hidden", !mine_ || !!me.out || !!me.watch);
   $("#clearArrowsBtn").classList.toggle("hidden", !(me.arrows?.length || me.zones.bf.some(c => c.atk || c.blk)));
   $("#sideBtn").classList.toggle("hidden", f.cmdr || !sideIds.length || !!me.watch);
   $("#undoBtn").classList.toggle("hidden", !!rule("noUndo"));
@@ -2557,6 +2582,7 @@ document.addEventListener("pointerup", e => {
   if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf") { if (d.el.dataset.pile === "tapped") untapFromStack(d.el.dataset.stack, 1); else tapFromStack(d.el.dataset.stack, 1); } else clickCard(d.iid, d.zone, e); return; }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
+  if (to.startsWith("atk:")) { if (d.zone === "bf" && atkPlan) planAttack(d.iid, +to.slice(4)); return; }
   if (to === "bf") {
     const r = t.getBoundingClientRect(), cw = parseFloat(getComputedStyle(t).getPropertyValue("--cw")) || 84;
     const x = (e.clientX - d.dx + (d.zone === "bf" ? 0 : 0) - r.left) / r.width, y = (e.clientY - d.dy - r.top) / r.height;
@@ -2701,9 +2727,25 @@ function cardPanel(iid){
       p.onclick = here(() => { c.ctr[t] = v + 1; changed(); });
       ctrs.append(el("div", { className:"cp-ctr" }, el("span", { textContent:t }), m, el("b", { textContent:v }), p));
     }
-    for (const t of ["+1/+1", "-1/-1", "Loyalty", "Shield"].filter(t => !c.ctr?.[t])) ctrs.append(btn(`+ ${t}`, here(() => { c.ctr[t] = 1; say(`put a ${t} counter on ${nameOf(c)}.`); changed(); })));
-    ctrs.append(btn("Other counters...", act(() => counterDialog(c))));
-    right.append(sec("Counters", ctrs));
+    const quickC = ["+1/+1", "-1/-1", "Loyalty", "Shield"].filter(t => !c.ctr?.[t]);
+    if (quickC.length) ctrs.append(el("span", { className:"hint cp-add", textContent:"Add a counter:" }));
+    for (const t of quickC) ctrs.append(btn(t, here(() => { c.ctr[t] = 1; say(`put a ${t} counter on ${nameOf(c)}.`); changed(); })));
+    ctrs.append(btn("Other counters...", act(() => counterDialog(c, () => cardPanel(iid)))));
+    // Counters this card gives your other creatures (an anthem with counters): taken away when it leaves the battlefield
+    const lend = el("div", { className:"cp-row cp-lend" }, btn("Counters on all your creatures...", act(() => lendDialog(c, () => cardPanel(iid)))));
+    if (c.gave?.length) {
+      const sum = {}; for (const g of c.gave) if (me.zones.bf.some(x => x.iid === g.iid)) sum[g.t] = (sum[g.t] || 0) + g.n;
+      const n = new Set(c.gave.filter(g => me.zones.bf.some(x => x.iid === g.iid)).map(g => g.iid)).size;
+      lend.append(el("span", { className:"hint", textContent:`It gave ${Object.entries(sum).map(([t, v]) => `${v} ${t}`).join(", ") || "nothing"} to ${n} creature${n === 1 ? "" : "s"} (taken away when it leaves)` }),
+        btn("Take them away", here(() => removeGiven(c))));
+    }
+    // Until end of turn (Giant Growth and the like): gone when the turn ends
+    const eot = el("div", { className:"cp-row cp-eot" }, el("span", { className:"hint", textContent:"Until end of turn:" }));
+    if (c.eot) { const sg = v => (v < 0 ? "" : "+") + v, x = el("button", { type:"button", className:"btn small primary", textContent:`${sg(c.eot[0])}/${sg(c.eot[1])} this turn ×`, ariaLabel:"Take away the until end of turn change" });
+      x.onclick = here(() => { delete c.eot; say(`took away ${nameOf(c)}'s until end of turn change (now ${ptOf(c)?.str || "no power/toughness"}).`); changed(); }); eot.append(x); }
+    for (const [p, t] of [[1, 1], [2, 2], [3, 3], [1, 0], [-1, -1], [-2, -2]])
+      eot.append(btn(`${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t}`, here(() => { addPt(c, { eot:[p, t] }); say(`gave ${nameOf(c)} ${ptText({ eot:[p, t] })} (now ${ptOf(c)?.str}).`); changed(); })));
+    right.append(sec("Counters", ctrs, eot, lend));
     // Key terms: printed ones and ones given on the table; point at (or click) one to see what it means
     const kws = el("div", { className:"cp-row" }), printed = c.fd ? [] : (k?.keywords || []).filter(n => !(c.kw || []).some(x => x.n === n));
     const chip = (n, given) => {
@@ -2724,20 +2766,19 @@ function cardPanel(iid){
     // Mana it makes, and power/toughness
     const mana = el("div", { className:"cp-row" }, ...(c.mana || []).filter(x => COLORS.includes(x)).map(x => el("img", { src:`https://svgs.scryfall.io/card-symbols/${x}.svg`, alt:`${MANA_NAME[x]} mana`, style:"width:22px;height:22px" })),
       btn(c.mana?.length ? "Change..." : "Mark the mana it makes...", act(() => manaDialog(c))));
-    const ptRow = el("div", { className:"cp-row" }, el("span", { textContent:pt ? pt.str : "None" }),
-      btn("Change...", act(() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }))));
-    right.append(el("div", { style:"display:flex;gap:18px;flex-wrap:wrap" }, el("div", { style:"flex:1;min-width:180px" }, sec("Mana it makes", mana)), el("div", { style:"flex:1;min-width:160px" }, sec("Power/toughness", ptRow))));
+    const kf = k?.card_faces?.[c.face || 0] || k, base = c.base ? c.base.join("/") : c.fd ? "2/2" : kf?.power != null ? `${kf.power}/${kf.toughness}` : "None";
+    const ptRow = el("div", { className:"cp-row" }, el("span", { textContent:base }),
+      ...(pt && pt.str !== base ? [el("span", { className:"hint", textContent:`(now ${pt.str})` })] : []),
+      btn("Change", act(() => baseDialog(c, () => cardPanel(iid)))));
+    right.append(el("div", { style:"display:flex;gap:18px;flex-wrap:wrap" }, el("div", { style:"flex:1;min-width:180px" }, sec("Mana it makes", mana)), el("div", { style:"flex:1;min-width:160px" }, sec("Base power/toughness", ptRow))));
     // Combat and arrows
     const fight = el("div", { className:"cp-row" });
-    if (isCreature(c)) {
-      for (const s of presentSeats().filter(s => s !== mySeat && s !== c.atk && !isOut(s))) { const b = btn(`Attack ${nm(s)}`, act(() => attackWith(c, s)), "cp-seat"); b.style.borderColor = SEAT_HEX[s - 1]; fight.append(b); }
-      fight.append(btn("Block... (click the attacker)", act(() => startTargeting("block", iid))));
-    }
+    // (attacking is the Attack button at the top, on your turn; blocking is the box that pops up when you're attacked)
     if (c.atk || c.blk) fight.append(btn("Out of combat (remove its arrow)", act(() => outOfCombat(c))));
     fight.append(btn("Target with an arrow...", act(() => startTargeting("arrow", iid))),
       c.att ? btn("Unattach", here(() => { c.att = null; c.x = clamp(c.x + 0.02, 0, 0.94); say(`unattached ${nameOf(c)}.`); changed(); })) : btn("Attach to...", act(() => startTargeting("attach", iid))));
     if (me.arrows.some(a => a.from === iid)) fight.append(btn("Remove its arrows", here(() => { me.arrows = me.arrows.filter(a => a.from !== iid); changed(); })));
-    right.append(sec(isCreature(c) ? "Combat and arrows" : "Arrows", fight));
+    right.append(sec("Arrows", fight));
     // Who controls it
     const others = presentSeats().filter(s => s !== mySeat), ctl = el("div", { className:"cp-row" });
     if (c.owner && c.owner !== mySeat) ctl.append(btn(`Give back to ${nm(c.owner)}`, act(() => { if (giveCard(iid, c.owner)) say(`gave ${nameOf(c)} back to ${nm(c.owner)}.`); })));
@@ -2764,10 +2805,6 @@ function cardMenu(iid, x, y){
     items.push({ label:c.tapped ? "Untap" : "Tap", fn:() => toggleTap(c) });
     // (combat by hand: an arrow to the player it attacks, or to the creature it blocks)
     if (c.atk || c.blk) items.push({ label:"Out of combat (remove its arrow)", fn:() => outOfCombat(c) });
-    if (isCreature(c)) {
-      for (const s of presentSeats().filter(s => s !== mySeat && s !== c.atk && !isOut(s))) items.push({ label:`Attack ${nm(s)}`, fn:() => attackWith(c, s) });
-      items.push({ label:"Block... (click the attacker)", fn:() => startTargeting("block", iid) });
-    }
     if (faces(k)) items.push({ label:"Transform (flip to the other face)", fn:() => { c.face = c.face ? 0 : 1; say(`transformed ${nameOf(c)}.`); changed(); } });
     items.push({ label:c.fd ? "Turn face up" : "Turn face down", fn:() => { c.fd = !c.fd; say(c.fd ? "turned a card face down." : `turned ${nameOf(c)} face up.`); changed(); } });
     items.push({ label:"Counters...", fn:() => counterDialog(c) }, { label:"Mana symbols (what it can make)...", fn:() => manaDialog(c) }, { label:"Key terms (flying, haste...)...", fn:() => kwDialog(c) }, { label:"Power/toughness...", fn:() => ptDialog(nameOf(c), c, d => { addPt(c, d); say(`gave ${nameOf(c)} ${ptText(d)} (now ${ptOf(c)?.str}).`); changed(); }) },
@@ -3192,26 +3229,187 @@ function ptDialog(title, c, done){
   if (c && (c.eot || c.mod)) btns.unshift({ label:"Back to printed", fn:() => { const was = { eot:(c.eot || [0, 0]).map(x => -x), mod:(c.mod || [0, 0]).map(x => -x) }; done(was); } });
   openModal(`Power/toughness: ${title}`, body, btns);
 }
-function counterDialog(c){
+// Counters on a card, in the same order every time (setting one doesn't move it), plus power/toughness until end of
+// turn; back: what Done goes back to (the card's panel)
+function counterDialog(c, back){
   const types = ["+1/+1", "-1/-1", "+1/+0", "+0/+1", "-1/-0", "-0/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
-  const body = el("div");
+  const body = el("div"), eot0 = [...(c.eot || [0, 0])];
+  const stepper = (label, v, minus, plus, aria = label) => {
+    const m = el("button", { innerHTML:"&minus;", ariaLabel:`${aria} minus` }), p = el("button", { textContent:"+", ariaLabel:`${aria} plus` });
+    m.onclick = () => { minus(); draw_(); }; p.onclick = () => { plus(); draw_(); };
+    return el("div", { className:"ctrl ctrgrid" }, el("span", { textContent:label }), m, el("b", { textContent:v }), p);
+  };
   const draw_ = () => {
     body.innerHTML = "";
-    const all = [...new Set([...Object.keys(c.ctr), ...types])];
-    for (const t of all) {
-      const v = c.ctr[t] || 0, r = el("div", { className:"ctrl", style:"max-width:280px;margin-bottom:4px" });
-      const m = el("button", { innerHTML:"&minus;", ariaLabel:`${t} minus` }), p = el("button", { textContent:"+", ariaLabel:`${t} plus` });
-      m.onclick = () => { c.ctr[t] = Math.max(0, v - 1); if (!c.ctr[t]) delete c.ctr[t]; changed(); draw_(); };
-      p.onclick = () => { c.ctr[t] = v + 1; changed(); draw_(); };
-      r.append(el("span", { textContent:t }), m, el("b", { textContent:v }), p); body.append(r);
+    for (const t of [...types, ...Object.keys(c.ctr).filter(t => !types.includes(t))]) {
+      const v = c.ctr[t] || 0;
+      body.append(stepper(t, v, () => { c.ctr[t] = Math.max(0, v - 1); if (!c.ctr[t]) delete c.ctr[t]; changed(); }, () => { c.ctr[t] = v + 1; changed(); }));
     }
     const name = el("input", { type:"text", placeholder:"Other counter", maxLength:20 });
     const add = el("button", { className:"btn small", textContent:"Add" });
     add.onclick = () => { const t = name.value.trim(); if (t) { c.ctr[t] = (c.ctr[t] || 0) + 1; changed(); draw_(); } };
     body.append(el("div", { className:"row", style:"margin-top:8px" }, name, add));
+    const e = c.eot || [0, 0], sg = v => (v > 0 ? "+" : "") + v, bump = (i, x) => { const d = [0, 0]; d[i] = x; addPt(c, { eot:d }); changed(); };
+    body.append(el("h3", { textContent:"Until end of turn" }),
+      stepper("Power", sg(e[0]), () => bump(0, -1), () => bump(0, 1), "Power until end of turn"),
+      stepper("Toughness", sg(e[1]), () => bump(1, -1), () => bump(1, 1), "Toughness until end of turn"));
   };
   draw_();
-  openModal(`Counters on ${nameOf(c)}`, body, [{ label:"Done", primary:true, fn:() => say(`set counters on ${nameOf(c)}: ${Object.entries(c.ctr).map(([k, v]) => `${v} ${k}`).join(", ") || "none"}.`) }]);
+  const done = () => {
+    say(`set counters on ${nameOf(c)}: ${Object.entries(c.ctr).map(([k, v]) => `${v} ${k}`).join(", ") || "none"}.`);
+    const e = c.eot || [0, 0], d = [e[0] - eot0[0], e[1] - eot0[1]];
+    if (d[0] || d[1]) say(`gave ${nameOf(c)} ${ptText({ eot:d })} (now ${ptOf(c)?.str}).`);
+    if (back) setTimeout(back);
+  };
+  openModal(`Counters on ${nameOf(c)}`, body, [{ label:"Done", primary:true, fn:done }]);
+}
+// Base power/toughness: what the creature is before counters and other changes (a Biomass Mutation, a Turn to Frog)
+function baseDialog(c, back){
+  const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k, num = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
+  const now = c.base || [num(c.fd ? 2 : f?.power), num(c.fd ? 2 : f?.toughness)];
+  const p = el("input", { type:"number", min:-99, max:99, value:now[0], ariaLabel:"Base power" }), t = el("input", { type:"number", min:-99, max:99, value:now[1], ariaLabel:"Base toughness" });
+  const body = el("div", {}, el("div", { className:"ptbase" }, p, el("b", { textContent:"/" }), t),
+    el("p", { className:"hint", textContent:`Printed: ${c.fd ? "2/2 (face down)" : `${f?.power ?? "none"}/${f?.toughness ?? "none"}`}. Counters and until end of turn changes still count on top.` }));
+  const set = v => { if (v) c.base = v; else delete c.base; say(v ? `set ${nameOf(c)}'s base power/toughness to ${v[0]}/${v[1]} (now ${ptOf(c)?.str}).` : `put ${nameOf(c)} back to its printed power/toughness (now ${ptOf(c)?.str || "none"}).`); changed(); if (back) setTimeout(back); };
+  const btns = [{ label:"Cancel", fn:() => { if (back) setTimeout(back); } }, { label:"OK", primary:true, fn:() => set([clamp(Math.round(+p.value || 0), -99, 99), clamp(Math.round(+t.value || 0), -99, 99)]) }];
+  if (c.base) btns.unshift({ label:"Back to printed", fn:() => set(null) });
+  openModal(`Base power/toughness: ${nameOf(c)}`, body, btns);
+  setTimeout(() => p.select());
+}
+/* Counters a card gives your creatures ("each other creature you control gets a +1/+1 counter"): they go on now, and
+   the card remembers them (gave), so they come off again when it leaves the battlefield */
+function lendDialog(c, back){
+  const types = ["+1/+1", "-1/-1", "+1/+0", "+0/+1", "-1/-0", "-0/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
+  const want = {}, body = el("div");
+  const others = el("input", { type:"radio", name:"lendWho", checked:true }), all = el("input", { type:"radio", name:"lendWho" });
+  const list = el("div");
+  const draw_ = () => {
+    list.replaceChildren(...types.map(t => {
+      const m = el("button", { innerHTML:"&minus;", ariaLabel:`${t} minus` }), p = el("button", { textContent:"+", ariaLabel:`${t} plus` });
+      m.onclick = () => { want[t] = Math.max(0, (want[t] || 0) - 1); draw_(); }; p.onclick = () => { want[t] = (want[t] || 0) + 1; draw_(); };
+      return el("div", { className:"ctrl ctrgrid" }, el("span", { textContent:t }), m, el("b", { textContent:want[t] || 0 }), p);
+    }));
+  };
+  draw_();
+  body.append(el("label", { style:"display:flex;gap:6px;align-items:center" }, others, "Each other creature you control"),
+    el("label", { style:"display:flex;gap:6px;align-items:center;margin-bottom:8px" }, all, `All creatures you control (${nameOf(c)} too)`),
+    list, el("p", { className:"hint", textContent:`They come off again when ${nameOf(c)} leaves the battlefield.` }));
+  const go = () => {
+    const ts = Object.entries(want).filter(([, n]) => n > 0); if (!ts.length) { if (back) setTimeout(back); return; }
+    const targets = me.zones.bf.filter(x => isCreature(x) && (all.checked || x.iid !== c.iid));
+    c.gave = c.gave || [];
+    for (const x of targets) for (const [t, n] of ts) { x.ctr[t] = (x.ctr[t] || 0) + n; c.gave.push({ iid:x.iid, t, n }); }
+    say(`gave ${all.checked ? "each creature they control" : "each other creature they control"} ${ts.map(([t, n]) => `${n} ${t} counter${n === 1 ? "" : "s"}`).join(" and ")} from ${nameOf(c)} (${targets.length} creature${targets.length === 1 ? "" : "s"}).`);
+    changed(); if (back) setTimeout(back);
+  };
+  openModal(`Counters on your creatures from ${nameOf(c)}`, body, [{ label:"Cancel", fn:() => { if (back) setTimeout(back); } }, { label:"Give them", primary:true, fn:go }]);
+}
+// Takes back the counters a card gave (leaving: it left the battlefield)
+function removeGiven(c, leaving = false){
+  let n = 0;
+  for (const g of c.gave || []) {
+    const x = me.zones.bf.find(y => y.iid === g.iid); if (!x || !x.ctr?.[g.t]) continue;
+    x.ctr[g.t] = Math.max(0, x.ctr[g.t] - g.n); if (!x.ctr[g.t]) delete x.ctr[g.t]; n++;
+  }
+  delete c.gave;
+  if (n) say(`${leaving ? `${nameOf(c)} left the battlefield: took` : "took"} back the counters ${leaving ? "it" : nameOf(c)} gave.`);
+  if (!leaving) changed();
+}
+/* Attacking, simply: on your turn, Attack shows a box for each player above your battlefield (which stays in view);
+   drag your creatures onto the player each one attacks, then Attack. They tap (unless they have vigilance) and an arrow
+   shows each attack. The player attacked gets a box at the top. */
+let atkPlan = null;  // (while choosing: creature -> the seat it attacks)
+function startAttack(){
+  if (!presentSeats().some(s => s !== mySeat && !isOut(s))) { toast("There's no one to attack."); return; }
+  atkPlan = new Map(me.zones.bf.filter(c => c.atk).map(c => [c.iid, c.atk]));
+  renderAtkBar();
+}
+function planAttack(iid, seat){
+  const c = me.zones.bf.find(x => x.iid === iid); if (!c) return;
+  if (!isCreature(c)) { toast(`${nameOf(c)} isn't a creature.`); return; }
+  if (c.tapped && !c.atk) { toast(`${nameOf(c)} is tapped, so it can't attack.`); return; }
+  if (seat) atkPlan.set(iid, seat); else atkPlan.delete(iid);
+  renderAtkBar();
+}
+function renderAtkBar(){
+  const bar = $("#atkBar");
+  if (!atkPlan || !table.started || table.turnSeat !== mySeat || me.out) { atkPlan = null; bar.classList.add("hidden"); document.querySelectorAll("#bf .card.planatk").forEach(x => x.classList.remove("planatk")); return; }
+  const foes = presentSeats().filter(s => s !== mySeat && !isOut(s));
+  for (const [iid, s] of atkPlan) if (!foes.includes(s) || !me.zones.bf.some(c => c.iid === iid)) atkPlan.delete(iid);
+  const sig = JSON.stringify([foes.map(nm), [...atkPlan], me.zones.bf.filter(c => atkPlan.has(c.iid)).map(nameOf)]);
+  if (bar.dataset.sig !== sig || bar.classList.contains("hidden")) { bar.dataset.sig = sig; bar.replaceChildren(...foes.map(s => {
+    const mine = me.zones.bf.filter(c => atkPlan.get(c.iid) === s);
+    const box = el("div", { className:"atkdrop", title:`Drag creatures here to attack ${nm(s)}` }, el("b", { textContent:`Attack ${nm(s)}` }),
+      mine.length ? el("div", { className:"chips" }, ...mine.map(c => { const x = el("button", { type:"button", textContent:`${nameOf(c)} ×`, ariaLabel:`${nameOf(c)} stays home` }); x.onclick = () => planAttack(c.iid, 0); return x; }))
+        : el("span", { className:"hint", textContent:"Drag creatures here" }));
+    box.dataset.drop = `atk:${s}`; box.style.borderColor = SEAT_HEX[s - 1]; return box;
+  }), el("div", { className:"atkside" },
+    (() => { const b = el("button", { type:"button", className:"btn small primary", textContent:`Attack (${atkPlan.size})` }); b.onclick = confirmAttack; return b; })(),
+    (() => { const b = el("button", { type:"button", className:"btn small", textContent:"Cancel" }); b.onclick = () => { atkPlan = null; renderAtkBar(); }; return b; })())); }
+  bar.classList.remove("hidden");
+  const r = $("#bf").getBoundingClientRect();
+  bar.style.left = `${Math.max(8, r.left)}px`; bar.style.width = `${Math.min(r.width, innerWidth - 16)}px`;
+  bar.style.top = `${Math.max(56, r.top - bar.offsetHeight - 6)}px`;
+  document.querySelectorAll("#bf .card").forEach(x => x.classList.toggle("planatk", atkPlan.has(x.dataset.iid)));
+}
+function confirmAttack(){
+  const by = {};
+  for (const c of me.zones.bf) {
+    const s = atkPlan.get(c.iid) || 0; if (!s && !c.atk) continue;
+    me.arrows = (me.arrows || []).filter(a => a.from !== c.iid);
+    if (!s) { c.atk = 0; continue; }
+    if (!c.atk && !kwOf(c).some(k => /^vigilance$/i.test(k))) c.tapped = true;
+    c.atk = s; c.blk = ""; me.arrows.push({ from:c.iid, player:s }); (by[s] = by[s] || []).push(nameOf(c));
+  }
+  for (const [s, list] of Object.entries(by)) say(`attacked ${nm(+s)} with ${list.join(", ")}.`);
+  if (!Object.keys(by).length) say("isn't attacking.");
+  atkPlan = null; renderAtkBar(); changed();
+}
+$("#attackBtn").onclick = () => { if (atkPlan) { atkPlan = null; renderAtkBar(); } else startAttack(); };
+addEventListener("resize", () => { if (atkPlan) renderAtkBar(); });
+/* Being attacked: a box at the top (your battlefield stays in view) with the attackers. Take the damage, or Respond:
+   cast spells and so on as usual, pick blockers, then take the damage from the ones not blocked. */
+let defend = { sig:"", done:"", mode:"ask", blocks:{} };
+function renderDefend(){
+  const box = $("#defendBox");
+  const atk = me && !me.watch && !me.out ? Object.entries(players).filter(([s]) => +s !== mySeat).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk === mySeat).map(c => ({ c, s:+s }))) : [];
+  const sig = atk.map(a => a.c.iid).sort().join(",");
+  if (!sig || sig === defend.done) { box.classList.add("hidden"); if (!sig) defend = { sig:"", done:"", mode:"ask", blocks:{} }; return; }
+  if (sig !== defend.sig) defend = { ...defend, sig, mode:"ask", blocks:{} };
+  else if (!box.classList.contains("hidden") && box.dataset.mode === defend.mode && box.dataset.sig === sig) return;
+  box.dataset.mode = defend.mode; box.dataset.sig = sig;
+  const pw = c => parseInt(c.pt, 10) || 0;
+  const unblocked = () => atk.filter(a => !defend.blocks[a.c.iid]);
+  const myBlockers = me.zones.bf.filter(c => isCreature(c) && !c.tapped);
+  const rows = atk.map(a => {
+    const r = el("div", { className:"atkrow" }, a.c.img ? el("img", { src:a.c.img, alt:"" }) : el("span", { style:"width:40px" }),
+      el("span", { className:"atkname" }, el("b", { textContent:a.c.name || "Face-down creature" }), el("small", { textContent:`${a.c.pt || "?"} · from ${nm(a.s)}` })));
+    if (defend.mode === "respond") {
+      const sel = el("select", { ariaLabel:`Block ${a.c.name || "the attacker"} with` }, el("option", { value:"", textContent:"Not blocked" }),
+        ...myBlockers.map(b => el("option", { value:b.iid, textContent:`Block with ${nameOf(b)}${showPt(b) ? ` (${showPt(b).str})` : ""}` })));
+      sel.value = defend.blocks[a.c.iid] || ""; sel.onchange = () => { defend.blocks[a.c.iid] = sel.value; total.textContent = dmgText(); };
+      r.append(sel);
+    }
+    return r;
+  });
+  const dmgText = () => { const n = unblocked().reduce((t, a) => t + pw(a.c), 0); return `${n} damage to you ${defend.mode === "respond" ? "from the ones not blocked" : "if you take it"}.`; };
+  const total = el("p", { className:"hint", textContent:dmgText() });
+  const take = () => {
+    const hits = unblocked(), n = hits.reduce((t, a) => t + pw(a.c), 0);
+    for (const a of atk) { const b = defend.blocks[a.c.iid] && me.zones.bf.find(x => x.iid === defend.blocks[a.c.iid]); if (b) setBlock(b, a.c, a.s); }
+    if (n) { noteLife(); me.life -= n; }
+    if (FORMATS[table.fmt].cmdr) for (const a of hits) if (a.c.cmdr && pw(a.c)) { const key = `${a.s}:${a.c.iid}`; me.cmd[key] = (me.cmd[key] || 0) + pw(a.c); }
+    say(n ? `took ${n} combat damage from ${hits.map(a => a.c.name || "a face-down creature").join(", ")}.` : "took no combat damage.");
+    defend.done = sig; box.classList.add("hidden"); changed();
+  };
+  const btn = (label, fn, primary) => { const b = el("button", { type:"button", className:"btn" + (primary ? " primary" : ""), textContent:label }); b.onclick = fn; return b; };
+  const acts = el("div", { className:"acts" }, ...(defend.mode === "ask"
+    ? [btn("Respond", () => { defend.mode = "respond"; renderDefend(); }), btn("Take the damage", take, true)]
+    : [btn("Back", () => { defend.mode = "ask"; defend.blocks = {}; renderDefend(); }), btn("Done: take the damage", take, true)]));
+  box.replaceChildren(el("h2", { textContent:"You're being attacked" }),
+    ...(defend.mode === "respond" ? [el("p", { className:"hint", textContent:"Cast spells and use abilities as usual. Pick a blocker for any attacker, then Done." })] : []),
+    ...rows, total, acts);
+  box.classList.remove("hidden");
 }
 // Tokens: the ones your cards make (from Scryfall's related cards), or search for any token
 async function tokenDialog(rel){
@@ -3614,7 +3812,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
-    el("p", { innerHTML:"<b>Combat</b> is by hand: right-click a creature, <b>Attack</b> a player, and an arrow shows it to everyone; to block, right-click your creature, <b>Block...</b>, and click the attacker (or right-click the attacker). Tap, deal damage and change life yourself. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
+    el("p", { innerHTML:"<b>Combat</b>: on your turn, <b>Attack</b> at the top lists your creatures; pick the player each one attacks. The player attacked gets a box at the top: <b>Take the damage</b>, or <b>Respond</b> to cast spells and pick blockers first. Creatures fighting each other is up to you. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. The log and chat open from <b>Log &amp; chat</b> at the top; while it's closed, new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
