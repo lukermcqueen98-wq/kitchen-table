@@ -594,9 +594,16 @@ test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and tou
   await expect(card.locator(".pt")).toHaveText("3/4");
   // Luke: two +1/+0 counters and a -0/-1 counter: 3/4 becomes 5/3
   await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
+  const rows = () => a.locator(".modal .ctrgrid span").allTextContents();
+  const order = await rows();
   for (let i = 0; i < 2; i++) await a.locator(".modal").getByRole("button", { name:"+1/+0 plus" }).click();
   await a.locator(".modal").getByRole("button", { name:"-0/-1 plus" }).click();
+  expect(await rows()).toEqual(order);  // (setting a counter doesn't move it in the list)
   await button(a, "Done");
+  // Done goes back to the card's panel, with the counters on it under Counters
+  await expect(a.locator(".modal-card h2")).toHaveText("Gamma Card");
+  await expect(a.locator(".modal .cp-ctr span")).toHaveText(["+1/+0", "-0/-1"]);
+  await button(a, "Close");
   await expect(card.locator(".pt")).toHaveText("5/3");
   await expect(card.locator(".ctrs span")).toHaveText(["+2/+0", "-0/-1"]);
   await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .pt`)).toHaveText("5/3");
@@ -607,8 +614,21 @@ test("digital table: +1/+0, +0/+1, -1/-0 and -0/-1 counters change power and tou
   await expect(card.locator(".pt")).toHaveText("5/4");
   // ...and a -1/-0: 4/4
   await card.click({ button:"right" }); await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
-  await a.locator(".modal").getByRole("button", { name:"-1/-0 plus" }).click(); await button(a, "Done");
+  await a.locator(".modal").getByRole("button", { name:"-1/-0 plus" }).click(); await button(a, "Done"); await button(a, "Close");
   await expect(card.locator(".pt")).toHaveText("4/4");
+  // Until end of turn, from the Counters section: +2/+2 makes it 6/6, and it can be taken away again
+  await card.click({ button:"right" }); await a.locator(".modal .cp-eot").getByRole("button", { name:"+2/+2", exact:true }).click();
+  await expect(card.locator(".pt")).toHaveText("6/6");
+  await expect(opp(b, "Luke").locator(`.card[data-iid="${gamma}"] .pt`)).toHaveText("6/6");
+  await a.locator(".modal").getByRole("button", { name:"Take away the until end of turn change" }).click();
+  await expect(card.locator(".pt")).toHaveText("4/4");
+  // ...or with the steppers in the counters list
+  await a.locator(".modal").getByRole("button", { name:"Other counters...", exact:true }).click();
+  await a.locator(".modal").getByRole("button", { name:"Power until end of turn plus" }).click();
+  await button(a, "Done");
+  await expect(card.locator(".pt")).toHaveText("5/4");
+  await expect(a.locator(".modal .cp-eot")).toContainText("+1/+0 this turn");
+  await button(a, "Close");
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });

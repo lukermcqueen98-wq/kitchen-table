@@ -406,6 +406,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .cp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .cp-grid .btn{min-height:40px}
 .cp-ctr{display:flex;align-items:center;gap:8px;border:1px solid var(--felt-edge);border-radius:8px;padding:4px 8px;background:rgba(255,255,255,.03)}
+.cp-eot{margin-top:8px}
+.ctrgrid{display:grid !important;justify-content:start !important;grid-template-columns:120px 34px 44px 34px;align-items:center;gap:6px;margin-bottom:4px;max-width:none}
+.ctrgrid b{text-align:center}
 .cp-ctr b{min-width:22px;text-align:center;font-size:16px}
 .cp-ctr button{width:34px;height:34px;border-radius:8px;border:1px solid var(--felt-edge);background:none;font-size:17px}
 .cp-kw{position:relative;border-radius:999px;border:1px solid var(--brass);background:rgba(255,207,90,.12);padding:4px 10px;font-size:13px;cursor:help}
@@ -2702,8 +2705,14 @@ function cardPanel(iid){
       ctrs.append(el("div", { className:"cp-ctr" }, el("span", { textContent:t }), m, el("b", { textContent:v }), p));
     }
     for (const t of ["+1/+1", "-1/-1", "Loyalty", "Shield"].filter(t => !c.ctr?.[t])) ctrs.append(btn(`+ ${t}`, here(() => { c.ctr[t] = 1; say(`put a ${t} counter on ${nameOf(c)}.`); changed(); })));
-    ctrs.append(btn("Other counters...", act(() => counterDialog(c))));
-    right.append(sec("Counters", ctrs));
+    ctrs.append(btn("Other counters...", act(() => counterDialog(c, () => cardPanel(iid)))));
+    // Until end of turn (Giant Growth and the like): gone when the turn ends
+    const eot = el("div", { className:"cp-row cp-eot" }, el("span", { className:"hint", textContent:"Until end of turn:" }));
+    if (c.eot) { const sg = v => (v < 0 ? "" : "+") + v, x = el("button", { type:"button", className:"btn small primary", textContent:`${sg(c.eot[0])}/${sg(c.eot[1])} this turn ×`, ariaLabel:"Take away the until end of turn change" });
+      x.onclick = here(() => { delete c.eot; say(`took away ${nameOf(c)}'s until end of turn change (now ${ptOf(c)?.str || "no power/toughness"}).`); changed(); }); eot.append(x); }
+    for (const [p, t] of [[1, 1], [2, 2], [3, 3], [1, 0], [-1, -1], [-2, -2]])
+      eot.append(btn(`${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t}`, here(() => { addPt(c, { eot:[p, t] }); say(`gave ${nameOf(c)} ${ptText({ eot:[p, t] })} (now ${ptOf(c)?.str}).`); changed(); })));
+    right.append(sec("Counters", ctrs, eot));
     // Key terms: printed ones and ones given on the table; point at (or click) one to see what it means
     const kws = el("div", { className:"cp-row" }), printed = c.fd ? [] : (k?.keywords || []).filter(n => !(c.kw || []).some(x => x.n === n));
     const chip = (n, given) => {
@@ -3192,26 +3201,39 @@ function ptDialog(title, c, done){
   if (c && (c.eot || c.mod)) btns.unshift({ label:"Back to printed", fn:() => { const was = { eot:(c.eot || [0, 0]).map(x => -x), mod:(c.mod || [0, 0]).map(x => -x) }; done(was); } });
   openModal(`Power/toughness: ${title}`, body, btns);
 }
-function counterDialog(c){
+// Counters on a card, in the same order every time (setting one doesn't move it), plus power/toughness until end of
+// turn; back: what Done goes back to (the card's panel)
+function counterDialog(c, back){
   const types = ["+1/+1", "-1/-1", "+1/+0", "+0/+1", "-1/-0", "-0/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
-  const body = el("div");
+  const body = el("div"), eot0 = [...(c.eot || [0, 0])];
+  const stepper = (label, v, minus, plus, aria = label) => {
+    const m = el("button", { innerHTML:"&minus;", ariaLabel:`${aria} minus` }), p = el("button", { textContent:"+", ariaLabel:`${aria} plus` });
+    m.onclick = () => { minus(); draw_(); }; p.onclick = () => { plus(); draw_(); };
+    return el("div", { className:"ctrl ctrgrid" }, el("span", { textContent:label }), m, el("b", { textContent:v }), p);
+  };
   const draw_ = () => {
     body.innerHTML = "";
-    const all = [...new Set([...Object.keys(c.ctr), ...types])];
-    for (const t of all) {
-      const v = c.ctr[t] || 0, r = el("div", { className:"ctrl", style:"max-width:280px;margin-bottom:4px" });
-      const m = el("button", { innerHTML:"&minus;", ariaLabel:`${t} minus` }), p = el("button", { textContent:"+", ariaLabel:`${t} plus` });
-      m.onclick = () => { c.ctr[t] = Math.max(0, v - 1); if (!c.ctr[t]) delete c.ctr[t]; changed(); draw_(); };
-      p.onclick = () => { c.ctr[t] = v + 1; changed(); draw_(); };
-      r.append(el("span", { textContent:t }), m, el("b", { textContent:v }), p); body.append(r);
+    for (const t of [...types, ...Object.keys(c.ctr).filter(t => !types.includes(t))]) {
+      const v = c.ctr[t] || 0;
+      body.append(stepper(t, v, () => { c.ctr[t] = Math.max(0, v - 1); if (!c.ctr[t]) delete c.ctr[t]; changed(); }, () => { c.ctr[t] = v + 1; changed(); }));
     }
     const name = el("input", { type:"text", placeholder:"Other counter", maxLength:20 });
     const add = el("button", { className:"btn small", textContent:"Add" });
     add.onclick = () => { const t = name.value.trim(); if (t) { c.ctr[t] = (c.ctr[t] || 0) + 1; changed(); draw_(); } };
     body.append(el("div", { className:"row", style:"margin-top:8px" }, name, add));
+    const e = c.eot || [0, 0], sg = v => (v > 0 ? "+" : "") + v, bump = (i, x) => { const d = [0, 0]; d[i] = x; addPt(c, { eot:d }); changed(); };
+    body.append(el("h3", { textContent:"Until end of turn" }),
+      stepper("Power", sg(e[0]), () => bump(0, -1), () => bump(0, 1), "Power until end of turn"),
+      stepper("Toughness", sg(e[1]), () => bump(1, -1), () => bump(1, 1), "Toughness until end of turn"));
   };
   draw_();
-  openModal(`Counters on ${nameOf(c)}`, body, [{ label:"Done", primary:true, fn:() => say(`set counters on ${nameOf(c)}: ${Object.entries(c.ctr).map(([k, v]) => `${v} ${k}`).join(", ") || "none"}.`) }]);
+  const done = () => {
+    say(`set counters on ${nameOf(c)}: ${Object.entries(c.ctr).map(([k, v]) => `${v} ${k}`).join(", ") || "none"}.`);
+    const e = c.eot || [0, 0], d = [e[0] - eot0[0], e[1] - eot0[1]];
+    if (d[0] || d[1]) say(`gave ${nameOf(c)} ${ptText({ eot:d })} (now ${ptOf(c)?.str}).`);
+    if (back) setTimeout(back);
+  };
+  openModal(`Counters on ${nameOf(c)}`, body, [{ label:"Done", primary:true, fn:done }]);
 }
 // Tokens: the ones your cards make (from Scryfall's related cards), or search for any token
 async function tokenDialog(rel){
