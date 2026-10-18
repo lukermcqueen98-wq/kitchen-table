@@ -130,6 +130,10 @@ header.bar .btn.primary{padding:6px 16px}
 #grid.n3,#grid.n4{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
 #grid.n3 .tile,#grid.n4 .tile{grid-column:span 2}
 #grid.n3 .tile.third{grid-column:2 / span 2}
+/* 5 or 6 players: three across, two rows (with 5, the bottom two sit in the middle) */
+#grid.n5,#grid.n6{grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
+#grid.n5 .tile,#grid.n6 .tile{grid-column:span 2}
+#grid.n5 .tile.fourth{grid-column:2 / span 2}
 /* One player's camera full screen: the others are hidden (still connected) and the side panel stays for card lookups */
 #grid.focus{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr)}
 #grid.focus .tile{display:none}
@@ -354,7 +358,7 @@ button.mpip{cursor:pointer}
 
 @media (max-width:900px){
   #table{grid-template-columns:1fr;grid-template-rows:auto auto auto;height:auto;min-height:100%}
-  #grid.n2,#grid.n3,#grid.n4{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto}
+  #grid.n2,#grid.n3,#grid.n4,#grid.n5,#grid.n6{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto}
   #grid .tile{grid-column:auto !important;aspect-ratio:16/9}
   aside{border-left:0;border-top:1px solid var(--felt-edge)}
   #panelBtn{display:none}
@@ -580,13 +584,13 @@ button.mpip{cursor:pointer}
 <script>
 (() => {
 const PREFIX = "kt-mtg-v1";
-const MAX = 4;
-const SEAT_HEX = ["#e8dcb5", "#4a86c5", "#c65a3f", "#5a9a52"];
-const SEAT_INK = ["#1b1608", "#ffffff", "#ffffff", "#ffffff"];
+const MAX = 6;
+const SEAT_HEX = ["#e8dcb5", "#4a86c5", "#c65a3f", "#5a9a52", "#9a6fcf", "#3fa7a3"];
+const SEAT_INK = ["#1b1608", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
 const CLOCKS = ["off", "up", "60", "120", "180", "300"];
 // Game modes: the host picks one and every player's starting life and seat limit follow it
 const MODES = {
-  cmdr:{ label:"Commander (up to 4 players, 40 life)", short:"Commander", life:40, max:4 },
+  cmdr:{ label:"Commander (up to 6 players, 40 life)", short:"Commander", life:40, max:6 },
   duel:{ label:"1v1 Commander (2 players, 30 life)", short:"1v1 Commander", life:30, max:2 },
   brawl:{ label:"Brawl (up to 4 players, 30 life)", short:"Brawl", life:30, max:4 },
   sixty:{ label:"60-card formats (up to 4 players, 20 life)", short:"60-card", life:20, max:4 }
@@ -874,7 +878,7 @@ $("#joinBtn").onclick = async () => {
       try { peer = await openPeer(`${PREFIX}-${roomCode}-${s}`); mySeat = s; }
       catch (e) { if (e.type !== "unavailable-id") throw e; }
     }
-    if (!peer) throw new Error("This table already has 4 players.");
+    if (!peer) throw new Error(`This table already has ${MAX} players.`);
   } catch (e) {
     err.textContent = e.message || "Could not reach the connection server. Check your internet and try again.";
     $("#joinBtn").disabled = false; $("#joinBtn").textContent = "Sit down";
@@ -1610,7 +1614,7 @@ function render(bumpMine){
     v.classList.toggle("rot", !!p.rot);
     el.classList.toggle("active", table.turnSeat === s);
     const pos = tileSeats(seats).indexOf(s);
-    el.style.order = pos; el.classList.toggle("third", pos === 2);
+    el.style.order = pos; el.classList.toggle("third", pos === 2); el.classList.toggle("fourth", pos === 3);
     el.querySelector(".pname").textContent = p.name || "Connecting...";
     renderBadges(el, s);
     renderCmdrs(el, s);

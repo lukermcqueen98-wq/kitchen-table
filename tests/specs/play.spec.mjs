@@ -94,8 +94,8 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   expect(await ktp(b, () => ktPlay.me.zones.lib.length + ktPlay.me.zones.hand.length)).toBe(35);
 
   // Playing a card (double-click) puts it on the battlefield for everyone; clicking it taps it
-  await a.locator("#hand .card").first().dblclick();
-  await expect(a.locator("#bf .card")).toHaveCount(1);
+  // (retried: Rick keeping his hand can redraw Luke's hand between the two clicks of the double-click)
+  await expect(async () => { await a.locator("#hand .card").first().dblclick(); await expect(a.locator("#bf .card")).toHaveCount(1, { timeout:2000 }); }).toPass({ timeout:10000 });
   await expect(opp(b, "Luke").locator(".obf .card")).toHaveCount(1);
   await a.locator("#bf .card").first().click();
   await expect(opp(b, "Luke").locator(".obf .card.tapped")).toHaveCount(1);

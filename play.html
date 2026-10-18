@@ -148,6 +148,9 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .matpick.on,.matpick:hover,.matpick:focus-visible{border-color:var(--brass)}
 .matsw{display:block;height:60px;border-radius:6px}
 .obf .card{--w:64px}
+/* 4 or 5 opponents: their boards in two rows of three */
+#opps.many{grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);flex-basis:50%}
+#opps.many .obf .card{--w:48px}
 .opiles{display:flex;flex-direction:row;align-items:flex-start;gap:6px;padding:6px;border-left:1px solid var(--felt-edge);overflow:auto}
 .opile{border:1px solid var(--felt-edge);border-radius:8px;background:rgba(0,0,0,.25);padding:4px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
 .opile:hover,.opile:focus-visible{border-color:var(--brass)}
@@ -349,7 +352,8 @@ details.term a{font-size:13px;color:var(--brass)}
   aside#panel{display:none;position:fixed;right:0;top:0;bottom:0;width:min(88vw,360px);z-index:60;background:var(--felt-deep);box-shadow:-6px 0 24px rgba(0,0,0,.6)}
   body.panel-open aside#panel{display:flex}
   #panelClose{display:block;align-self:flex-end;margin:6px 8px 0}
-  #opps{grid-auto-columns:minmax(78vw,1fr);overflow-x:auto;flex:0 0 32%}
+  #opps,#opps.many{grid-auto-flow:column;grid-template-columns:none;grid-auto-rows:auto;grid-auto-columns:minmax(78vw,1fr);overflow-x:auto;flex:0 0 32%}
+  #opps.many .obf .card{--w:36px}
   .obf .card{--w:36px}
   #side{width:128px;padding:6px;gap:6px}
   .lifebox output{font-size:30px}
@@ -476,7 +480,6 @@ details.term a{font-size:13px;color:var(--brass)}
       <div id="side">
         <div id="myBadges"></div>
         <div class="lifebox"><button id="lifeMinus" aria-label="Lose 1 life">&minus;</button><output id="lifeOut" aria-label="Your life"></output><button id="lifePlus" aria-label="Gain 1 life">+</button></div>
-        <div id="ctrlBox"></div>
         <div class="piles">
           <div class="pile" id="libPile" data-drop="lib" title="Double-click to draw. Right-click for more."></div>
           <div class="pile" id="gyPile" data-drop="gy" title="Graveyard"></div>
@@ -484,6 +487,7 @@ details.term a{font-size:13px;color:var(--brass)}
         </div>
         <div class="row" style="justify-content:space-between"><span id="landChip" class="chip"></span><span class="hint" id="handCount"></span></div>
         <div id="czone" data-drop="cz"></div>
+        <div id="ctrlBox"></div>  <!-- (below the piles, so a long commander damage list at a big table doesn't push them out of view) -->
         <div id="dungeonBox"></div>
       </div>
     </div>
@@ -510,10 +514,10 @@ details.term a{font-size:13px;color:var(--brass)}
 /* =====================================================================
    Basics
    ===================================================================== */
-const PREFIX = "kt-dig-v1", MAX = 4;
-const SEAT_HEX = ["#e8dcb5", "#4a86c5", "#c65a3f", "#5a9a52"];
+const PREFIX = "kt-dig-v1", MAX = 6;
+const SEAT_HEX = ["#e8dcb5", "#4a86c5", "#c65a3f", "#5a9a52", "#9a6fcf", "#3fa7a3"];
 const FORMATS = {
-  cmdr:{ label:"Commander (up to 4 players, 40 life)", short:"Commander", life:40, max:4, cmdr:true },
+  cmdr:{ label:"Commander (up to 6 players, 40 life)", short:"Commander", life:40, max:6, cmdr:true },
   duel:{ label:"1v1 Commander (2 players, 30 life)", short:"1v1 Commander", life:30, max:2, cmdr:true },
   sixty:{ label:"60-card formats (up to 4 players, 20 life)", short:"60-card", life:20, max:4, cmdr:false }
 };
@@ -847,7 +851,7 @@ const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:st
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1",
                    stackLands:store.get("kt-dig-stack", "1") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
-const watchers = {};  // seat -> name, for people watching (seats 5 to 8)  // (commanders taken out of the decklist go back if you pick another)
+const watchers = {};  // seat -> name, for people watching (seats 7 to 10)  // (commanders taken out of the decklist go back if you pick another)
 
 function blankMe(name){
   return { name, life:FORMATS[table.fmt].life, poison:0, energy:0, exp:0, cmd:{}, mana:{ W:0, U:0, B:0, R:0, G:0, C:0 },
@@ -988,13 +992,14 @@ async function sitDown(resume){
   roomCode = (resume ? params.get("room") : $("#roomIn").value.trim().toLowerCase().replace(/[^a-z0-9]/g, "")) || randomCode();
   btn.textContent = "Finding a seat...";
   try {
-    // (people watching use seats 5 to 8, so they never take a player's seat)
-    const order = watch ? [5, 6, 7, 8] : [resume?.seat, 1, 2, 3, 4].filter((s, i, a) => s && a.indexOf(s) === i);
+    // (people watching use the 4 seats after the players', so they never take a player's seat)
+    const seatsUp = n => Array.from({ length:n }, (_, i) => i + 1);
+    const order = watch ? seatsUp(4).map(i => MAX + i) : [resume?.seat, ...seatsUp(MAX)].filter((s, i, a) => s && a.indexOf(s) === i);
     for (const s of order) {
       try { peer = await openPeer(`${PREFIX}-${roomCode}-${s}`); mySeat = s; break; }
       catch (e) { if (e.type !== "unavailable-id") throw e; }
     }
-    if (!peer) throw new Error(watch ? "This table already has 4 people watching." : "This table already has 4 players.");
+    if (!peer) throw new Error(watch ? "This table already has 4 people watching." : `This table already has ${MAX} players.`);
   } catch (e) {
     err.textContent = e.message || "Could not reach the connection server. Check your internet and try again.";
     btn.disabled = false; btn.textContent = "Sit down"; return;
@@ -1017,7 +1022,7 @@ async function sitDown(resume){
   else if (!resume && !watch) checkMyDeck();
   setInterval(tick, 1000);
 }
-function seatOf(id){ const m = /-(\d)$/.exec(id); return m ? +m[1] : 0; }
+function seatOf(id){ const m = /-(\d+)$/.exec(id); return m ? +m[1] : 0; }
 function peerId(s){ return `${PREFIX}-${roomCode}-${s}`; }
 function wirePeer(){
   peer.on("connection", conn => {
@@ -1983,7 +1988,7 @@ function place(e, c){ e.style.left = (c.x * 100) + "%"; e.style.top = (c.y * 100
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = [...seats.filter(s => s > mySeat), ...seats.filter(s => s < mySeat)];
-  box.innerHTML = ""; box.classList.toggle("hidden", !order.length);
+  box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
@@ -3172,7 +3177,7 @@ $("#helpBtn").onclick = () => {
 function chatLine(who, text, seat){
   const li = el("li", { className:"chat" }), t = new Date();
   li.append(el("span", { className:"t", textContent:t.toTimeString().slice(0, 5) }));
-  const w = el("b", { textContent:who + ":" }); if (seat) w.style.color = SEAT_HEX[(seat - 1) % 4]; li.append(w);
+  const w = el("b", { textContent:who + ":" }); if (seat) w.style.color = SEAT_HEX[(seat - 1) % SEAT_HEX.length]; li.append(w);
   li.dataset.raw = String(text); li.dataset.pre = li.childNodes.length; li.append(...linkCards(String(text)));
   const ul = $("#log"); ul.append(li); while (ul.children.length > 300) ul.firstChild.remove();
   $("#logWrap").scrollTop = $("#logWrap").scrollHeight;
