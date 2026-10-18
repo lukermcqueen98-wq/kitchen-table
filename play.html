@@ -328,10 +328,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .fout{margin:6px 0 0;font-size:14px;color:#d9e2dc}
 .fsum{font-size:16px;font-weight:600;margin:12px 0 4px;color:var(--parchment)}
 .termlist{max-height:60vh;overflow:auto}
-details.term{border-bottom:1px solid var(--felt-edge);padding:6px 2px}
-details.term summary{cursor:pointer;font-weight:600}
-details.term p{margin:6px 0 4px;font-size:14px}
-details.term a{font-size:13px;color:var(--brass)}
+.term{border-bottom:1px solid var(--felt-edge);padding:6px 2px}
+.term p{margin:3px 0 4px;font-size:14px}
 .modal-card.wide .gcard{width:164px}
 .modal-card.wide .gcard .card{--w:164px}
 #pop{position:fixed;z-index:85;pointer-events:none;filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))}
@@ -1918,7 +1916,7 @@ function kwDialog(c, send){
     body.append(grid);
     const other = el("input", { type:"text", placeholder:"Another key term (any keyword or short rule)", maxLength:40, ariaLabel:"Another key term", style:"flex:1;min-width:220px" });
     other.setAttribute("list", "kwList");  // (list is read-only as a property)
-    const dl = el("datalist", { id:"kwList" }, ...[...TERMS.values()].map(t => el("option", { value:t.name })));
+    const dl = el("datalist", { id:"kwList" }, ...[...TERMS.values()].filter(t => t.cat === "ka" || t.cat === "aw").map(t => el("option", { value:t.name })));
     const add = el("button", { className:"btn small", textContent:"Add" }); add.onclick = () => { const n = other.value.trim().slice(0, 40); if (n) set(n.replace(/^./, x => x.toUpperCase()), true); };
     other.onkeydown = e => { if (e.key === "Enter") add.click(); };
     body.append(el("div", { className:"row", style:"margin-top:10px;gap:6px" }, other, add, dl));
@@ -3073,47 +3071,24 @@ function viewCard(c){
   document.body.append(layer); close.focus();
 }
 function closeInspect(){ $("#inspect")?.remove(); }
-/* Magic terms (terms.js, shared with the webcam table, plus every keyword on Scryfall's lists): the Terms window
-   lists and searches them, and viewing a card shows the ones on it */
+/* Magic terms (terms.js, shared with the webcam table): the Terms window lists and searches them, and viewing a card
+   shows the ones on it */
 const TERMS = new Map();
-for (const [name, def] of window.KT_KEYWORDS || []) TERMS.set(norm(name), { name, def });
-let termCatalogs = null;
-function loadTermCatalogs(){
-  return termCatalogs ||= (async () => {
-    let lists = null;
-    try { const c = JSON.parse(store.get("kt-kw", "null")); if (c && Date.now() - c.t < 7 * 864e5) lists = c.l; } catch {}
-    if (!lists) {
-      const got = await Promise.all(["keyword-abilities", "keyword-actions", "ability-words"].map(c => scry("/catalog/" + c)));
-      if (got.some(g => !Array.isArray(g?.data))) return;
-      lists = got.map(g => g.data.filter(x => typeof x === "string").slice(0, 600));
-      store.set("kt-kw", JSON.stringify({ t:Date.now(), l:lists }));
-    }
-    const what = ["A Magic keyword ability.", "A Magic keyword action.", "An ability word: it has no rules meaning of its own, it labels abilities that work alike."];
-    lists.forEach((list, j) => list.forEach(name => { const k = norm(name); if (k && !TERMS.has(k)) TERMS.set(k, { name, def:`${what[j]} See the full rules on MTG Wiki.` }); }));
-  })().catch(() => {});
-}
+for (const t of window.KT_allTerms ? window.KT_allTerms() : []) TERMS.set(norm(t.name), t);
+// (a card's terms: its keywords, ability words, tokens and the like; not everyday words like "cast", "draw" or "creature")
+const TERM_SKIP = new Set(["game", "turn", "slang"]);
+const TERM_PLAIN = new Set(["activate", "attach", "cast", "counter", "create", "destroy", "discard", "play", "reveal", "search", "shuffle", "tap",
+  "untap", "exchange", "double", "exile", "sacrifice", "token", "commander", "poison", "energy", "loyalty"]);
 function termsIn(text){
   const t = ` ${norm(text)} `, out = [];
-  for (const [k, v] of TERMS) if (k.length > 2 && new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(s|es|ed|d|ing)?\\b`).test(t)) out.push(v);
+  for (const [k, v] of TERMS) if (k.length > 2 && !TERM_SKIP.has(v.cat) && !TERM_PLAIN.has(k) && new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(s|es|ed|d|ing)?\\b`).test(t)) out.push(v);
   return out.filter((v, i) => out.findIndex(o => o.name === v.name) === i).slice(0, 12);
 }
-function termEl(k, open = false){
-  const d = el("details", { className:"term", open }, el("summary", { textContent:k.name }), el("p", { textContent:k.def }),
-    el("a", { href:"https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")), target:"_blank", rel:"noopener", textContent:"Full rules on MTG Wiki" }));
-  return d;
-}
+function termEl(k){ return el("div", { className:"term" }, el("b", { textContent:k.name }), el("p", { textContent:k.def })); }
 $("#termsBtn").onclick = () => {
-  const search = el("input", { type:"search", placeholder:"Search terms, like trample or ward", ariaLabel:"Search Magic terms", autocomplete:"off", style:"width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25)" });
-  const count = el("p", { className:"hint" }), list = el("div", { className:"termlist" });
-  const draw_ = () => {
-    const q = norm(search.value), all = [...new Map([...TERMS.values()].map(k => [k.name, k])).values()].sort((a, b) => a.name.localeCompare(b.name));
-    const shown = q ? all.filter(k => norm(k.name).includes(q) || norm(k.def).includes(q)) : all;
-    count.textContent = q ? `${shown.length} of ${all.length} terms` : `${all.length} terms. Search, or open one to read what it means.`;
-    list.innerHTML = ""; list.append(...shown.slice(0, 400).map(k => termEl(k, shown.length === 1)));
-  };
-  search.oninput = draw_; draw_();
-  loadTermCatalogs().then(() => { if (!$("#modal").classList.contains("hidden") && list.isConnected) draw_(); });
-  openModal("Magic terms", el("div", {}, search, count, list));
+  const ui = window.KT_termsUI();
+  openModal("Magic terms", ui.el);
+  setTimeout(() => ui.search.focus(), 50);
 };
 function showReveal(who, list, what){
   openModal(`${who} revealed${what ? " " + what : ""}`, cardGrid(list, null));

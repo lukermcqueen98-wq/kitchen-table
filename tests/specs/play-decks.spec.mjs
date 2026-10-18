@@ -65,10 +65,26 @@ test("digital table: picking an official deck (Commander and 60-card), with desc
   // Magic terms: the Terms window lists them (the same list as the webcam table's), searchable
   await a.click("#termsBtn");
   await expect(a.locator(".modal-card h2")).toHaveText("Magic terms");
-  await expect(a.locator(".modal details.term").first()).toBeVisible();
-  await a.fill(".modal input[type=search]", "trample");
-  await expect(a.locator(".modal details.term[open] summary")).toHaveText("Trample");
-  await expect(a.locator(".modal details.term[open] p")).toContainText("lethal");
+  // (every term with its meaning showing, A to Z, filters by group, and no links to other sites)
+  await expect(a.locator(".modal .ktt-item").first()).toBeVisible();
+  expect(await a.locator(".modal .ktt-item").count()).toBeGreaterThan(400);
+  await expect(a.locator(".modal a")).toHaveCount(0);
+  // Search: the name first, then meanings that mention it; a different ending still finds it
+  await a.fill(".modal .ktt-search", "trample");
+  await expect(a.locator(".modal .ktt-item .ktt-name b").first()).toHaveText("Trample");
+  await expect(a.locator(".modal .ktt-def").first()).toContainText("lethal");
+  await a.fill(".modal .ktt-search", "can't be blocked");
+  await expect(a.locator(".modal .ktt-item", { hasText:"Menace" })).toHaveCount(1);
+  await a.fill(".modal .ktt-search", "scried");
+  await expect(a.locator(".modal .ktt-item .ktt-name b").first()).toHaveText("Scry");
+  // Groups: ability words only, then jump to a letter
+  await a.fill(".modal .ktt-search", "");
+  await a.locator(".modal .ktt-cats button", { hasText:"Ability words" }).click();
+  await expect(a.locator(".modal .ktt-item .ktt-tag").first()).toHaveText("Ability words");
+  await expect(a.locator(".modal .ktt-item", { hasText:"Landfall" })).toHaveCount(1);
+  await expect(a.locator(".modal .ktt-item", { hasText:"Trample" })).toHaveCount(0);
+  await a.locator(".modal .ktt-az button", { hasText:"T" }).click();
+  await expect(a.locator('.modal .ktt-letter[data-letter="T"]')).toBeInViewport();
   expect(a.errors).toEqual([]);
   await browser.close();
 });

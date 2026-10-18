@@ -348,11 +348,6 @@ button.mpip{cursor:pointer}
 /* keyword highlights in captions */
 .fuzzy{font-style:italic}
 /* Terms library */
-#termSearch{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.25);margin-bottom:6px}
-#termList details{border-bottom:1px solid var(--felt-edge);padding:7px 0}
-#termList summary{cursor:pointer;font-weight:600}
-#termList p{margin:6px 0 4px;font-size:14px}
-#termList a{color:var(--brass);font-size:13px}
 #captions .unknown{color:var(--muted);font-weight:700;padding:0 2px;cursor:help}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--felt-deep);border:1px solid var(--brass);border-radius:10px;padding:10px 14px;z-index:60;display:flex;gap:12px;align-items:center;max-width:92vw}
 
@@ -543,9 +538,7 @@ button.mpip{cursor:pointer}
     <div class="pane hidden" role="tabpanel" data-pane="terms" aria-labelledby="tab-terms">
       <section>
         <h2>Magic terms</h2>
-        <input id="termSearch" type="search" placeholder="Search terms, like trample or ward" aria-label="Search Magic terms" autocomplete="off">
-        <p class="hint" id="termCount"></p>
-        <div id="termList"></div>
+        <div id="termsBox"></div>
       </section>
     </div>
     <div class="pane hidden" role="tabpanel" data-pane="table" aria-labelledby="tab-table">
@@ -3793,8 +3786,7 @@ function kwForms(base, flag){
 const KW = new Map(); let kwMax = 1;
 KEYWORDS.forEach(([name, def, flag]) => kwForms(norm(name), flag).forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } }));
 ["equipped", "equipping"].forEach(f => KW.set(f, KW.get("equip")));
-renderTerms();
-/* Every other keyword Magic has, from Scryfall's lists, so new sets are covered too. They link to MTG Wiki for the rules.
+/* Every other keyword Magic has, from Scryfall's lists, so new sets are covered too (with their meaning from terms.js).
    Single common English words are left out ("fear", "gift", "plot"), or everyday talk would light up. */
 const KW_COMMON = new Set(("fear shadow gift craft backup station sneak companion bargain discover plot suspect manifest adapt bolster support " +
   "meld clash learn seek explore fateseal attach cast counter create destroy discard double exchange fight play reveal search shuffle " +
@@ -3810,39 +3802,24 @@ async function loadKeywordCatalogs(){
     lists = got.map(g => g.data.filter(x => typeof x === "string").slice(0, 600));
     store.set("kt-kw", JSON.stringify({ t:Date.now(), l:lists }));
   }
-  const what = ["A Magic keyword ability.", "A Magic keyword action.", "An ability word: it has no rules meaning of its own, it labels abilities that work alike."];
+  const what = ["A Magic keyword ability. The card's reminder text explains it.", "A Magic keyword action. The card's text explains it.",
+    "An ability word: it has no rules meaning of its own, it labels abilities that work alike."];
+  const glossary = new Map((window.KT_allTerms?.() || []).map(t => [norm(t.name), t.def]));
   lists.forEach((list, j) => list.forEach(name => {
     const k = norm(name); if (!k || KW.has(k) || (!k.includes(" ") && KW_COMMON.has(k))) return;
-    const def = what[j] + " Open MTG Wiki below for the full rules.";
+    const def = glossary.get(k) || what[j];
     kwForms(k, j === 1 ? "v" : "").forEach(f => { if (!KW.has(f)) { KW.set(f, { name, def }); kwMax = Math.max(kwMax, f.split(" ").length); } });
   }));
   lispKW = null;  // rebuilt with these next time it's needed
-  renderTerms();
 }
-/* Terms tab: every Magic term with what it means, searchable */
-function renderTerms(){
-  const list = $("#termList"); if (!list) return;
-  const q = norm($("#termSearch").value || ""), byName = new Map();
-  for (const k of KW.values()) if (k && !byName.has(k.name)) byName.set(k.name, k);
-  const all = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
-  const shown = q ? all.filter(k => norm(k.name).includes(q) || norm(k.def).includes(q)) : all;
-  $("#termCount").textContent = q ? `${shown.length} of ${all.length} terms` : `${all.length} terms. Search, or open one to read what it means.`;
-  list.innerHTML = "";
-  for (const k of shown.slice(0, 400)) {
-    const d = document.createElement("details"), sm = document.createElement("summary"); sm.textContent = k.name; d.appendChild(sm);
-    const p = document.createElement("p"); p.textContent = k.def; d.appendChild(p);
-    const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
-    d.appendChild(a); list.appendChild(d);
-    if (shown.length === 1) d.open = true;
-  }
-}
-$("#termSearch").addEventListener("input", renderTerms);
+/* Terms tab: every Magic term with what it means (terms.js), searchable and grouped */
+const termsUI = window.KT_termsUI ? window.KT_termsUI() : null;
+if (termsUI) $("#termsBox").replaceChildren(termsUI.el);
 function showKeyword(k){
   const view = $("#cardView"); view.innerHTML = ""; focusCardView();
   const h = document.createElement("h2"); h.textContent = k.name; view.appendChild(h);
   const d = document.createElement("p"); d.className = "oracle"; withSymbols(d, k.def); view.appendChild(d);
-  const a = document.createElement("a"); a.href = "https://mtg.wiki/page/" + encodeURIComponent(k.name.replace(/ /g, "_")); a.target = "_blank"; a.rel = "noopener"; a.textContent = "Full rules on MTG Wiki";
-  view.appendChild(a); setStatus("");
+  setStatus("");
 }
 
 /* Sound-alike matching against the table's decklists, for names speech recognition gets wrong (like "smog" for Smaug) */
