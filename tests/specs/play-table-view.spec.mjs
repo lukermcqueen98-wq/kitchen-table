@@ -112,7 +112,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   const hisCard = opp(b, "Luke").locator(".dungeon");
   await expect(hisCard.locator(".droom.here")).toHaveText("Secret Entrance");
   await expect(hisCard).toContainText("🗝 Initiative");
-  expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom || d.left >= l.right || d.right <= l.left; })).toBe(true);  // (not covering it)
+  expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom || d.bottom <= l.top || d.left >= l.right || d.right <= l.left; })).toBe(true);  // (not covering it)
 
   // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
   await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
