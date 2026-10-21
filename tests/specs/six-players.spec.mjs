@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, sitDown, settle, tile, BASE } from "../support/players.mjs";
+import { launchBrowser, newPlayer, sitDown, settle, tile, tool, BASE } from "../support/players.mjs";
 
 const NAMES = ["Luke", "Rick", "Sam", "Ana", "Bo", "Cy"];
 
@@ -42,6 +42,20 @@ test("Commander on the digital table: six players, each sees five opponents in t
   await expect(ps[0].locator("#ctrlBox .ctrlhead")).toHaveText("Commander damage you've taken");
   await expect(ps[0].locator("#libPile")).toBeInViewport();  // (the commander damage list for five opponents sits below the piles)
   await expect(ps[5].locator(".opp").first()).toContainText("Luke");
+  // Mirror (the default): every board in an equal box, three across and two down, yours last; every battlefield is
+  // the same size, so each looks the way its player sees it
+  await expect(ps[0].locator("#play")).toHaveClass(/\bmirror\b/); await expect(ps[0].locator("#play")).toHaveClass(/\bm6\b/);
+  const boards = await ps[0].evaluate(() => [...document.querySelectorAll(".opp .obf, #bf")].map(b => { const r = b.getBoundingClientRect(); return [r.width, r.height]; }));
+  expect(boards).toHaveLength(6);
+  for (const [w, h] of boards) { expect(Math.abs(w - boards[0][0])).toBeLessThan(3); expect(Math.abs(h - boards[0][1])).toBeLessThan(3); }
+  const cellsAt = await ps[0].evaluate(() => [...document.querySelectorAll(".opp"), document.querySelector("#me")].map(o => { const r = o.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y)]; }));
+  expect(new Set(cellsAt.map(c => c[1])).size).toBe(2);  // (two rows)
+  expect(cellsAt[5][1]).toBeGreaterThan(cellsAt[0][1]); expect(cellsAt[5][0]).toBeGreaterThan(cellsAt[4][0]);  // (yours: bottom right)
+  await expect(ps[0].locator("#handWrap")).toBeVisible();
+  // Game › Layout switches to the round table (and remembers it)
+  await tool(ps[0], "#layoutBtn");
+  await expect(ps[0].locator("#play")).toHaveClass(/\bround\b/);
+  await expect(ps[0].locator("#layoutBtn")).toHaveText("Layout: Round table");
   // Round table, in turn order clockwise from your left: next player lower left, then upper left, across the top,
   // upper right, lower right; the middle shows the turn order
   const pos = await ps[0].evaluate(() => [...document.querySelectorAll(".opp")].map(o => ({ pos:o.dataset.pos, name:o.querySelector(".ohead b, .ohead strong")?.textContent || o.textContent.slice(0, 20), ...o.getBoundingClientRect().toJSON() })));
