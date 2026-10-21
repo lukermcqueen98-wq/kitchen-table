@@ -54,7 +54,7 @@ test("Commander on the digital table: six players, each sees five opponents in t
   const turned = await ps[0].evaluate(() => [...document.querySelectorAll(".opp .oframe")].map(f => getComputedStyle(f).transform !== "none"));
   expect(turned).toEqual([true, true, true, true, true]);
   // ...and every battlefield is the same size, so each looks the way its owner sees it
-  const sizes = await ps[0].evaluate(() => [...document.querySelectorAll(".oframe, #myFrame")].map(f => `${f.offsetWidth}x${f.offsetHeight}`));
+  const sizes = await ps[0].evaluate(() => [...document.querySelectorAll(".oframe .obf, #myFrame #bf")].map(f => `${f.offsetWidth}x${f.offsetHeight}`));
   expect(sizes).toHaveLength(6); expect(new Set(sizes).size).toBe(1);
   await expect(ps[0].locator("#handWrap")).toBeVisible();
   // Game › Layout switches to the round table (and remembers it)
