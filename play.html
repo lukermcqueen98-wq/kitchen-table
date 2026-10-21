@@ -567,6 +567,13 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   body.handstrip main#play.lt{padding-bottom:10px}
 }
 #turnToken{display:none}
+/* (the shuffle riffle: the deck splits into two halves that fan apart and snap back together) */
+.riffling{position:relative}
+.riffling .card.back{animation:riffleA .9s ease-in-out var(--rd,0s) both}
+.riffling::after{content:"";position:absolute;z-index:3;pointer-events:none;width:var(--pw,54px);aspect-ratio:63/88;left:50%;top:3px;margin-left:calc(var(--pw,54px) / -2);
+  border-radius:4.75%/3.5%;background:#1a1208 url(card-back.jpg) center/100% 100% no-repeat;box-shadow:0 2px 6px rgba(0,0,0,.6);animation:riffleB .9s ease-in-out var(--rd,0s) both}
+@keyframes riffleA{0%,100%{transform:none}20%{transform:translateX(-38%) rotate(-10deg)}45%{transform:translateX(-30%) rotate(-6deg)}70%{transform:translateX(-8%) rotate(-2deg)}}
+@keyframes riffleB{0%{opacity:0;transform:none}10%{opacity:1}20%{transform:translateX(38%) rotate(10deg)}45%{transform:translateX(30%) rotate(6deg)}70%{transform:translateX(8%) rotate(2deg)}90%{opacity:1}100%{opacity:0;transform:none}}
 .oframe{display:contents}
 .hubring{position:relative;height:min(100%,210px);aspect-ratio:1;border-radius:50%;border:2px dashed var(--felt-edge);display:flex;align-items:center;justify-content:center}
 .hubmid{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;max-width:62%}
@@ -816,7 +823,11 @@ const params = new URLSearchParams(location.search);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 function rnd(n){ const a = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n; do crypto.getRandomValues(a); while (a[0] >= lim); return (a[0] % n) + 1; }
-function shuffle(a){ for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1) - 1; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function shuffle(a){
+  for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1) - 1; [a[i], a[j]] = [a[j], a[i]]; }
+  if (typeof me !== "undefined" && me && a === me.zones?.lib) me.shuffles = (me.shuffles || 0) + 1;  // (everyone's screen riffles your library: see riffle)
+  return a;
+}
 function norm(t){ return String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9/]+/g, " ").trim(); }
 function el(tag, props = {}, ...kids){ const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) if (k != null) e.append(k); return e; }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1300,7 +1311,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, shuffles:me.shuffles || 0 };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1522,7 +1533,7 @@ function cleanPub(st){
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
            dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, shuffles:num(st.shuffles, 0, 1e6),
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
@@ -2399,10 +2410,22 @@ function sizeBoards(){
   if (isFinite(F)) play.style.setProperty("--fw", `${Math.max(120, Math.floor(F))}px`);
 }
 addEventListener("resize", () => requestAnimationFrame(sizeBoards));
+/* A shuffle: the player's library pile riffles (its two halves fan apart and snap back) on every screen, when their
+   shuffle count goes up */
+const seenShuffles = {}, riffleUntil = {};
+function riffle(seat, n, pileEl){
+  if (!pileEl) return;
+  if (seenShuffles[seat] !== undefined && n > seenShuffles[seat]) riffleUntil[seat] = Date.now() + 900;
+  seenShuffles[seat] = n;
+  const left = (riffleUntil[seat] || 0) - Date.now();
+  if (left > 0) { pileEl.classList.add("riffling"); pileEl.style.setProperty("--rd", `${(900 - left) / -1000}s`); setTimeout(() => pileEl.classList.remove("riffling"), left); }
+}
 function render(){
   if (!me) return;
   if (!me.watch) players[mySeat] = { ...pub(), seat:mySeat };
-  renderOpps(); if (!me.watch) renderMine(); renderCombat(); renderTurn(); relinkLog(); applyMats(); sizeBoards();
+  renderOpps(); if (!me.watch) { renderMine(); riffle(mySeat, me.shuffles || 0, $("#libPile")); }
+  for (const o of document.querySelectorAll(".opp")) riffle(+o.dataset.seat, players[+o.dataset.seat]?.shuffles || 0, o.querySelector(".p-lib"));
+  renderCombat(); renderTurn(); relinkLog(); applyMats(); sizeBoards();
   const w = Object.values(watchers); $("#watchers").textContent = w.length ? `Watching: ${w.join(", ")}` : "";
   requestAnimationFrame(drawArrows);
 }
