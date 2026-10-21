@@ -75,17 +75,10 @@ test("Commander on the digital table: six players, each sees five opponents in t
   for (const id of ["#libPile", "#lifeOut", "#logBtn", "#nextTurn"]) await expect(ps[0].locator(id)).toBeVisible();
   await expect(ps[0].locator("details.tmenu > summary")).toHaveText(["Turn", "Table", "Game"]);  // (dice, tokens and the rest are in these)
 
-  // Clicking a board's empty space zooms in on it (over the other boards, your own stays); Esc goes back
+  // No zooming in on a board any more (every board is the same everywhere; cards pop out when you point at them)
   const rick = ps[0].locator(".opp", { hasText:"Rick" });
+  await expect(rick.getByRole("button", { name:"Zoom in" })).toHaveCount(0);
   await rick.locator(".obf").click({ position:{ x:5, y:5 } });
-  await expect(ps[0].locator(".opp.zoomed")).toHaveCount(1);
-  await expect(ps[0].locator(".opp.zoomed")).toContainText("Rick");
-  const z = await ps[0].locator(".opp.zoomed").boundingBox(), mb = await ps[0].locator("#me").boundingBox();
-  expect(z.width).toBeGreaterThan(mb.width - 4); expect(z.y + z.height).toBeLessThan(mb.y + 2);
-  await ps[0].keyboard.press("Escape");
-  await expect(ps[0].locator(".opp.zoomed")).toHaveCount(0);
-  await rick.getByRole("button", { name:"Zoom in" }).click();
-  await ps[0].locator(".opp.zoomed").getByRole("button", { name:"Back to the table" }).click();
   await expect(ps[0].locator(".opp.zoomed")).toHaveCount(0);
 
   // Starting the game shuffles the turn order once; the table is laid out around you in that order
