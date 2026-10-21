@@ -565,6 +565,13 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   body.handstrip main#play.lt{padding-bottom:10px}
 }
 #turnToken{display:none}
+.pgrip{display:none}
+@media (min-width:901px){
+  main#play.lt .moved{position:absolute !important;z-index:4}
+  main#play.lt #myFrame .pgrip{display:flex;position:absolute;left:-7px;top:-7px;z-index:6;width:20px;height:20px;align-items:center;justify-content:center;border-radius:50%;
+    background:var(--brass);color:#241602;font-size:13px;line-height:1;cursor:grab;touch-action:none;opacity:.55;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+  main#play.lt #myFrame .pgrip:hover,main#play.lt #myFrame .moved .pgrip:active{opacity:1}
+}
 .oframe{display:contents}
 /* Zoomed in on one player's battlefield (click its empty space): it covers the other boards, bigger cards */
 .opp.zoomed{position:fixed;inset:12px;z-index:45;background:var(--felt-deep);box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -1307,7 +1314,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, pileAt:me.pileAt || {} };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1514,6 +1521,15 @@ function tick(){
   }
   renderTurn();
 }
+/* Piles a player has moved on their own mat at the long table (command zone, library, graveyard, exile): x in board
+   widths from the left edge of their board, y a share of their mat's depth; the rest sit in their columns */
+const PILES = ["cz", "lib", "gy", "ex"];
+const cleanPileAt = v => v && typeof v === "object" ? Object.fromEntries(PILES.filter(k => v[k] && isFinite(+v[k].x) && isFinite(+v[k].y)).map(k => [k, { x:clamp(+v[k].x, -2, 3), y:clamp(+v[k].y, 0, 1) }])) : {};
+function pilePos(e, at){
+  e.classList.toggle("moved", !!at);
+  e.style.left = at ? `calc((100% - var(--colw) - var(--fw,400px)) / 2 + var(--fw,400px) * ${at.x})` : "";
+  e.style.top = at ? `${at.y * 100}%` : "";
+}
 function cleanPub(st){
   if (!st || typeof st !== "object") return null;
   const cl = list => (Array.isArray(list) ? list : []).slice(0, 400).map(c => c && typeof c === "object" ? {
@@ -1529,7 +1545,7 @@ function cleanPub(st){
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
            dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, pileAt:cleanPileAt(st.pileAt),
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
@@ -2406,10 +2422,55 @@ function sizeBoards(){
   if (isFinite(F)) play.style.setProperty("--fw", `${Math.max(120, Math.floor(F))}px`);
 }
 addEventListener("resize", () => requestAnimationFrame(sizeBoards));
+// Your piles at the long table: where you've put them on your mat, or in their columns; each with a grip to drag it
+function placeMyPiles(){
+  const frame = $("#myFrame"); if (!frame) return;
+  const els = { cz:$("#czone"), lib:$("#libPile"), gy:$("#gyPile"), ex:$("#exPile") }, at = cleanPileAt(me.pileAt);
+  for (const k of PILES) {
+    const e = els[k];
+    if (at[k] && e.parentElement !== frame) frame.append(e);
+    pilePos(e, at[k]);
+    let g = e.querySelector(":scope > .pgrip");
+    if (!g) { g = el("span", { className:"pgrip", textContent:"⠿", title:"Drag to move this on your mat (double-click: back to its place)" }); e.append(g); }
+    g.dataset.pile = k;
+  }
+  // (the ones not moved, in their columns: command zone over library, graveyard over exile)
+  $("#myRight").append(...["cz", "lib"].filter(k => !at[k]).map(k => els[k]));
+  $("#myPiles").append(...["gy", "ex"].filter(k => !at[k]).map(k => els[k]));
+}
+let pileDrag = null;
+document.addEventListener("pointerdown", e => {
+  const g = e.target.closest?.("#myFrame .pgrip"); if (!g || e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const pile = g.parentElement, frame = $("#myFrame"), fr = frame.getBoundingClientRect(), r = pile.getBoundingClientRect();
+  pileDrag = { k:g.dataset.pile, pile, frame, fr, r, sx:e.clientX, sy:e.clientY, dx:e.clientX - r.left, dy:e.clientY - r.top, w:r.width, h:r.height, moved:false };
+}, true);
+document.addEventListener("pointermove", e => {
+  if (!pileDrag) return;
+  const { pile, frame, fr, r, dx, dy, w, h } = pileDrag;
+  if (!pileDrag.moved) {  // (it only lifts out of its column once it really moves: a click or double-click leaves it be)
+    if (Math.hypot(e.clientX - pileDrag.sx, e.clientY - pileDrag.sy) < 4) return;
+    pileDrag.moved = true; if (pile.parentElement !== frame) frame.append(pile);
+    pile.classList.add("moved"); pile.style.left = `${r.left - fr.left}px`; pile.style.top = `${r.top - fr.top}px`;
+  }
+  pile.style.left = `${clamp(e.clientX - dx - fr.left, 0, fr.width - w)}px`; pile.style.top = `${clamp(e.clientY - dy - fr.top, 0, fr.height - h)}px`;
+});
+document.addEventListener("pointerup", () => {
+  if (!pileDrag) return;
+  const { k, pile, fr, moved } = pileDrag, b = $("#bf"); pileDrag = null;
+  if (!moved) return;
+  const x = (parseFloat(pile.style.left) - b.offsetLeft) / (b.offsetWidth || 1), y = parseFloat(pile.style.top) / (fr.height || 1);
+  me.pileAt = { ...cleanPileAt(me.pileAt), [k]:{ x, y } }; changed();
+});
+document.addEventListener("click", e => { if (e.target.closest?.(".pgrip")) { e.stopPropagation(); e.preventDefault(); } }, true);  // (moving a pile doesn't open it)
+document.addEventListener("dblclick", e => {
+  const g = e.target.closest?.("#myFrame .pgrip"); if (!g) return;
+  const at = cleanPileAt(me.pileAt); delete at[g.dataset.pile]; me.pileAt = at; changed();
+});
 function render(){
   if (!me) return;
   if (!me.watch) players[mySeat] = { ...pub(), seat:mySeat };
-  renderOpps(); if (!me.watch) renderMine(); renderCombat(); renderTurn(); relinkLog(); applyMats(); sizeBoards();
+  renderOpps(); if (!me.watch) { renderMine(); placeMyPiles(); } renderCombat(); renderTurn(); relinkLog(); applyMats(); sizeBoards();
   const w = Object.values(watchers); $("#watchers").textContent = w.length ? `Watching: ${w.join(", ")}` : "";
   requestAnimationFrame(drawArrows);
 }
@@ -2473,7 +2534,8 @@ function renderOpps(){
     side.prepend(el("span", { id:"turnToken", role:"status" }));
   }
   if (!lt && side.parentElement !== $("#me")) {
-    $("#me").prepend($("#bf")); $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#myPiles").prepend($("#libPile")); $("#ctrlBox").before($("#czone"));
+    $("#me").prepend($("#bf")); $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#myPiles").append($("#libPile"), $("#gyPile"), $("#exPile")); $("#ctrlBox").before($("#czone"));
+    for (const e of [$("#libPile"), $("#gyPile"), $("#exPile"), $("#czone")]) pilePos(e, null);
     $("#myFrame")?.remove(); $("#turnToken")?.remove();
   }
   if (lt) {
@@ -2524,10 +2586,13 @@ function renderOpps(){
     // (oframe: their battlefield and piles, turned to face their seat at the long table)
     // (at the long table their library sits with their other piles)
     const libOf = () => { const b = el("div", { className:"opile" + (p.lib ? "" : " empty"), title:`${p.name}'s library: ${p.lib} cards` }); b.append(p.lib ? el("div", { className:"card back", style:"position:relative" }) : el("div", { className:"ph" }), el("span", { className:"opilelbl", textContent:`Library ${p.lib}` })); return b; };
-    const libPile = p.libTop ? libTopOf(p) : lt ? libOf() : null;
-    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, lt ? null : p.cz.length ? cz : null, bfEl,
-      el("div", { className:"opiles" }, lt ? null : libPile, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)),
-      lt ? el("div", { className:"oright" }, p.cz.length ? cz : null, libPile) : null)));
+    const libPile = p.libTop ? libTopOf(p) : lt ? libOf() : null, gyPile = pileOf(p.gy, "gy"), exPile = pileOf(p.ex, "ex");
+    const frameEl = el("div", { className:"oframe" }, lt ? null : p.cz.length ? cz : null, bfEl,
+      el("div", { className:"opiles" }, lt ? null : libPile, gyPile, exPile, dungeonCard(s, p.dungeon, false)),
+      lt ? el("div", { className:"oright" }, p.cz.length ? cz : null, libPile) : null);
+    // (piles they've moved on their mat, in the same place on their side of the table)
+    if (lt) for (const [k, e] of [["cz", p.cz.length ? cz : null], ["lib", libPile], ["gy", gyPile], ["ex", exPile]]) if (e && p.pileAt?.[k]) { frameEl.append(e); pilePos(e, p.pileAt[k]); }
+    o.append(el("div", { className:"obody" }, frameEl));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
     if (lt) { o.dataset.slot = SLOTS[order.indexOf(s)]; o.style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[s - 1]} 32%, #1a1030)`); }
