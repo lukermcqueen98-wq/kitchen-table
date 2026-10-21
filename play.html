@@ -485,10 +485,10 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
    strip across the middle holds whose turn it is and your life and counters; your hand sits below the table. */
 @media (min-width:901px){
   main#play.lt{--ba:3;display:grid;gap:12px;padding:22px 26px 10px;isolation:isolate;
-    grid-template-columns:minmax(0,.38fr) minmax(0,1fr) minmax(0,.38fr);grid-template-rows:minmax(0,1fr) auto minmax(0,1fr) auto auto;
-    grid-template-areas:"L T R" "L mid R" "L me R" "bar bar bar" "hand hand hand"}
-  main#play.lt4{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
-  main#play.lt5{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me BR R" "bar bar bar bar" "hand hand hand hand"}
+    grid-template-columns:minmax(0,.38fr) minmax(0,1fr) minmax(0,.38fr);grid-template-rows:minmax(0,1fr) auto minmax(0,1fr) auto;
+    grid-template-areas:"L T R" "L mid R" "L me R" "bar bar bar";padding-bottom:16px}
+  main#play.lt4{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me me R" "bar bar bar bar"}
+  main#play.lt5{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me BR R" "bar bar bar bar"}
   /* (the wood: under the mats and the middle strip, not the hand) */
   main#play.lt::before{content:"";grid-row:1 / 4;grid-column:1 / -1;margin:-14px;border-radius:26px;z-index:-1;
     background:repeating-linear-gradient(2deg,#6b4526 0px,#7a5130 10px,#5e3c20 17px,#714a2b 27px);box-shadow:inset 0 0 0 3px #3a2414,0 24px 60px rgba(0,0,0,.6)}
@@ -506,7 +506,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   /* (name plates: a pill on the owner's edge of the mat; the end seats' at the bottom) */
   main#play.lt .ohead{position:absolute;left:50%;top:6px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap;
     max-width:calc(100% - 12px);overflow:hidden;padding:3px 12px;border:1px solid var(--felt-edge);border-radius:999px;background:rgba(15,9,30,.92);font-size:12px}
-  main#play.lt [data-slot="L"] .ohead,main#play.lt [data-slot="R"] .ohead,main#play.lt [data-slot="BR"] .ohead,main#play.lt #myPlate{top:auto;bottom:6px}
+  main#play.lt [data-slot="L"] .ohead,main#play.lt [data-slot="R"] .ohead,main#play.lt [data-slot="BR"] .ohead{top:auto;bottom:6px}
   main#play.lt .ohead .oname{order:1} main#play.lt .ohead .olife{order:2;margin-left:0;font-size:18px} main#play.lt .ohead .ocount,main#play.lt .ohead .badge{order:3}
   main#play.lt .ohead .ozoom{order:4;margin-left:2px;font-size:11px;padding:0 7px}
   main#play.lt .ohead .ocount ~ .ocount{display:none}  /* (the plate: name, life and hand, like across a real table) */
@@ -520,7 +520,6 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt [data-slot^="T"] .oframe{transform:translate(-50%,-50%) rotate(180deg)}
   main#play.lt [data-slot="L"] .oframe{transform:translate(-50%,-50%) rotate(90deg)}
   main#play.lt [data-slot="R"] .oframe{transform:translate(-50%,-50%) rotate(-90deg)}
-  main#play.lt #myFrame{top:calc(50% - 15px)}
   main#play.lt .opp.zoomed .oframe{width:calc(100cqw - 16px) !important;height:calc(100cqh - 60px);transform:translate(-50%,-50%)}  /* (zoomed in: upright to read, and big) */
   main#play.lt .opp.zoomed .oframe .obf{width:min(calc(100cqw - 16px - var(--colw)),calc((100cqh - 60px) * var(--ba)));height:auto;aspect-ratio:var(--ba);top:0;bottom:auto;left:0}
   main#play.lt .oframe,main#play.lt #myFrame{--colw:calc(var(--fw,400px) * .124 + 44px)}  /* (the two pile columns at the right-hand end) */
@@ -551,11 +550,21 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #ctrlBox .ctrl{gap:6px}
   main#play.lt #dungeonBox{order:5}
   main#play.lt #combatBar{grid-area:bar;margin:0}
-  main#play.lt #handWrap{grid-area:hand;margin-top:8px;border:1px solid var(--felt-edge);border-radius:12px;background:rgba(15,9,30,.88)}
-  main#play.lt #hand{min-height:112px}
-  main#play.lt #hand .card{--w:96px;margin-right:-18px}
+  /* (your hand, like Arena: docked at the bottom with just the tops showing; point at it and it rises) */
+  main#play.lt #handWrap{position:fixed;left:50%;bottom:0;z-index:50;max-width:calc(100vw - 40px);padding:0 16px;border:0;background:none;
+    transform:translate(-50%,calc(100% - 62px));transition:transform .18s ease-out;pointer-events:auto}
+  main#play.lt #handWrap:hover,main#play.lt #handWrap:focus-within,main#play.lt #handWrap:has(.drop){transform:translate(-50%,-6px)}
+  main#play.lt #handWrap>.hint{display:none}
+  main#play.lt #hand{min-height:0;overflow:visible;padding:14px 0 0;justify-content:center;filter:drop-shadow(0 -6px 18px rgba(0,0,0,.55))}
+  main#play.lt #hand .card{--w:124px;margin-right:-34px}
+  main#play.lt #hand .card:hover{transform:translateY(-18px) scale(1.06);z-index:5}
+  /* (the tests click cards in your hand: there it stays a strip under the table, unless a test asks for &dock) */
+  body.handstrip main#play.lt #handWrap{position:static;grid-column:1 / -1;transform:none;border:1px solid var(--felt-edge);border-radius:12px;background:rgba(15,9,30,.88)}
+  /* (the tests click cards in your hand: there it stays a strip under the table, unless a test asks for &dock) */
+  body.handstrip main#play.lt #handWrap{position:static;grid-column:1 / -1;transform:none;border:1px solid var(--felt-edge);border-radius:12px;background:rgba(15,9,30,.88)}
+  body.handstrip main#play.lt{padding-bottom:10px}
 }
-#turnToken,#myPlate{display:none}
+#turnToken{display:none}
 .oframe{display:contents}
 /* Zoomed in on one player's battlefield (click its empty space): it covers the other boards, bigger cards */
 .opp.zoomed{position:fixed;inset:12px;z-index:45;background:var(--felt-deep);box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -2391,7 +2400,7 @@ function sizeBoards(){
   const A = parseFloat(getComputedStyle(play).getPropertyValue("--ba")) || 2.4; let F = Infinity;
   for (const b of document.querySelectorAll("#play.lt .opp:not(.zoomed) .obody, #play.lt #me")) {
     const r = b.getBoundingClientRect(), side = /^[LR]$/.test(b.closest(".opp")?.dataset.slot || "");
-    const along = side ? r.height : r.width, depth = (side ? r.width : r.height) - (b.id === "me" ? 30 : 0);
+    const along = side ? r.height : r.width, depth = side ? r.width : r.height;
     if (along > 0 && depth > 0) F = Math.min(F, (along - 16 - 44) / 1.124, (depth - 16) * A);  // (the pile columns: --colw)
   }
   if (isFinite(F)) play.style.setProperty("--fw", `${Math.max(120, Math.floor(F))}px`);
@@ -2461,17 +2470,14 @@ function renderOpps(){
   if (lt && side.parentElement === $("#me")) {
     $("#play").append(side);
     const frame = el("div", { id:"myFrame" }); $("#me").prepend(frame); frame.append($("#bf"), $("#myPiles"), el("div", { id:"myRight" }, $("#czone"), $("#libPile")));
-    $("#me").append(el("div", { id:"myPlate", className:"ohead" })); side.prepend(el("span", { id:"turnToken", role:"status" }));
+    side.prepend(el("span", { id:"turnToken", role:"status" }));
   }
   if (!lt && side.parentElement !== $("#me")) {
     $("#me").prepend($("#bf")); $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#myPiles").prepend($("#libPile")); $("#ctrlBox").before($("#czone"));
-    $("#myFrame")?.remove(); $("#myPlate")?.remove(); $("#turnToken")?.remove();
+    $("#myFrame")?.remove(); $("#turnToken")?.remove();
   }
   if (lt) {
-    // (your name plate, and whose turn it is in the middle of the table)
-    const pip = el("span", { className:"pip" }); pip.style.background = SEAT_HEX[mySeat - 1];
-    $("#myPlate").replaceChildren(pip, el("span", { className:"oname", textContent:`You (${me.name})` }), el("span", { className:"olife", textContent:me.life }),
-      el("span", { className:"ocount", textContent:`Hand ${me.zones.hand.length} · Library ${me.zones.lib.length}` }));
+    // (whose turn it is, in the middle of the table)
     $("#me").style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[mySeat - 1]} 32%, #1a1030)`);
     $("#turnToken").textContent = !table.started ? "Waiting to start" : table.turnSeat === mySeat ? "Your turn" : `${nm(table.turnSeat)} is up`;
   }
@@ -4189,6 +4195,8 @@ function linkCards(text){
 window.addEventListener("beforeunload", () => save());
 
 // For tests: a way to reach the game state
+if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
+if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
 if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, cards, alerts, cues };
 })();
 </script>
