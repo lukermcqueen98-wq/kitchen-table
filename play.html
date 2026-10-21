@@ -2203,10 +2203,13 @@ function ptCounters(c){
   for (const [k, [a, b]] of Object.entries(PT_CTRS)) { const v = c.ctr?.[k] || 0; p += a * v; t += b * v; }
   return [p, t];
 }
+/* A * in printed power/toughness (Dungrove Elder, Tarmogoyf) counts as 0: put counters on the creature for what its
+   text makes it ("1+*" is 1 plus its counters) */
+const starPt = v => { const m = v == null ? null : /^(\d*)\+?\*$/.exec(String(v)); return m ? String(+m[1] || 0) : v; };
 function ptOf(c){
   const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
-  // (base: a base power/toughness set on the table, in place of the printed one)
-  const bp = c.base ? String(c.base[0]) : c.fd ? "2" : f?.power ?? k?.power, bt = c.base ? String(c.base[1]) : c.fd ? "2" : f?.toughness ?? k?.toughness;
+  // (base: a base power/toughness set on the table, in place of the printed one; a * counts as 0)
+  const bp = c.base ? String(c.base[0]) : c.fd ? "2" : starPt(f?.power ?? k?.power), bt = c.base ? String(c.base[1]) : c.fd ? "2" : starPt(f?.toughness ?? k?.toughness);
   const [np, nt] = ptCounters(c);
   const dp = np + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = nt + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
   if (bp == null && !dp && !dt && !c.mod && !c.eot) return null;

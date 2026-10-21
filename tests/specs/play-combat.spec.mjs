@@ -88,6 +88,25 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await box.getByRole("button", { name:"Take the damage", exact:true }).click();
   await expect(b.locator("#lifeOut")).toHaveText("17");
   await expect(a.locator("#log")).toContainText("Rick took 3 combat damage from Gamma Card.");
+  // A */* creature is 0/0 plus its counters: with three +1/+1 counters it's 3/3, and deals 3
+  await ktp(a, () => {
+    ktPlay.cards.set("elder-0000", { id:"elder-0000", name:"Test Elder", type_line:"Creature — Treefolk", power:"*", toughness:"*",
+      oracle_text:"Test Elder's power and toughness are each equal to the number of Forests you control.", image_uris:{ small:"https://cards.scryfall.io/small/0.png", normal:"https://cards.scryfall.io/normal/0.png" } });
+    ktPlay.me.zones.bf.push({ iid:"eldercard", id:"elder-0000", x:0.6, y:0.3, tapped:false, fd:false, face:0, ctr:{} });
+  });
+  await a.locator('#bf .card[data-iid="eldercard"]').click({ button:"right" });
+  await expect(a.locator(".modal .cp-sec", { hasText:"Base power/toughness" })).toContainText("*/*");
+  await a.locator(".modal").getByRole("button", { name:"+1/+1", exact:true }).first().click();
+  for (let i = 0; i < 2; i++) await a.locator(".modal").getByRole("button", { name:"Add a +1/+1 counter" }).click();
+  await a.locator(".modal").getByRole("button", { name:"Close", exact:true }).click();
+  await expect(a.locator('#bf .card[data-iid="eldercard"] .pt')).toHaveText("3/3");
+  await a.click("#attackBtn");
+  await dragTo(a, a.locator('#bf .card[data-iid="eldercard"]'), a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" }));
+  await a.locator("#atkBar").getByRole("button", { name:/^Attack \(/ }).click();
+  await expect(box).toContainText("Test Elder");
+  await expect(box).toContainText("6 damage to you if you take it.");  // (the Gamma Card is still attacking too)
+  await box.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await expect(b.locator("#lifeOut")).toHaveText("11");
   await a.click("#nextTurn");
   // (ending the turn with more than 7 cards asks for discards: keep them)
   const keep = a.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
