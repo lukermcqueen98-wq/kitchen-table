@@ -42,15 +42,17 @@ test("Commander on the digital table: six players, each sees five opponents in t
   await expect(ps[0].locator("#ctrlBox .ctrlhead")).toHaveText("Commander damage you've taken");
   await expect(ps[0].locator("#libPile")).toBeInViewport();  // (the commander damage list for five opponents sits below the piles)
   await expect(ps[5].locator(".opp").first()).toContainText("Luke");
-  // Mirror (the default): every board in an equal box, three across and two down, yours last; every battlefield is
-  // the same size, so each looks the way its player sees it
-  await expect(ps[0].locator("#play")).toHaveClass(/\bmirror\b/); await expect(ps[0].locator("#play")).toHaveClass(/\bm6\b/);
-  const boards = await ps[0].evaluate(() => [...document.querySelectorAll(".opp .obf, #bf")].map(b => { const r = b.getBoundingClientRect(); return [r.width, r.height]; }));
-  expect(boards).toHaveLength(6);
-  for (const [w, h] of boards) { expect(Math.abs(w - boards[0][0])).toBeLessThan(3); expect(Math.abs(h - boards[0][1])).toBeLessThan(3); }
-  const cellsAt = await ps[0].evaluate(() => [...document.querySelectorAll(".opp"), document.querySelector("#me")].map(o => { const r = o.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y)]; }));
-  expect(new Set(cellsAt.map(c => c[1])).size).toBe(2);  // (two rows)
-  expect(cellsAt[5][1]).toBeGreaterThan(cellsAt[0][1]); expect(cellsAt[5][0]).toBeGreaterThan(cellsAt[4][0]);  // (yours: bottom right)
+  // Long table (the default): you on the near side; the others around it in turn order from your left (left end,
+  // across in two, right end) and the fifth beside you; their boards turn to face their seats
+  await expect(ps[0].locator("#play")).toHaveClass(/\blt5\b/);
+  const slots = await ps[0].evaluate(() => [...document.querySelectorAll(".opp")].map(o => { const r = o.getBoundingClientRect(); return { slot:o.dataset.slot, x:r.x, y:r.y, w:r.width, h:r.height }; }));
+  expect(slots.map(o => o.slot)).toEqual(["L", "T1", "T2", "R", "BR"]);
+  const [sl, st1, st2, sr, sbr] = slots, mine = await ps[0].locator("#me").boundingBox();
+  expect(st1.x).toBeGreaterThan(sl.x + sl.w - 2); expect(st2.x).toBeGreaterThan(st1.x); expect(sr.x).toBeGreaterThan(st2.x + st2.w - 2);
+  expect(sl.h).toBeGreaterThan(st1.h * 1.5);  // (the ends run the length of the table)
+  expect(mine.y).toBeGreaterThan(st1.y + st1.h - 2); expect(sbr.x).toBeGreaterThan(mine.x);
+  const turned = await ps[0].evaluate(() => [...document.querySelectorAll(".opp .oframe")].map(f => getComputedStyle(f).transform !== "none"));
+  expect(turned).toEqual([true, true, true, true, true]);
   await expect(ps[0].locator("#handWrap")).toBeVisible();
   // Game › Layout switches to the round table (and remembers it)
   await tool(ps[0], "#layoutBtn");

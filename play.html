@@ -478,29 +478,46 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.round .opp.zoomed{position:relative;inset:auto;grid-row:1 / bar-start;grid-column:1 / -1;z-index:5}
   main#play.r4 #hub,main#play.r5 #hub{grid-area:hub;display:flex;align-items:center;justify-content:center;min-height:0}
 }
-/* Mirror (the default): every player's board in an equal box, drawn the way its player sees it: each battlefield
-   the same shape (--ba, width over height) with cards a fixed share of its width (--cw), so a card sits in the same
-   spot on every screen. Your hand gets the strip along the bottom. */
+/* Long table (the default): a wooden table split into one playmat per player. You always have the near side; the
+   others sit around it in turn order (the next player at your left end, then across, then your right end). Each
+   opponent's battlefield, piles and command zone are turned to face their seat, laid out the way they see them, so
+   their lands are nearest them and their creatures toward the middle. Your hand gets the strip along the bottom. */
 @media (min-width:901px){
-  main#play.mirror{display:grid;gap:8px;padding:8px;--sidew:190px}
-  main#play.m2{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr)) auto auto;--ba:4.2;--cw:5cqw}
-  main#play.m4{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr)) auto auto;--ba:1.8;--cw:11.5cqw}
-  main#play.m6{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr)) auto auto;--ba:1;--cw:20cqw}
-  main#play.mirror #opps{display:contents}
-  main#play.mirror .opp{order:1;min-width:0;min-height:0}
-  main#play.mirror #me{order:2;margin:0;grid-template-columns:minmax(0,1fr) var(--sidew);grid-template-rows:minmax(0,1fr);grid-template-areas:"bf side";container-type:size}
-  main#play.mirror #combatBar{order:3;grid-column:1 / -1;margin:0}
-  main#play.mirror #handWrap{order:4;grid-column:1 / -1;border:1px solid var(--felt-edge);border-radius:10px;background:rgba(0,0,0,.12)}
-  main#play.mirror #hand{min-height:112px}
-  main#play.mirror #hand .card{--w:96px;margin-right:-18px}
-  main#play.mirror .obody{container-type:size;display:grid;grid-template-columns:minmax(0,1fr) var(--sidew);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bf piles" "bf cz"}
-  main#play.mirror .opiles{grid-area:piles;flex-wrap:wrap;justify-content:center;overflow:visible}
-  main#play.mirror .ocz{grid-area:cz;border-right:0;border-left:1px solid var(--felt-edge);flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:flex-start}
-  main#play.mirror .opile .card,main#play.mirror .opile .ph{--w:44px;width:44px}
-  main#play.mirror .pile .card,main#play.mirror .pile .ph{--w:44px;width:44px}
-  main#play.mirror #bf,main#play.mirror .obf{grid-area:bf;flex:none;aspect-ratio:var(--ba);width:min(100%,calc(100cqh * var(--ba)));height:auto;align-self:center;justify-self:center;container-type:inline-size;border-radius:8px;outline:1px solid var(--felt-edge)}
-  main#play.mirror #bf .card,main#play.mirror .obf .card,main#play.mirror .opp.zoomed .obf .card{--w:var(--cw)}
+  main#play.lt{display:grid;gap:12px;padding:14px;margin:6px 8px 0;border-radius:22px;grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto auto;
+    background:repeating-linear-gradient(2deg,#6b4526 0px,#7a5130 10px,#5e3c20 17px,#714a2b 27px);box-shadow:inset 0 0 0 3px #3a2414,0 18px 50px rgba(0,0,0,.55)}
+  main#play.lt1{grid-template-columns:minmax(0,1fr);grid-template-areas:"T" "me" "bar" "hand"}
+  main#play.lt2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"T1 T2" "me me" "bar bar" "hand hand"}
+  main#play.lt3{grid-template-columns:minmax(0,.42fr) minmax(0,1fr) minmax(0,.42fr);grid-template-areas:"L T R" "L me R" "bar bar bar" "hand hand hand"}
+  main#play.lt4{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
+  main#play.lt5{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me BR R" "bar bar bar bar" "hand hand hand hand"}
+  main#play.lt #opps{display:contents}
+  main#play.lt .opp{min-width:0;min-height:0;border-color:rgba(0,0,0,.45);box-shadow:0 2px 0 rgba(255,255,255,.08)}
+  main#play.lt .opp[data-slot="L"]{grid-area:L} main#play.lt .opp[data-slot="R"]{grid-area:R} main#play.lt .opp[data-slot="T"]{grid-area:T}
+  main#play.lt .opp[data-slot="T1"]{grid-area:T1} main#play.lt .opp[data-slot="T2"]{grid-area:T2} main#play.lt .opp[data-slot="BR"]{grid-area:BR}
+  main#play.lt .opp[data-slot="L"],main#play.lt .opp[data-slot="R"]{flex-direction:column-reverse}  /* (their name at the bottom of their area) */
+  main#play.lt .opp[data-slot="L"] .ohead,main#play.lt .opp[data-slot="R"] .ohead{border-bottom:0;border-top:1px solid var(--felt-edge)}
+  main#play.lt #me{grid-area:me;margin:0;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:minmax(0,1fr);grid-template-areas:"bf side";border-color:rgba(0,0,0,.45)}
+  main#play.lt #combatBar{grid-area:bar;margin:0}
+  main#play.lt #handWrap{grid-area:hand;border:1px solid rgba(0,0,0,.45);border-radius:10px;background:rgba(15,9,30,.88)}
+  main#play.lt #hand{min-height:112px}
+  main#play.lt #hand .card{--w:96px;margin-right:-18px}
+  main#play.lt .pile .card,main#play.lt .pile .ph{--w:44px;width:44px}
+  /* (each board: cards a fixed share of its width, so a board looks the same on every screen) */
+  main#play.lt #bf,main#play.lt .obf{container-type:inline-size}
+  main#play.lt #bf .card,main#play.lt .obf .card{--w:clamp(30px,9.5cqw,96px)}
+  main#play.lt .obody{container-type:size;position:relative}
+  main#play.lt .oframe{position:absolute;left:50%;top:50%;width:100cqw;height:100cqh;display:grid;grid-template-columns:minmax(0,1fr) 120px;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bf piles" "bf cz";transform:translate(-50%,-50%)}
+  main#play.lt .opp[data-slot="T"] .oframe,main#play.lt .opp[data-slot="T1"] .oframe,main#play.lt .opp[data-slot="T2"] .oframe{transform:translate(-50%,-50%) rotate(180deg)}
+  main#play.lt .opp[data-slot="L"] .oframe{width:100cqh;height:100cqw;transform:translate(-50%,-50%) rotate(90deg)}
+  main#play.lt .opp[data-slot="R"] .oframe{width:100cqh;height:100cqw;transform:translate(-50%,-50%) rotate(-90deg)}
+  main#play.lt .opp.zoomed .oframe{width:100cqw;height:100cqh;transform:translate(-50%,-50%)}  /* (zoomed in: upright to read) */
+  main#play.lt .oframe .obf{grid-area:bf}
+  main#play.lt .oframe .opiles{grid-area:piles;flex-wrap:wrap;justify-content:center;border-left:1px solid var(--felt-edge);overflow:visible}
+  main#play.lt .oframe .ocz{grid-area:cz;border-right:0;border-left:1px solid var(--felt-edge);flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:flex-start}
+  main#play.lt .opile .card,main#play.lt .opile .ph{--w:40px;width:40px}
+  main#play.lt .ocz .card{--w:44px}
 }
+.oframe{display:contents}
 /* Zoomed in on one player's battlefield (click its empty space): it covers the other boards, bigger cards */
 .opp.zoomed{position:fixed;inset:12px;z-index:45;background:var(--felt-deep);box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .opp.zoomed .obf{container-type:size}
@@ -664,7 +681,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
           <button role="menuitem" class="btn small mitem" id="copyLink">Copy invite link</button>
           <button role="menuitem" class="btn small mitem" id="rulesBtn" title="House rules for this table">House rules</button>
           <button role="menuitem" class="btn small mitem hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
-          <button role="menuitem" class="btn small mitem" id="layoutBtn" title="Mirror: every board as its player sees it, all the same size. Round table: the others around you, your board bigger.">Layout: Mirror</button>
+          <button role="menuitem" class="btn small mitem" id="layoutBtn" title="Long table: everyone's playmat on one table, you on the near side, cards facing their owners. Round table: the others around you, your board bigger.">Layout: Long table</button>
           <button role="menuitem" class="btn small mitem" id="matBtn" title="Pick a playmat for your side of the table (everyone sees it)">Playmat</button>
           <button role="menuitem" class="btn small mitem" id="termsBtn" title="Magic terms and what they mean">Terms</button>
           <button role="menuitem" class="btn small mitem" id="statsBtn">Stats</button>
@@ -2379,15 +2396,14 @@ function renderOpps(){
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
-  const mirror = !settings.round && order.length > 0 && !me.watch && matchMedia("(min-width:901px)").matches;
-  const round = !mirror && order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
+  const lt = !settings.round && order.length > 0 && !me.watch && matchMedia("(min-width:901px)").matches;
+  const round = !lt && order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
   if (!order.includes(zoomSeat)) zoomSeat = 0;
-  // (Mirror: one box each, two or three across; your box takes what's left of the bottom row)
-  const cells = order.length < 2 ? 2 : order.length < 4 ? 4 : 6;
-  $("#play").className = mirror ? `mirror m${cells}${zoomSeat ? " zooming" : ""}` : round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
-  $("#me").style.gridColumn = mirror ? `span ${cells - order.length}` : "";
-  const hw = $("#handWrap"); if (mirror ? hw.parentElement === $("#me") : hw.parentElement !== $("#me")) (mirror ? $("#play") : $("#me")).append(hw);
-  $("#layoutBtn").textContent = settings.round ? "Layout: Round table" : "Layout: Mirror";
+  // Long table: each player's place, in turn order from your left (see the CSS); with five opponents one shares your side
+  const SLOTS = [[], ["T"], ["T1", "T2"], ["L", "T", "R"], ["L", "T1", "T2", "R"], ["L", "T1", "T2", "R", "BR"]][order.length];
+  $("#play").className = lt ? `lt lt${order.length}${zoomSeat ? " zooming" : ""}` : round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
+  const hw = $("#handWrap"); if (lt ? hw.parentElement === $("#me") : hw.parentElement !== $("#me")) (lt ? $("#play") : $("#me")).append(hw);
+  $("#layoutBtn").textContent = settings.round ? "Layout: Round table" : "Layout: Long table";
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
@@ -2418,9 +2434,11 @@ function renderOpps(){
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
-    o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false))));
+    // (oframe: their battlefield and piles, turned to face their seat at the long table)
+    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)))));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
+    if (lt) o.dataset.slot = SLOTS[order.indexOf(s)];
     o.classList.toggle("zoomed", s === zoomSeat);
     box.append(o);
   }
