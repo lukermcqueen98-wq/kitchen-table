@@ -485,7 +485,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 @media (min-width:901px){
   main#play.lt{display:grid;gap:12px;padding:14px;margin:6px 8px 0;border-radius:22px;grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto auto;
     background:repeating-linear-gradient(2deg,#6b4526 0px,#7a5130 10px,#5e3c20 17px,#714a2b 27px);box-shadow:inset 0 0 0 3px #3a2414,0 18px 50px rgba(0,0,0,.55)}
-  main#play.lt1{grid-template-columns:minmax(0,1fr);grid-template-areas:"T" "me" "bar" "hand"}
+  main#play.lt0,main#play.lt1{grid-template-columns:minmax(0,1fr);grid-template-areas:"T" "me" "bar" "hand"}
+  main#play.lt .oppwait{grid-area:T;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;border:2px dashed rgba(0,0,0,.5);border-radius:10px;background:rgba(15,9,30,.6)}
+  main#play.lt .oppwait b{font:700 22px var(--serif)}
   main#play.lt2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"T1 T2" "me me" "bar bar" "hand hand"}
   main#play.lt3{grid-template-columns:minmax(0,.42fr) minmax(0,1fr) minmax(0,.42fr);grid-template-areas:"L T R" "L me R" "bar bar bar" "hand hand hand"}
   main#play.lt4{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
@@ -2393,10 +2395,10 @@ function cardW(box){
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = seatsAfter(mySeat, seats).filter(s => s !== mySeat);
-  box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
+  const lt = !settings.round && !me.watch && matchMedia("(min-width:901px)").matches;  // (the long table, even before anyone joins)
+  box.innerHTML = ""; box.classList.toggle("hidden", !order.length && !lt); box.classList.toggle("many", order.length > 3);
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
-  const lt = !settings.round && order.length > 0 && !me.watch && matchMedia("(min-width:901px)").matches;
   const round = !lt && order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
   if (!order.includes(zoomSeat)) zoomSeat = 0;
   // Long table: each player's place, in turn order from your left (see the CSS); with five opponents one shares your side
@@ -2404,6 +2406,11 @@ function renderOpps(){
   $("#play").className = lt ? `lt lt${order.length}${zoomSeat ? " zooming" : ""}` : round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
   const hw = $("#handWrap"); if (lt ? hw.parentElement === $("#me") : hw.parentElement !== $("#me")) (lt ? $("#play") : $("#me")).append(hw);
   $("#layoutBtn").textContent = settings.round ? "Layout: Round table" : "Layout: Long table";
+  // (alone at the long table: an empty seat across from you until someone joins)
+  if (lt && !order.length) {
+    const copy = el("button", { type:"button", className:"btn primary", textContent:"Copy invite link" }); copy.onclick = () => $("#copyLink").click();
+    box.append(el("div", { className:"oppwait" }, el("b", { textContent:"Waiting for players" }), el("span", { className:"hint", textContent:"Share your invite link: whoever joins sits across from you." }), copy));
+  }
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
