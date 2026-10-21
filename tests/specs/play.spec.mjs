@@ -95,7 +95,9 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
 
   // Playing a card (double-click) puts it on the battlefield for everyone; clicking it taps it
   // (retried: Rick keeping his hand can redraw Luke's hand between the two clicks of the double-click)
-  await expect(async () => { await a.locator("#hand .card").first().dblclick(); await expect(a.locator("#bf .card")).toHaveCount(1, { timeout:2000 }); }).toPass({ timeout:10000 });
+  // (a permanent: an instant or sorcery played from the hand goes straight to the graveyard)
+  const permanent = () => ktp(a, () => ktPlay.me.zones.hand.find(c => !/Instant|Sorcery/.test(ktPlay.cards.get(c.id)?.type_line || ""))?.iid);
+  await expect(async () => { if (!await a.locator("#bf .card").count()) await a.locator(`#hand .card[data-iid="${await permanent()}"]`).dblclick(); await expect(a.locator("#bf .card")).toHaveCount(1, { timeout:2000 }); }).toPass({ timeout:10000 });
   await expect(opp(b, "Luke").locator(".obf .card")).toHaveCount(1);
   await a.locator("#bf .card").first().click();
   await expect(opp(b, "Luke").locator(".obf .card.tapped")).toHaveCount(1);

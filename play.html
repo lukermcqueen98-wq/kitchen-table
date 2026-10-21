@@ -478,6 +478,46 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.round .opp.zoomed{position:relative;inset:auto;grid-row:1 / bar-start;grid-column:1 / -1;z-index:5}
   main#play.r4 #hub,main#play.r5 #hub{grid-area:hub;display:flex;align-items:center;justify-content:center;min-height:0}
 }
+/* Long table (the default): a wooden table split into one playmat per player. You always have the near side; the
+   others sit around it in turn order (the next player at your left end, then across, then your right end). Each
+   opponent's battlefield, piles and command zone are turned to face their seat, laid out the way they see them, so
+   their lands are nearest them and their creatures toward the middle. Your hand gets the strip along the bottom. */
+@media (min-width:901px){
+  main#play.lt{display:grid;gap:12px;padding:14px;margin:6px 8px 0;border-radius:22px;grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto auto;
+    background:repeating-linear-gradient(2deg,#6b4526 0px,#7a5130 10px,#5e3c20 17px,#714a2b 27px);box-shadow:inset 0 0 0 3px #3a2414,0 18px 50px rgba(0,0,0,.55)}
+  main#play.lt1{grid-template-columns:minmax(0,1fr);grid-template-areas:"T" "me" "bar" "hand"}
+  main#play.lt2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"T1 T2" "me me" "bar bar" "hand hand"}
+  main#play.lt3{grid-template-columns:minmax(0,.42fr) minmax(0,1fr) minmax(0,.42fr);grid-template-areas:"L T R" "L me R" "bar bar bar" "hand hand hand"}
+  main#play.lt4{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
+  main#play.lt5{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me BR R" "bar bar bar bar" "hand hand hand hand"}
+  main#play.lt #opps{display:contents}
+  main#play.lt .opp{min-width:0;min-height:0;border-color:rgba(0,0,0,.45);box-shadow:0 2px 0 rgba(255,255,255,.08)}
+  main#play.lt .opp[data-slot="L"]{grid-area:L} main#play.lt .opp[data-slot="R"]{grid-area:R} main#play.lt .opp[data-slot="T"]{grid-area:T}
+  main#play.lt .opp[data-slot="T1"]{grid-area:T1} main#play.lt .opp[data-slot="T2"]{grid-area:T2} main#play.lt .opp[data-slot="BR"]{grid-area:BR}
+  main#play.lt .opp[data-slot="L"],main#play.lt .opp[data-slot="R"]{flex-direction:column-reverse}  /* (their name at the bottom of their area) */
+  main#play.lt .opp[data-slot="L"] .ohead,main#play.lt .opp[data-slot="R"] .ohead{border-bottom:0;border-top:1px solid var(--felt-edge)}
+  main#play.lt #me{grid-area:me;margin:0;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:minmax(0,1fr);grid-template-areas:"bf side";border-color:rgba(0,0,0,.45)}
+  main#play.lt #combatBar{grid-area:bar;margin:0}
+  main#play.lt #handWrap{grid-area:hand;border:1px solid rgba(0,0,0,.45);border-radius:10px;background:rgba(15,9,30,.88)}
+  main#play.lt #hand{min-height:112px}
+  main#play.lt #hand .card{--w:96px;margin-right:-18px}
+  main#play.lt .pile .card,main#play.lt .pile .ph{--w:44px;width:44px}
+  /* (each board: cards a fixed share of its width, so a board looks the same on every screen) */
+  main#play.lt #bf,main#play.lt .obf{container-type:inline-size}
+  main#play.lt #bf .card,main#play.lt .obf .card{--w:clamp(30px,9.5cqw,96px)}
+  main#play.lt .obody{container-type:size;position:relative}
+  main#play.lt .oframe{position:absolute;left:50%;top:50%;width:100cqw;height:100cqh;display:grid;grid-template-columns:minmax(0,1fr) 120px;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bf piles" "bf cz";transform:translate(-50%,-50%)}
+  main#play.lt .opp[data-slot="T"] .oframe,main#play.lt .opp[data-slot="T1"] .oframe,main#play.lt .opp[data-slot="T2"] .oframe{transform:translate(-50%,-50%) rotate(180deg)}
+  main#play.lt .opp[data-slot="L"] .oframe{width:100cqh;height:100cqw;transform:translate(-50%,-50%) rotate(90deg)}
+  main#play.lt .opp[data-slot="R"] .oframe{width:100cqh;height:100cqw;transform:translate(-50%,-50%) rotate(-90deg)}
+  main#play.lt .opp.zoomed .oframe{width:100cqw;height:100cqh;transform:translate(-50%,-50%)}  /* (zoomed in: upright to read) */
+  main#play.lt .oframe .obf{grid-area:bf}
+  main#play.lt .oframe .opiles{grid-area:piles;flex-wrap:wrap;justify-content:center;border-left:1px solid var(--felt-edge);overflow:visible}
+  main#play.lt .oframe .ocz{grid-area:cz;border-right:0;border-left:1px solid var(--felt-edge);flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:flex-start}
+  main#play.lt .opile .card,main#play.lt .opile .ph{--w:40px;width:40px}
+  main#play.lt .ocz .card{--w:44px}
+}
+.oframe{display:contents}
 /* Zoomed in on one player's battlefield (click its empty space): it covers the other boards, bigger cards */
 .opp.zoomed{position:fixed;inset:12px;z-index:45;background:var(--felt-deep);box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .opp.zoomed .obf{container-type:size}
@@ -641,6 +681,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
           <button role="menuitem" class="btn small mitem" id="copyLink">Copy invite link</button>
           <button role="menuitem" class="btn small mitem" id="rulesBtn" title="House rules for this table">House rules</button>
           <button role="menuitem" class="btn small mitem hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
+          <button role="menuitem" class="btn small mitem" id="layoutBtn" title="Long table: everyone's playmat on one table, you on the near side, cards facing their owners. Round table: the others around you, your board bigger.">Layout: Long table</button>
           <button role="menuitem" class="btn small mitem" id="matBtn" title="Pick a playmat for your side of the table (everyone sees it)">Playmat</button>
           <button role="menuitem" class="btn small mitem" id="termsBtn" title="Magic terms and what they mean">Terms</button>
           <button role="menuitem" class="btn small mitem" id="statsBtn">Stats</button>
@@ -1189,7 +1230,7 @@ const conns = {}, calls = {};
 let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, order:[], at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1", logPop:store.get("kt-dig-logpop", "1") === "1",
-                   stackLands:store.get("kt-dig-stack", "1") === "1" };
+                   stackLands:store.get("kt-dig-stack", "1") === "1", round:store.get("kt-dig-round", "0") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
 let zoomSeat = 0;  // the player whose battlefield is zoomed in on (0: none)
 const watchers = {};  // seat -> name, for people watching (seats 7 to 10)  // (commanders taken out of the decklist go back if you pick another)
@@ -1944,7 +1985,7 @@ function draw(n = 1, quiet = false){
 }
 // Where a card lands on the battlefield when it isn't dropped somewhere: the next free spot, lands on a lower row
 function freeSpot(c){
-  const bf = $("#bf"), w = bf.clientWidth || 900, h = bf.clientHeight || 400, cw = parseFloat(getComputedStyle(bf).getPropertyValue("--cw")) || 84;
+  const bf = $("#bf"), w = bf.clientWidth || 900, h = bf.clientHeight || 400, cw = cardW(bf);
   const dx = (cw + 10) / w, dy = (cw * 88 / 63 * 0.45) / h;  // (rows overlap a little, like a real table)
   const land = isLand(cardOf(c)), y = land ? 0.6 : 0.04;
   for (let row = 0; row < 3; row++) for (let x = 0.01; x < 1 - dx; x += dx) {
@@ -2285,7 +2326,7 @@ function drawBattlefield(box, list, opts){
         e.append(el("span", { className:"stackn", textContent:`×${n}` }), el("span", { className:"stackup", textContent:`${n} ${tapped ? "tapped" : "untapped"}` }));
         box.append(e); place(e, c);
         // (a tapped card lies sideways: set clear of the untapped pile)
-        if (tapped && up) { const w = parseFloat(getComputedStyle(e).getPropertyValue("--w")) || 84; e.style.left = `calc(${c.x * 100}% + ${Math.round(w * 1.5)}px)`; }
+        if (tapped && up) { const w = e.offsetWidth || 84; e.style.left = `calc(min(${c.x * 100}%, 100% - var(--w) * 2.5) + ${Math.round(w * 1.5)}px)`; }
       }
       continue;
     }
@@ -2294,7 +2335,7 @@ function drawBattlefield(box, list, opts){
     if (host) {
       /* An attachment peeks out from behind its card, up and to the right (a bit more for each one), with its name
          on the part that shows; below the card instead when there's no room above. Pointing at it brings it forward. */
-      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, w = parseFloat(getComputedStyle(e).getPropertyValue("--w")) || 84;
+      const n = list.filter(x => x.att === host.iid).indexOf(c) + 1, w = e.offsetWidth || 84;
       const peek = 0.46 * w * n, above = host.y * (box.clientHeight || 400) >= peek;
       e.style.left = `calc(${host.x * 100}% + ${0.16 * w * n}px)`;
       e.style.top = `calc(${host.y * 100}% ${above ? "-" : "+"} ${peek}px)`;
@@ -2339,16 +2380,30 @@ function drawArrows(){
   }
 }
 addEventListener("resize", () => requestAnimationFrame(drawArrows));
-function place(e, c){ e.style.left = (c.x * 100) + "%"; e.style.top = (c.y * 100) + "%"; }
+let wasDesk = matchMedia("(min-width:901px)").matches;
+addEventListener("resize", () => { const d = matchMedia("(min-width:901px)").matches; if (d !== wasDesk && me) { wasDesk = d; render(); } });
+// (kept inside its battlefield: a card placed near the edge on a bigger screen still shows whole)
+function place(e, c){ e.style.left = `min(${c.x * 100}%, 100% - var(--w))`; e.style.top = `min(${c.y * 100}%, 100% - var(--w) * 1.397)`; }
+// How wide a card is on a battlefield right now, in px
+function cardW(box){
+  const c = box.querySelector(":scope > .card:not(.attached)"); if (c?.offsetWidth) return c.offsetWidth;
+  const v = getComputedStyle(box).getPropertyValue("--cw").trim();
+  return v.endsWith("cqw") ? parseFloat(v) / 100 * box.clientWidth : parseFloat(v) || 84;
+}
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = seatsAfter(mySeat, seats).filter(s => s !== mySeat);
   box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
-  const round = order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
+  const lt = !settings.round && order.length > 0 && !me.watch && matchMedia("(min-width:901px)").matches;
+  const round = !lt && order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
   if (!order.includes(zoomSeat)) zoomSeat = 0;
-  $("#play").className = round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
+  // Long table: each player's place, in turn order from your left (see the CSS); with five opponents one shares your side
+  const SLOTS = [[], ["T"], ["T1", "T2"], ["L", "T", "R"], ["L", "T1", "T2", "R"], ["L", "T1", "T2", "R", "BR"]][order.length];
+  $("#play").className = lt ? `lt lt${order.length}${zoomSeat ? " zooming" : ""}` : round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
+  const hw = $("#handWrap"); if (lt ? hw.parentElement === $("#me") : hw.parentElement !== $("#me")) (lt ? $("#play") : $("#me")).append(hw);
+  $("#layoutBtn").textContent = settings.round ? "Layout: Round table" : "Layout: Long table";
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
@@ -2379,9 +2434,11 @@ function renderOpps(){
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
-    o.append(el("div", { className:"obody" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false))));
+    // (oframe: their battlefield and piles, turned to face their seat at the long table)
+    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)))));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
+    if (lt) o.dataset.slot = SLOTS[order.indexOf(s)];
     o.classList.toggle("zoomed", s === zoomSeat);
     box.append(o);
   }
@@ -2587,9 +2644,9 @@ document.addEventListener("pointerup", e => {
   const to = t.dataset.drop;
   if (to.startsWith("atk:")) { if (d.zone === "bf" && atkPlan) planAttack(d.iid, +to.slice(4)); return; }
   if (to === "bf") {
-    const r = t.getBoundingClientRect(), cw = parseFloat(getComputedStyle(t).getPropertyValue("--cw")) || 84;
+    const r = t.getBoundingClientRect(), cw = cardW(t);
     const x = (e.clientX - d.dx + (d.zone === "bf" ? 0 : 0) - r.left) / r.width, y = (e.clientY - d.dy - r.top) / r.height;
-    if (d.zone === "bf") { const f = findCard(d.iid); f.c.x = clamp(x, 0, 1 - cw / r.width); f.c.y = clamp(y, 0, 0.86); if (f.c.att) { say(`unattached ${nameOf(f.c)}.`); f.c.att = null; } changed(); }
+    if (d.zone === "bf") { const f = findCard(d.iid); f.c.x = clamp(x, 0, 1 - cw / r.width); f.c.y = clamp(y, 0, Math.max(0, 1 - cw * 1.397 / r.height)); if (f.c.att) { say(`unattached ${nameOf(f.c)}.`); f.c.att = null; } changed(); }
     else move(d.iid, "bf", { x, y });
   } else if (to !== d.zone || to === "lib") move(d.iid, to, { bottom:e.shiftKey });
 });
@@ -3955,6 +4012,7 @@ function adjustMat(start, isNew){
     el("div", { className:"matctl" }, el("label", {}, el("span", { textContent:"Zoom" }), zoom), el("label", {}, el("span", { textContent:"Darken" }), dim), arrows)),
     [{ label:"Cancel" }, { label:isNew ? "Use this playmat" : "Save", primary:true, fn:() => setMat(m, !isNew) }], { wide:true });
 }
+$("#layoutBtn").onclick = () => { settings.round = !settings.round; store.set("kt-dig-round", settings.round ? "1" : "0"); render(); };
 $("#matBtn").onclick = () => {
   const grid = el("div", { className:"matgrid" });
   for (const [k, x] of Object.entries(MATS)) {
