@@ -338,12 +338,13 @@ test("digital table: playmats everyone sees, including players who sit down late
   const room = new URL(a.url()).searchParams.get("room"); await settle(a);
   // Luke picks the Island mat before Rick arrives
   await tool(a, "#matBtn"); await a.locator(".modal .matpick", { hasText:"Island" }).click();
-  await expect(a.locator("#bf")).toHaveClass(/mat/);
-  expect(await a.locator("#bf").evaluate(e => e.style.background)).toContain("gradient");
+  // (at the long table a playmat covers its player's whole mat)
+  await expect(a.locator("#me")).toHaveClass(/mat/);
+  expect(await a.locator("#me").evaluate(e => e.style.background)).toContain("gradient");
   await b.goto(`${BASE}/play.html?kt-test&room=${room}`);
   await b.fill("#nameIn", "Rick"); await b.selectOption("#fmtSel", "sixty"); await b.fill("#deckIn", "30 Gamma Card\n30 Forest"); await b.click("#joinBtn");
   await expect(opp(b, "Luke")).toBeVisible({ timeout:15000 });
-  await expect(opp(b, "Luke").locator(".obody")).toHaveClass(/mat/);
+  await expect(opp(b, "Luke")).toHaveClass(/\bmat\b/);
   // A picture from a link
   // (the picture is checked, then adjusted: move it and zoom in, with previews of both views)
   await tool(a, "#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://cards.scryfall.io/art_crop/0.png"); await button(a, "Use this picture");
@@ -357,21 +358,21 @@ test("digital table: playmats everyone sees, including players who sit down late
   await a.mouse.move(prev.x + prev.width / 2, prev.y + prev.height / 2); await a.mouse.down();
   await a.mouse.move(prev.x + prev.width / 2 - prev.width * 0.15, prev.y + prev.height / 2, { steps:4 }); await a.mouse.up();
   await button(a, "Use this playmat");
-  const layer = opp(b, "Luke").locator(".obody > .matlayer img");
+  const layer = opp(b, "Luke").locator(":scope > .matlayer img");
   await expect(layer).toHaveAttribute("src", "https://cards.scryfall.io/art_crop/0.png");
   const look = await layer.evaluate(i => [i.style.objectPosition, i.style.transform]);
   expect(look[1]).toBe("scale(1.5)");
   const [x, y] = look[0].match(/\d+/g).map(Number);
   expect(x).toBeGreaterThan(55); expect(y).toBe(55);
   await expect(b.locator("#log")).toContainText("Luke put down a new playmat.");
-  expect(await a.locator("#bf > .matlayer img").evaluate(i => i.style.objectPosition)).toBe(look[0]);
+  expect(await a.locator("#me > .matlayer img").evaluate(i => i.style.objectPosition)).toBe(look[0]);
   // A link that doesn't load is caught before it's used
   await tool(a, "#matBtn"); await a.fill(".modal input[aria-label='Picture link']", "https://pictures.example.invalid/mat.png"); await button(a, "Use this picture");
   await expect(a.locator("#toast")).toContainText("That picture didn't load.");
   await button(a, "Close");
   // ...and back to plain felt
   await tool(a, "#matBtn"); await a.locator(".modal .matpick", { hasText:"Felt (plain)" }).click();
-  await expect(opp(b, "Luke").locator(".obody")).not.toHaveClass(/mat/);
+  await expect(opp(b, "Luke")).not.toHaveClass(/\bmat\b/);
   expect([...a.errors, ...b.errors]).toEqual([]);
   await browser.close();
 });
