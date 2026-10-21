@@ -484,7 +484,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
    sits in the same spot on every screen; each opponent's battlefield, piles and command zone face their seat. A slim
    strip across the middle holds whose turn it is and your life and counters; your hand sits below the table. */
 @media (min-width:901px){
-  main#play.lt{--ba:2.4;display:grid;gap:12px;padding:22px 26px 10px;isolation:isolate;
+  main#play.lt{--ba:3;display:grid;gap:12px;padding:22px 26px 10px;isolation:isolate;
     grid-template-columns:minmax(0,.38fr) minmax(0,1fr) minmax(0,.38fr);grid-template-rows:minmax(0,1fr) auto minmax(0,1fr) auto auto;
     grid-template-areas:"L T R" "L mid R" "L me R" "bar bar bar" "hand hand hand"}
   main#play.lt4{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
@@ -498,7 +498,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   /* (each mat: rounded, tinted with its player's color; gold while it's their turn) */
   main#play.lt .opp,main#play.lt #me,main#play.lt .oppwait{position:relative;min-width:0;min-height:0;margin:0;border-radius:14px;overflow:hidden;
     border:1px solid rgba(0,0,0,.45);background:radial-gradient(ellipse at 50% 45%,var(--mat,#3b2a5c),#120b22 125%);box-shadow:inset 0 0 40px rgba(0,0,0,.5),0 2px 0 rgba(255,255,255,.08)}
-  main#play.lt #me{grid-area:me;display:block;container-type:size;border:2px solid #e8dcb5}
+  main#play.lt #me{grid-area:me;display:block;container-type:size;border:2px solid #e8dcb5;isolation:isolate}
+  main#play.lt .opp{isolation:isolate}
   main#play.lt .opp.turn,main#play.lt #me.turn{border:2px solid var(--brass);box-shadow:0 0 0 2px rgba(255,207,90,.35),inset 0 0 40px rgba(0,0,0,.5)}
   main#play.lt .oppwait{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;border-style:dashed;--mat:#2a1f45}
   main#play.lt .oppwait b{font:700 20px var(--serif)}
@@ -512,24 +513,31 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt .obody{position:absolute;inset:30px 0 0;container-type:size}
   main#play.lt [data-slot="L"] .obody,main#play.lt [data-slot="R"] .obody,main#play.lt [data-slot="BR"] .obody{inset:0 0 30px}
   /* (each battlefield the same shape, as big as fits its mat, turned to face its owner) */
-  main#play.lt .oframe,main#play.lt #myFrame{position:absolute;left:50%;top:50%;display:block;aspect-ratio:var(--ba);height:auto;
-    width:min(calc(100cqw - 16px),calc((100cqh - 16px) * var(--ba)));transform:translate(-50%,-50%)}
-  main#play.lt .oframe,main#play.lt #myFrame,main#play.lt [data-slot="L"] .oframe,main#play.lt [data-slot="R"] .oframe{width:var(--fw,400px)}  /* (every board the same size: see sizeBoards) */
+  /* (each seat: a strip as long as its mat (from its owner's side) and as deep as a board; the board, the same size for
+     everyone, sits in the middle of it, and the piles at the owner's right-hand end of the mat) */
+  main#play.lt .oframe,main#play.lt #myFrame{position:absolute;left:50%;top:50%;display:block;width:calc(100cqw - 16px);height:calc(var(--fw,400px) / var(--ba));transform:translate(-50%,-50%)}
+  main#play.lt [data-slot="L"] .oframe,main#play.lt [data-slot="R"] .oframe{width:calc(100cqh - 16px)}
   main#play.lt [data-slot^="T"] .oframe{transform:translate(-50%,-50%) rotate(180deg)}
   main#play.lt [data-slot="L"] .oframe{transform:translate(-50%,-50%) rotate(90deg)}
   main#play.lt [data-slot="R"] .oframe{transform:translate(-50%,-50%) rotate(-90deg)}
   main#play.lt #myFrame{top:calc(50% - 15px)}
-  main#play.lt .opp.zoomed .oframe{width:min(calc(100cqw - 16px),calc((100cqh - 60px) * var(--ba))) !important;transform:translate(-50%,-50%)}  /* (zoomed in: upright to read) */
-  main#play.lt .oframe .obf,main#play.lt #myFrame #bf{position:absolute;inset:0;container-type:inline-size;border-radius:8px}
-  main#play.lt #bf .card,main#play.lt .obf .card{--w:9cqw}
+  main#play.lt .opp.zoomed .oframe{width:calc(100cqw - 16px) !important;height:calc(100cqh - 60px);transform:translate(-50%,-50%)}  /* (zoomed in: upright to read, and big) */
+  main#play.lt .opp.zoomed .oframe .obf{width:min(calc(100cqw - 16px - var(--colw)),calc((100cqh - 60px) * var(--ba)));height:auto;aspect-ratio:var(--ba);top:0;bottom:auto;left:0}
+  main#play.lt .oframe,main#play.lt #myFrame{--colw:calc(var(--fw,400px) * .124 + 44px)}  /* (the two pile columns at the right-hand end) */
+  main#play.lt .oframe .obf,main#play.lt #myFrame #bf{position:absolute;top:0;bottom:0;left:calc((100% - var(--colw) - var(--fw,400px)) / 2);width:var(--fw,400px);container-type:inline-size;border-radius:8px}
+  main#play.lt #bf .card,main#play.lt .obf .card{--w:8cqw}
   /* (piles at the owner's right hand, the command zone just above) */
-  main#play.lt .oframe .opiles,main#play.lt #myFrame .piles{position:absolute;right:6px;bottom:6px;z-index:3;display:flex;flex-direction:row;gap:5px;padding:0;border:0;overflow:visible}
+  main#play.lt .oframe .opiles,main#play.lt #myFrame .piles{position:absolute;top:0;bottom:auto;z-index:3;display:flex;flex-direction:column;align-items:center;gap:5px;padding:0;border:0;overflow:visible}
   main#play.lt .oframe .opile,main#play.lt #myFrame .pile{background:rgba(15,9,30,.75);padding:3px;width:auto}
-  main#play.lt .opile .card,main#play.lt .opile .ph,main#play.lt .pile .card,main#play.lt .pile .ph{--w:6.2cqw;width:6.2cqw}
+  main#play.lt .opile .card,main#play.lt .opile .ph,main#play.lt .pile .card,main#play.lt .pile .ph{--w:calc(var(--fw,400px) * .062);width:calc(var(--fw,400px) * .062)}
   main#play.lt .opilelbl,main#play.lt #myFrame .pile{font-size:10px}
-  main#play.lt .oframe .ocz,main#play.lt #myFrame #czone{position:absolute;right:6px;bottom:auto;top:6px;z-index:3;min-height:0;min-width:0;border:1px solid var(--felt-edge);border-radius:8px;background:rgba(15,9,30,.6);flex-direction:row;padding:4px}
+  /* (the right-hand column: command zone, and the library under it; graveyard and exile along the bottom beside it) */
+  main#play.lt .oright,main#play.lt #myRight{position:absolute;right:6px;top:6px;z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  main#play.lt .oframe .opiles,main#play.lt #myFrame .piles{right:calc(var(--fw,400px) * .062 + 22px)}
+  main#play.lt .oframe .oright,main#play.lt #myFrame #myRight{top:0;right:0}
+  main#play.lt .oframe .ocz,main#play.lt #myFrame #czone{position:static;min-height:0;min-width:0;border:1px solid var(--felt-edge);border-radius:8px;background:rgba(15,9,30,.6);flex-direction:row;padding:4px}
   main#play.lt #myFrame #czone::before{display:none}
-  main#play.lt .ocz .card,main#play.lt #czone .card{--w:6.2cqw}
+  main#play.lt .ocz .card,main#play.lt #czone .card{--w:calc(var(--fw,400px) * .062)}
   /* (the middle strip: whose turn it is, and your life and counters) */
   main#play.lt #side{grid-area:mid;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 10px;padding:0;border:0;background:none;overflow:visible;min-height:0}
   main#play.lt #side>*{flex-shrink:1;min-width:0;max-width:100%;background:rgba(15,9,30,.9);border:1px solid rgba(0,0,0,.5);border-radius:999px;padding:3px 12px}
@@ -2384,7 +2392,7 @@ function sizeBoards(){
   for (const b of document.querySelectorAll("#play.lt .opp:not(.zoomed) .obody, #play.lt #me")) {
     const r = b.getBoundingClientRect(), side = /^[LR]$/.test(b.closest(".opp")?.dataset.slot || "");
     const along = side ? r.height : r.width, depth = (side ? r.width : r.height) - (b.id === "me" ? 30 : 0);
-    if (along > 0 && depth > 0) F = Math.min(F, along - 16, (depth - 16) * A);
+    if (along > 0 && depth > 0) F = Math.min(F, (along - 16 - 44) / 1.124, (depth - 16) * A);  // (the pile columns: --colw)
   }
   if (isFinite(F)) play.style.setProperty("--fw", `${Math.max(120, Math.floor(F))}px`);
 }
@@ -2452,11 +2460,11 @@ function renderOpps(){
   const side = $("#side");
   if (lt && side.parentElement === $("#me")) {
     $("#play").append(side);
-    const frame = el("div", { id:"myFrame" }); $("#me").prepend(frame); frame.append($("#bf"), $("#myPiles"), $("#czone"));
+    const frame = el("div", { id:"myFrame" }); $("#me").prepend(frame); frame.append($("#bf"), $("#myPiles"), el("div", { id:"myRight" }, $("#czone"), $("#libPile")));
     $("#me").append(el("div", { id:"myPlate", className:"ohead" })); side.prepend(el("span", { id:"turnToken", role:"status" }));
   }
   if (!lt && side.parentElement !== $("#me")) {
-    $("#me").prepend($("#bf")); $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#ctrlBox").before($("#czone"));
+    $("#me").prepend($("#bf")); $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#myPiles").prepend($("#libPile")); $("#ctrlBox").before($("#czone"));
     $("#myFrame")?.remove(); $("#myPlate")?.remove(); $("#turnToken")?.remove();
   }
   if (lt) {
@@ -2510,7 +2518,10 @@ function renderOpps(){
     // (oframe: their battlefield and piles, turned to face their seat at the long table)
     // (at the long table their library sits with their other piles)
     const libOf = () => { const b = el("div", { className:"opile" + (p.lib ? "" : " empty"), title:`${p.name}'s library: ${p.lib} cards` }); b.append(p.lib ? el("div", { className:"card back", style:"position:relative" }) : el("div", { className:"ph" }), el("span", { className:"opilelbl", textContent:`Library ${p.lib}` })); return b; };
-    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : lt ? libOf() : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)))));
+    const libPile = p.libTop ? libTopOf(p) : lt ? libOf() : null;
+    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, lt ? null : p.cz.length ? cz : null, bfEl,
+      el("div", { className:"opiles" }, lt ? null : libPile, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)),
+      lt ? el("div", { className:"oright" }, p.cz.length ? cz : null, libPile) : null)));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
     if (lt) { o.dataset.slot = SLOTS[order.indexOf(s)]; o.style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[s - 1]} 32%, #1a1030)`); }
@@ -4047,8 +4058,11 @@ function paintMat(box, m, slot){
 }
 function sendMat(conn){ if (conn && !me?.watch) send(conn, { type:"mat", mat:myMat }); }
 function applyMats(){
-  const mine = $("#bf"); if (mine) paintMat(mine, myMat, "me");
-  for (const o of document.querySelectorAll(".opp")) { const b = o.querySelector(".obody"); if (b) paintMat(b, mats[+o.dataset.seat], +o.dataset.seat); }
+  // (at the long table a playmat covers its player's whole mat; otherwise just the battlefield)
+  const lt = $("#play").classList.contains("lt"), mine = lt ? $("#me") : $("#bf"), off = lt ? $("#bf") : $("#me");
+  if (off) { off.style.background = ""; off.classList.remove("mat"); [...off.children].find(x => x.classList.contains("matlayer"))?.remove(); }
+  if (mine) paintMat(mine, myMat, "me");
+  for (const o of document.querySelectorAll(".opp")) { const b = lt ? o : o.querySelector(".obody"); if (b) paintMat(b, mats[+o.dataset.seat], +o.dataset.seat); }
 }
 function setMat(m, quiet = false){
   myMat = cleanMat(m);
