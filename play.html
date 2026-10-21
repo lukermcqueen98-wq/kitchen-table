@@ -483,20 +483,37 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
    opponent's battlefield, piles and command zone are turned to face their seat, laid out the way they see them, so
    their lands are nearest them and their creatures toward the middle. Your hand gets the strip along the bottom. */
 @media (min-width:901px){
-  main#play.lt{display:grid;gap:12px;padding:14px;margin:6px 8px 0;border-radius:22px;grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto auto;
+  main#play.lt{display:grid;gap:10px;padding:14px;margin:6px 8px 0;border-radius:22px;grid-template-rows:minmax(0,1fr) auto minmax(0,1fr) auto auto;
     background:repeating-linear-gradient(2deg,#6b4526 0px,#7a5130 10px,#5e3c20 17px,#714a2b 27px);box-shadow:inset 0 0 0 3px #3a2414,0 18px 50px rgba(0,0,0,.55)}
-  main#play.lt1{grid-template-columns:minmax(0,1fr);grid-template-areas:"T" "me" "bar" "hand"}
-  main#play.lt2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"T1 T2" "me me" "bar bar" "hand hand"}
-  main#play.lt3{grid-template-columns:minmax(0,.42fr) minmax(0,1fr) minmax(0,.42fr);grid-template-areas:"L T R" "L me R" "bar bar bar" "hand hand hand"}
-  main#play.lt4{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
-  main#play.lt5{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L me BR R" "bar bar bar bar" "hand hand hand hand"}
+  main#play.lt0,main#play.lt1{grid-template-columns:minmax(0,1fr);grid-template-areas:"T" "mid" "me" "bar" "hand"}
+  main#play.lt .oppwait{grid-area:T;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;border:2px dashed rgba(0,0,0,.5);border-radius:10px;background:rgba(15,9,30,.6)}
+  main#play.lt .oppwait b{font:700 22px var(--serif)}
+  main#play.lt2{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"T1 T2" "mid mid" "me me" "bar bar" "hand hand"}
+  main#play.lt3{grid-template-columns:minmax(0,.42fr) minmax(0,1fr) minmax(0,.42fr);grid-template-areas:"L T R" "L mid R" "L me R" "bar bar bar" "hand hand hand"}
+  main#play.lt4{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me me R" "bar bar bar bar" "hand hand hand hand"}
+  main#play.lt5{grid-template-columns:minmax(0,.5fr) repeat(2,minmax(0,.6fr)) minmax(0,.5fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me BR R" "bar bar bar bar" "hand hand hand hand"}
   main#play.lt #opps{display:contents}
   main#play.lt .opp{min-width:0;min-height:0;border-color:rgba(0,0,0,.45);box-shadow:0 2px 0 rgba(255,255,255,.08)}
   main#play.lt .opp[data-slot="L"]{grid-area:L} main#play.lt .opp[data-slot="R"]{grid-area:R} main#play.lt .opp[data-slot="T"]{grid-area:T}
   main#play.lt .opp[data-slot="T1"]{grid-area:T1} main#play.lt .opp[data-slot="T2"]{grid-area:T2} main#play.lt .opp[data-slot="BR"]{grid-area:BR}
   main#play.lt .opp[data-slot="L"],main#play.lt .opp[data-slot="R"]{flex-direction:column-reverse}  /* (their name at the bottom of their area) */
   main#play.lt .opp[data-slot="L"] .ohead,main#play.lt .opp[data-slot="R"] .ohead{border-bottom:0;border-top:1px solid var(--felt-edge)}
-  main#play.lt #me{grid-area:me;margin:0;grid-template-columns:minmax(0,1fr) 190px;grid-template-rows:minmax(0,1fr);grid-template-areas:"bf side";border-color:rgba(0,0,0,.45)}
+  main#play.lt #me{grid-area:me;margin:0;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"bf";border-color:rgba(0,0,0,.45);position:relative}
+  /* (your library, graveyard and exile on your mat at your right hand, your command zone just above them) */
+  main#play.lt #me .piles{position:absolute;right:10px;bottom:10px;z-index:3;display:flex;gap:6px}
+  main#play.lt #me .pile{background:rgba(15,9,30,.75);width:58px}
+  main#play.lt #me #czone{position:absolute;right:10px;bottom:118px;z-index:3;min-height:0;min-width:80px;background:rgba(15,9,30,.6)}
+  main#play.lt #me #czone .card{--w:52px}
+  /* (the middle of the table: your life, commander damage, poison and the rest, between the two sides) */
+  main#play.lt #side{grid-area:mid;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 18px;padding:5px 16px;border:1px solid rgba(0,0,0,.5);border-radius:999px;background:rgba(15,9,30,.88);overflow:visible;min-height:0}
+  main#play.lt #side .lifebox{gap:10px}
+  main#play.lt #side .lifebox output{font-size:30px}
+  main#play.lt #side .row{gap:10px}
+  main#play.lt #side>*{flex-shrink:1;min-width:0;max-width:100%}
+  main#play.lt #ctrlBox{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 14px}
+  main#play.lt #ctrlBox .ctrlhead{flex-basis:100%;text-align:center}
+  main#play.lt #ctrlBox .ctrlhead{margin:0}
+  main#play.lt #ctrlBox .ctrl{gap:6px}
   main#play.lt #combatBar{grid-area:bar;margin:0}
   main#play.lt #handWrap{grid-area:hand;border:1px solid rgba(0,0,0,.45);border-radius:10px;background:rgba(15,9,30,.88)}
   main#play.lt #hand{min-height:112px}
@@ -506,15 +523,18 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #bf,main#play.lt .obf{container-type:inline-size}
   main#play.lt #bf .card,main#play.lt .obf .card{--w:clamp(30px,9.5cqw,96px)}
   main#play.lt .obody{container-type:size;position:relative}
-  main#play.lt .oframe{position:absolute;left:50%;top:50%;width:100cqw;height:100cqh;display:grid;grid-template-columns:minmax(0,1fr) 120px;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bf piles" "bf cz";transform:translate(-50%,-50%)}
+  main#play.lt .oframe{position:absolute;left:50%;top:50%;width:100cqw;height:100cqh;display:block;transform:translate(-50%,-50%)}
   main#play.lt .opp[data-slot="T"] .oframe,main#play.lt .opp[data-slot="T1"] .oframe,main#play.lt .opp[data-slot="T2"] .oframe{transform:translate(-50%,-50%) rotate(180deg)}
   main#play.lt .opp[data-slot="L"] .oframe{width:100cqh;height:100cqw;transform:translate(-50%,-50%) rotate(90deg)}
   main#play.lt .opp[data-slot="R"] .oframe{width:100cqh;height:100cqw;transform:translate(-50%,-50%) rotate(-90deg)}
   main#play.lt .opp.zoomed .oframe{width:100cqw;height:100cqh;transform:translate(-50%,-50%)}  /* (zoomed in: upright to read) */
-  main#play.lt .oframe .obf{grid-area:bf}
-  main#play.lt .oframe .opiles{grid-area:piles;flex-wrap:wrap;justify-content:center;border-left:1px solid var(--felt-edge);overflow:visible}
-  main#play.lt .oframe .ocz{grid-area:cz;border-right:0;border-left:1px solid var(--felt-edge);flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:flex-start}
+  main#play.lt .oframe .obf{position:absolute;inset:0}
+  /* (their library, graveyard and exile on their mat at their right hand, their command zone just above) */
+  main#play.lt .oframe .opiles{position:absolute;right:8px;bottom:8px;z-index:3;flex-direction:row;padding:0;border:0;overflow:visible;gap:5px}
+  main#play.lt .oframe .opile{background:rgba(15,9,30,.75);padding:3px}
+  main#play.lt .oframe .ocz{position:absolute;right:8px;bottom:96px;z-index:3;border:1px solid var(--felt-edge);border-radius:8px;background:rgba(15,9,30,.6);flex-direction:row}
   main#play.lt .opile .card,main#play.lt .opile .ph{--w:40px;width:40px}
+  main#play.lt .opilelbl{font-size:10px}
   main#play.lt .ocz .card{--w:44px}
 }
 .oframe{display:contents}
@@ -721,7 +741,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
       <div id="side">
         <div id="myBadges"></div>
         <div class="lifebox"><button id="lifeMinus" aria-label="Lose 1 life">&minus;</button><output id="lifeOut" aria-label="Your life"></output><button id="lifePlus" aria-label="Gain 1 life">+</button></div>
-        <div class="piles">
+        <div class="piles" id="myPiles">
           <div class="pile" id="libPile" data-drop="lib" title="Double-click to draw. Right-click for more."></div>
           <div class="pile" id="gyPile" data-drop="gy" title="Graveyard"></div>
           <div class="pile" id="exPile" data-drop="ex" title="Exile"></div>
@@ -2393,17 +2413,26 @@ function cardW(box){
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = seatsAfter(mySeat, seats).filter(s => s !== mySeat);
-  box.innerHTML = ""; box.classList.toggle("hidden", !order.length); box.classList.toggle("many", order.length > 3);
+  const lt = !settings.round && !me.watch && matchMedia("(min-width:901px)").matches;  // (the long table, even before anyone joins)
+  box.innerHTML = ""; box.classList.toggle("hidden", !order.length && !lt); box.classList.toggle("many", order.length > 3);
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
-  const lt = !settings.round && order.length > 0 && !me.watch && matchMedia("(min-width:901px)").matches;
   const round = !lt && order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
   if (!order.includes(zoomSeat)) zoomSeat = 0;
   // Long table: each player's place, in turn order from your left (see the CSS); with five opponents one shares your side
   const SLOTS = [[], ["T"], ["T1", "T2"], ["L", "T", "R"], ["L", "T1", "T2", "R"], ["L", "T1", "T2", "R", "BR"]][order.length];
   $("#play").className = lt ? `lt lt${order.length}${zoomSeat ? " zooming" : ""}` : round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
   const hw = $("#handWrap"); if (lt ? hw.parentElement === $("#me") : hw.parentElement !== $("#me")) (lt ? $("#play") : $("#me")).append(hw);
+  // (long table: your side panel becomes the middle strip; your piles and command zone go on your mat)
+  const side = $("#side");
+  if (lt && side.parentElement === $("#me")) { $("#play").append(side); $("#me").append($("#myPiles"), $("#czone")); }
+  if (!lt && side.parentElement !== $("#me")) { $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#ctrlBox").before($("#czone")); }
   $("#layoutBtn").textContent = settings.round ? "Layout: Round table" : "Layout: Long table";
+  // (alone at the long table: an empty seat across from you until someone joins)
+  if (lt && !order.length) {
+    const copy = el("button", { type:"button", className:"btn primary", textContent:"Copy invite link" }); copy.onclick = () => $("#copyLink").click();
+    box.append(el("div", { className:"oppwait" }, el("b", { textContent:"Waiting for players" }), el("span", { className:"hint", textContent:"Share your invite link: whoever joins sits across from you." }), copy));
+  }
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
     const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
@@ -2435,7 +2464,9 @@ function renderOpps(){
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
     // (oframe: their battlefield and piles, turned to face their seat at the long table)
-    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)))));
+    // (at the long table their library sits with their other piles)
+    const libOf = () => { const b = el("div", { className:"opile" + (p.lib ? "" : " empty"), title:`${p.name}'s library: ${p.lib} cards` }); b.append(p.lib ? el("div", { className:"card back", style:"position:relative" }) : el("div", { className:"ph" }), el("span", { className:"opilelbl", textContent:`Library ${p.lib}` })); return b; };
+    o.append(el("div", { className:"obody" }, el("div", { className:"oframe" }, p.cz.length ? cz : null, bfEl, el("div", { className:"opiles" }, p.libTop ? libTopOf(p) : lt ? libOf() : null, pileOf(p.gy, "gy"), pileOf(p.ex, "ex"), dungeonCard(s, p.dungeon, false)))));
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
     if (lt) o.dataset.slot = SLOTS[order.indexOf(s)];

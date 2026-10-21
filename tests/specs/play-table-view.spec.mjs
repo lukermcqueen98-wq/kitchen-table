@@ -56,11 +56,12 @@ test("digital table: one Roll dice button with every die, rolls everyone sees, o
   // Luke's graveyard and exile show their top card on Rick's screen, with counts; a click shows them all
   const [g1, g2, x1] = await ktp(a, () => ktPlay.me.zones.hand.slice(0, 3).map(c => c.iid));
   await ktp(a, ([g1, g2, x1]) => { ktPlay.move(g1, "gy"); ktPlay.move(g2, "gy"); ktPlay.move(x1, "ex"); }, [g1, g2, x1]);
-  const piles = opp(b, "Luke").locator(".opile");
-  await expect(piles.nth(0)).toContainText("Graveyard 2");
-  await expect(piles.nth(1)).toContainText("Exile 1");
-  await expect(piles.nth(0).locator(".card img")).toHaveCount(1);
-  await piles.nth(0).click();
+  const pile = name => opp(b, "Luke").locator(".opile", { hasText:name });
+  await expect(pile("Graveyard")).toContainText("Graveyard 2");
+  await expect(pile("Exile")).toContainText("Exile 1");
+  await expect(pile("Library")).toBeVisible();  // (at the long table their library sits on their mat too)
+  await expect(pile("Graveyard").locator(".card img")).toHaveCount(1);
+  await pile("Graveyard").click();
   await expect(b.locator(".modal-card h2")).toHaveText("Luke's graveyard (2)");
   await button(b, "Close");
 
@@ -111,7 +112,7 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   const hisCard = opp(b, "Luke").locator(".dungeon");
   await expect(hisCard.locator(".droom.here")).toHaveText("Secret Entrance");
   await expect(hisCard).toContainText("🗝 Initiative");
-  expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom; })).toBe(true);
+  expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom || d.left >= l.right || d.right <= l.left; })).toBe(true);  // (not covering it)
 
   // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
   await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
@@ -222,7 +223,7 @@ test("digital table: library, graveyard and exile options (Magic's usual ones), 
 
   // Another player's graveyard: Rick reanimates Luke's Gamma Card onto his own battlefield, then exiles the rest
   const gamma = await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "gy"); ktPlay.move(ktPlay.me.zones.lib[0].iid, "gy"); return c.iid; });
-  await expect(opp(b, "Luke").locator(".opile").first()).toContainText("Graveyard 2");
+  await expect(opp(b, "Luke").locator(".opile", { hasText:"Graveyard" })).toContainText("Graveyard 2");
   await opp(b, "Luke").locator(".opile", { hasText:"Graveyard" }).click();
   await b.locator(".modal .gcard", { has:b.locator(`.card[data-iid="${gamma}"]`) }).getByRole("button", { name:"Onto my battlefield" }).click();
   await expect.poll(() => ktp(b, g => ktPlay.me.zones.bf.some(c => c.iid === g && c.owner === 1), gamma)).toBe(true);
