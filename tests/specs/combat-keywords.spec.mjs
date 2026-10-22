@@ -163,7 +163,9 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   await expect(d.locator(".toast, #toast").last()).toContainText("menace");
   await box.getByRole("button", { name:/^Block with Guard Two / }).click();
   await expect(box).toContainText("0 damage to you");
-  await done(); await settleCombat();
+  await done();
+  // (two blockers: Luke divides the 3 damage; the starting split is lethal to the first, the rest to the second)
+  await a.locator("#assignBox").getByRole("button", { name:"Done: deal the damage" }).click(); await settleCombat();
   await expect(life(d)).toHaveText("17");
   await expect(a.locator(`#bf .card[data-iid="${men}"]`)).toHaveCount(0);   // (4 damage back: it died)
   await expect(d.locator(`#bf .card[data-iid="${g1}"]`)).toHaveCount(0);     // (lethal to the first)
@@ -216,7 +218,7 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   const asg = a.locator("#assignBox");
   await expect(asg).toBeVisible(); await expect(asg).toContainText("Divide your damage");
   await expect(box).toContainText("to divide damage");
-  await expect(asg.getByLabel("Damage to Left Guard")).toHaveText("2"); await expect(asg.getByLabel("Damage to Right Guard")).toHaveText("2");
+  await expect(asg.getByLabel("Damage to Left Guard", { exact:true })).toHaveText("2"); await expect(asg.getByLabel("Damage to Right Guard", { exact:true })).toHaveText("2");
   for (let i = 0; i < 2; i++) await asg.getByRole("button", { name:"Less damage to Right Guard" }).click();
   await expect(asg.getByRole("button", { name:"Done: deal the damage" })).toBeDisabled();
   for (let i = 0; i < 2; i++) await asg.getByRole("button", { name:"More damage to Left Guard" }).click();

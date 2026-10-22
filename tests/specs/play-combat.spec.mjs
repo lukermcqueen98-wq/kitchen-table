@@ -77,7 +77,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(box).toContainText("0 damage to you with these blocks.");
   await box.getByRole("button", { name:"Done: take the damage", exact:true }).click();
   await expect(box).toBeHidden();
-  await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
+  await expect(b.locator("#log")).toContainText("You blocked Luke's Gamma Card with Gamma Card.");
   await expect(b.locator("#lifeOut")).toHaveText("20");
   await expect(b.locator("#log")).toContainText("You took no combat damage.");
   // (two 3/4s: neither dies; then combat is over and both leave it, their marks and lines gone)
