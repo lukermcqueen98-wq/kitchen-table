@@ -57,23 +57,10 @@ test("Commander on the digital table: six players, each sees five opponents in t
   const sizes = await ps[0].evaluate(() => [...document.querySelectorAll(".oframe .obf, #myFrame #bf")].map(f => `${f.offsetWidth}x${f.offsetHeight}`));
   expect(sizes).toHaveLength(6); expect(new Set(sizes).size).toBe(1);
   await expect(ps[0].locator("#handWrap")).toBeVisible();
-  // Game › Layout switches to the round table (and remembers it)
-  await tool(ps[0], "#layoutBtn");
-  await expect(ps[0].locator("#play")).toHaveClass(/\bround\b/);
-  await expect(ps[0].locator("#layoutBtn")).toHaveText("Layout: Round table");
-  // Round table, in turn order clockwise from your left: next player lower left, then upper left, across the top,
-  // upper right, lower right; the middle shows the turn order
-  const pos = await ps[0].evaluate(() => [...document.querySelectorAll(".opp")].map(o => ({ pos:o.dataset.pos, name:o.querySelector(".ohead b, .ohead strong")?.textContent || o.textContent.slice(0, 20), ...o.getBoundingClientRect().toJSON() })));
-  expect(pos.map(p => p.pos)).toEqual(["L1", "L2", "T", "R1", "R2"]);
-  const [l1, l2, t, r1, r2] = pos, meBox = await ps[0].locator("#me").boundingBox();
-  expect(Math.abs(l1.x - l2.x)).toBeLessThan(2); expect(l1.y).toBeGreaterThan(l2.y);
-  expect(t.x).toBeGreaterThan(l2.x + l2.width - 2); expect(r1.x).toBeGreaterThan(t.x + t.width - 2);
-  expect(r2.y).toBeGreaterThan(r1.y); expect(meBox.y).toBeGreaterThan(l1.y + l1.height - 2);
-  await expect(ps[0].locator("#hub .hubdot")).toHaveCount(6);
-  await expect(ps[0].locator("#hub")).toContainText("Waiting to start");
+  await expect(ps[0].locator("#layoutBtn")).toHaveCount(0);  // (the long table is the only layout)
   await expect(ps[0].locator(".opp").first()).toContainText("Rick");
   for (const id of ["#libPile", "#lifeOut", "#logBtn", "#nextTurn"]) await expect(ps[0].locator(id)).toBeVisible();
-  await expect(ps[0].locator("details.tmenu > summary")).toHaveText(["Turn", "Table", "Game"]);  // (dice, tokens and the rest are in these)
+  await expect(ps[0].locator("details.tmenu > summary")).toHaveText(["Table", "Game"]);  // (undo, dice, tokens and the rest are in these)
 
   // No zooming in on a board any more (every board is the same everywhere; cards pop out when you point at them)
   const rick = ps[0].locator(".opp", { hasText:"Rick" });
