@@ -601,6 +601,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .bump{animation:bump .4s ease-out}
 #arrows path{transition:opacity .2s}
 .hitfly{position:fixed;z-index:80;border-radius:6px;background:#1a1208 url(card-back.jpg) center/cover;box-shadow:0 10px 26px rgba(0,0,0,.65);pointer-events:none}
+.hitfly.trample{box-shadow:0 0 0 2px #ffb347,0 0 24px rgba(255,140,40,.8),0 10px 26px rgba(0,0,0,.65)}
+.burst{position:fixed;z-index:79;width:110px;height:110px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,220,140,.95),rgba(255,120,40,.6) 40%,transparent 70%)}
 .hitnum{position:fixed;z-index:81;font:800 30px/1 var(--serif);color:var(--danger);text-shadow:0 2px 8px #000;pointer-events:none}
 /* (the shuffle riffle: the deck splits into two halves that fan apart and snap back together) */
 .riffling{position:relative}
@@ -2789,6 +2791,7 @@ function renderMine(){
 let lastAtMe = 0;
 // The combat bar, while creatures are attacking: who's attacking whom (the arrows show which creature)
 function renderCombat(){
+  requestAnimationFrame(combatMoves);
   const attackers = Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk).map(c => ({ c, s:+s })));
   const note = $("#combatNote"), atMe = attackers.filter(a => a.c.atk === mySeat);
   $("#combatBar").classList.toggle("hidden", !attackers.length);
@@ -3752,7 +3755,7 @@ const cpw = c => parseInt(c.pt, 10) || 0;
    Indestructible: lethal damage doesn't destroy it (0 toughness still does).
    pairs: [{ a:{ c, s, d }, blockers:[{ c, s }] }], the cards as shared (pt "3/4", ck: key terms, col: colors). */
 function fight(pairs){
-  const out = { player:{}, dies:[], minus:{}, gain:{} };
+  const out = { player:{}, dies:[], minus:{}, gain:{}, took:{} };
   const unit = (c, s) => { const m = /^(-?\d+)\/(-?\d+)/.exec(c.pt || ""); return { c, s, p:m ? +m[1] : 0, t:m ? +m[2] : 0, kw:new Set(c.ck || []), col:c.col || "", dmg:0, minus:0, dt:false, dead:false }; };
   const has = (u, k) => u.kw.has(k), tough = u => u.t - u.minus;
   const P = d => out.player[d] ||= { life:0, poison:0, cmd:{}, from:[] };
@@ -3796,7 +3799,7 @@ function fight(pairs){
       if (t <= 0 || (!has(u, "indestructible") && (u.dmg >= t || (u.dt && u.dmg + u.minus > 0)))) { u.dead = true; out.dies.push(u.c.iid); }
     }
   }
-  for (const u of fs.flatMap(f => [f.A, ...f.B])) if (u.minus) out.minus[u.c.iid] = u.minus;
+  for (const u of fs.flatMap(f => [f.A, ...f.B])) { if (u.minus) out.minus[u.c.iid] = u.minus; if (u.dmg + u.minus) out.took[u.c.iid] = u.dmg + u.minus; }
   return out;
 }
 // Why a creature can't block an attacker ("" if it can): flying, can't be blocked, can't block, protection
@@ -3907,7 +3910,11 @@ function resolveCombat(){
   resolvedKeys.add(key);
   for (const a of atk) resolvedAtk.add(a.c.iid);
   const r = fight(pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]));
-  for (const d of defenders) { const p = r.player[d]; hitAnim(d, atk.filter(a => p?.from.includes(a.c)), p ? p.life + p.poison : 0); }
+  const fought = pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]);
+  // (a blocked attacker that still hit the player tramples over: it bursts through its blockers on its way)
+  const via = Object.fromEntries(fought.filter(f => f.blockers.length).map(f => [f.a.c.iid, f.blockers.map(b => cardAt(b.c.iid)).filter(Boolean)]).filter(([, es]) => es.length));
+  for (const d of defenders) { const p = r.player[d]; hitAnim(d, atk.filter(a => p?.from.includes(a.c)), p ? p.life + p.poison : 0, via); }
+  clashAnim(fought, r);
   const mine = me.watch ? [] : me.zones.bf;
   setTimeout(() => {
     if (me.watch) return;
@@ -3932,18 +3939,68 @@ function resolveCombat(){
     if (ch) { me.arrows = (me.arrows || []).filter(x => !ids.has(x.from)); changed(); }
   }, 1300);
 }
+/* Combat motion, on every screen: an attacker lunges toward the player it attacks when the attack is declared; a
+   blocker steps out toward the attacker it blocks; when the damage lands, each blocked attacker slams into its
+   blockers, every creature that took damage shakes with the damage over it, and the ones that died fade and grey
+   before they go to the graveyard. */
+const cardAt = iid => document.querySelector(`#bf .card[data-iid="${CSS.escape(iid)}"], .obf .card[data-iid="${CSS.escape(iid)}"]`);
+const centerOf = e => { const r = e.getBoundingClientRect(); return { x:r.left + r.width / 2, y:r.top + r.height / 2 }; };
+let seenAtk = new Set(), seenBlk = new Set();
+function combatMoves(){
+  if (!motionOK()) return;
+  const now = Object.entries(players).flatMap(([s, p]) => (p.bf || []).map(c => ({ c, s:+s })));
+  const lunge = (e, to, k) => { const a = centerOf(e), dx = (to.x - a.x) * k, dy = (to.y - a.y) * k;
+    e.animate([{ translate:"0 0" }, { translate:`${dx}px ${dy}px`, offset:.45 }, { translate:"0 0" }], { duration:520, easing:"cubic-bezier(.3,.7,.3,1)" }); };
+  for (const { c } of now) {
+    if (c.atk && !seenAtk.has(c.iid)) {
+      const e = cardAt(c.iid), t = c.atk === mySeat ? $("#lifeOut") : document.querySelector(`.opp[data-seat="${c.atk}"] .olife`);
+      if (e && t) { const tc = centerOf(t), d = Math.hypot(tc.x - centerOf(e).x, tc.y - centerOf(e).y) || 1; lunge(e, tc, Math.min(.35, 70 / d)); }
+    }
+    if (c.blk && !seenBlk.has(c.iid)) { const e = cardAt(c.iid), t = cardAt(c.blk); if (e && t) lunge(e, centerOf(t), .3); }
+  }
+  seenAtk = new Set(now.filter(x => x.c.atk).map(x => x.c.iid)); seenBlk = new Set(now.filter(x => x.c.blk).map(x => x.c.iid));
+}
+function clashAnim(pairs, r){
+  if (!motionOK()) return;
+  const floatNum = (e, text, delay) => setTimeout(() => {
+    const c = centerOf(e), n = el("span", { className:"hitnum", textContent:text }); n.style.left = `${c.x}px`; n.style.top = `${c.y - 20}px`; document.body.append(n);
+    n.animate([{ transform:"translate(-50%,0) scale(.6)", opacity:0 }, { transform:"translate(-50%,-10px) scale(1.15)", opacity:1, offset:.2 }, { transform:"translate(-50%,-44px)", opacity:0 }], { duration:1100, easing:"ease-out" }).onfinish = () => n.remove();
+  }, delay);
+  for (const { a, blockers } of pairs) {
+    if (!blockers.length) continue;
+    const ae = cardAt(a.c.iid), be = blockers.map(b => cardAt(b.c.iid)).filter(Boolean); if (!ae || !be.length) continue;
+    const to = be.map(centerOf).reduce((m, p, i, all) => ({ x:m.x + p.x / all.length, y:m.y + p.y / all.length }), { x:0, y:0 }), from = centerOf(ae);
+    const dx = (to.x - from.x) * .6, dy = (to.y - from.y) * .6;
+    ae.animate([{ translate:"0 0", scale:"1", zIndex:40 }, { translate:`${dx * .3}px ${dy * .3}px`, scale:"1.08", zIndex:40, offset:.25 },
+      { translate:`${dx}px ${dy}px`, scale:"1.08", zIndex:40, offset:.5 }, { translate:"0 0", scale:"1", zIndex:40 }], { duration:620, easing:"cubic-bezier(.5,0,.4,1)" });
+    for (const e of [ae, ...be]) {
+      const iid = e.dataset.iid, hurt = r.took[iid], dies = r.dies.includes(iid);
+      if (hurt) setTimeout(() => e.animate([{ rotate:"0deg" }, { rotate:"-5deg" }, { rotate:"5deg" }, { rotate:"-3deg" }, { rotate:"0deg" }], { duration:320 }), 300);
+      if (hurt) floatNum(e, `−${hurt}`, 300);
+      if (dies) setTimeout(() => e.animate([{ filter:"none", opacity:1 }, { filter:"grayscale(1) brightness(.6) drop-shadow(0 0 10px #ff3b5c)", opacity:.55 }], { duration:300, fill:"forwards" }), 420);
+    }
+  }
+}
 // The hit: each attacker that got through flies into the life total, which shakes and shows what it lost
-function hitAnim(d, hits, n){
+function hitAnim(d, hits, n, via = {}){
   const target = d === mySeat ? $("#lifeOut") : document.querySelector(`.opp[data-seat="${d}"] .olife`); if (!target) return;
-  const t = target.getBoundingClientRect();
+  const t = target.getBoundingClientRect(); let last = 0;
   hits.forEach((a, i) => {
-    const src = document.querySelector(`#bf .card[data-iid="${CSS.escape(a.c.iid)}"], .obf .card[data-iid="${CSS.escape(a.c.iid)}"]`); if (!src) return;
-    const r = src.getBoundingClientRect(), g = el("div", { className:"hitfly" });
+    const src = cardAt(a.c.iid); if (!src) return;
+    // (trample: it starts where it slammed into its blockers, once it has, with a burst there)
+    const over = via[a.c.iid], r0 = src.getBoundingClientRect(), from = over ? over.map(centerOf).reduce((m, p, j, all) => ({ x:m.x + p.x / all.length, y:m.y + p.y / all.length }), { x:0, y:0 }) : centerOf(src);
+    const r = { left:from.x - r0.width / 2, top:from.y - r0.height / 2, width:r0.width, height:r0.height }, g = el("div", { className:"hitfly" + (over ? " trample" : "") });
     g.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;${a.c.img ? `background-image:url("${a.c.img}")` : ""}`;
+    const delay = i * 140 + (over ? 320 : 0); last = Math.max(last, delay);
+    if (over) {
+      g.style.opacity = "0";
+      setTimeout(() => { const b = el("span", { className:"burst" }); b.style.left = `${from.x}px`; b.style.top = `${from.y}px`; document.body.append(b);
+        b.animate([{ transform:"translate(-50%,-50%) scale(.2)", opacity:1 }, { transform:"translate(-50%,-50%) scale(1.6)", opacity:0 }], { duration:450, easing:"ease-out" }).onfinish = () => b.remove(); }, delay);
+    }
     document.body.append(g);
     const dx = t.left + t.width / 2 - (r.left + r.width / 2), dy = t.top + t.height / 2 - (r.top + r.height / 2);
-    g.animate([{ transform:"none" }, { transform:`translate(${dx * .9}px,${dy * .9}px) scale(.75) rotate(-8deg)`, offset:.8 }, { transform:`translate(${dx}px,${dy}px) scale(.3)`, opacity:0 }],
-      { duration:650, delay:i * 140, easing:"cubic-bezier(.55,0,.8,.3)", fill:"both" }).onfinish = () => g.remove();
+    g.animate([{ transform:"none", opacity:1 }, { transform:`translate(${dx * .9}px,${dy * .9}px) scale(.75) rotate(-8deg)`, opacity:1, offset:.8 }, { transform:`translate(${dx}px,${dy}px) scale(.3)`, opacity:0 }],
+      { duration:650, delay, easing:"cubic-bezier(.55,0,.8,.3)", fill:"both" }).onfinish = () => g.remove();
   });
   if (!n) return;
   setTimeout(() => {
@@ -3951,7 +4008,7 @@ function hitAnim(d, hits, n){
     const num = el("span", { className:"hitnum", textContent:`−${n}` }); num.style.left = `${t.left + t.width / 2}px`; num.style.top = `${t.top}px`;
     document.body.append(num);
     num.animate([{ transform:"translate(-50%,0)", opacity:1 }, { transform:"translate(-50%,-46px)", opacity:0 }], { duration:1300, easing:"ease-out" }).onfinish = () => num.remove();
-  }, 600 + Math.max(0, hits.length - 1) * 140);
+  }, 600 + last);
 }
 // Tokens: the ones your cards make (from Scryfall's related cards), or search for any token
 async function tokenDialog(rel){
