@@ -88,11 +88,14 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await box.getByRole("button", { name:"Take the damage", exact:true }).click();
   await expect(b.locator("#lifeOut")).toHaveText("17");
   await expect(a.locator("#log")).toContainText("Rick took 3 combat damage from Gamma Card.");
+  // (it got through: it leaves combat, its attack mark and arrow gone on both screens)
+  await expect(a.locator(`#bf .card[data-iid="${bear}"].attacking`)).toHaveCount(0);
+  for (const p of [a, b]) await expect(p.locator("#arrows > path:not(.blockline)")).toHaveCount(0);
   // A */* creature is 0/0 plus its counters: with three +1/+1 counters it's 3/3, and deals 3
   await ktp(a, () => {
     ktPlay.cards.set("elder-0000", { id:"elder-0000", name:"Test Elder", type_line:"Creature — Treefolk", power:"*", toughness:"*",
       oracle_text:"Test Elder's power and toughness are each equal to the number of Forests you control.", image_uris:{ small:"https://cards.scryfall.io/small/0.png", normal:"https://cards.scryfall.io/normal/0.png" } });
-    ktPlay.me.zones.bf.push({ iid:"eldercard", id:"elder-0000", x:0.6, y:0.3, tapped:false, fd:false, face:0, ctr:{} });
+    ktPlay.me.zones.bf.push({ iid:"eldercard", id:"elder-0000", x:0.6, y:0.3, tapped:false, fd:false, face:0, ctr:{} }); ktPlay.changed();
   });
   await a.locator('#bf .card[data-iid="eldercard"]').click({ button:"right" });
   await expect(a.locator(".modal .cp-sec", { hasText:"Base power/toughness" })).toContainText("*/*");
@@ -104,9 +107,9 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await dragTo(a, a.locator('#bf .card[data-iid="eldercard"]'), a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" }));
   await a.locator("#atkBar").getByRole("button", { name:/^Attack \(/ }).click();
   await expect(box).toContainText("Test Elder");
-  await expect(box).toContainText("6 damage to you if you take it.");  // (the Gamma Card is still attacking too)
+  await expect(box).toContainText("3 damage to you if you take it.");
   await box.getByRole("button", { name:"Take the damage", exact:true }).click();
-  await expect(b.locator("#lifeOut")).toHaveText("11");
+  await expect(b.locator("#lifeOut")).toHaveText("14");
   await a.click("#nextTurn");
   // (ending the turn with more than 7 cards asks for discards: keep them)
   const keep = a.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
