@@ -507,6 +507,12 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt .opp.turn .oframe,main#play.lt #me.turn #myFrame{outline:2px solid var(--brass);box-shadow:0 0 0 4px rgba(255,207,90,.35),0 0 26px rgba(255,207,90,.3),inset 0 0 40px rgba(0,0,0,.5)}
   main#play.lt .oppwait{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;border-style:dashed;--mat:#2a1f45}
   main#play.lt .oppwait b{font:700 20px var(--serif)}
+  /* (an open seat: bare table with a dashed outline of the playmat that goes there, the same size as everyone's) */
+  main#play.lt .oppwait{border:0;background:none;box-shadow:none;display:grid;place-items:center;overflow:visible}
+  main#play.lt .waitmat{--pw:min(calc(var(--fw,400px) * .07),calc((var(--fw,400px) / var(--ba) - 26px) / 4.2));--colw:calc(var(--pw) * 2 + 30px);
+    width:calc(var(--fw,400px) + var(--colw));height:calc(var(--fw,400px) / var(--ba));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    border:2px dashed rgba(232,220,181,.35);border-radius:12px;background:radial-gradient(ellipse at 50% 45%,rgba(42,31,69,.85),rgba(18,11,34,.85) 125%)}
+  main#play.lt [data-slot="L"] .waitmat,main#play.lt [data-slot="R"] .waitmat{width:calc(var(--fw,400px) / var(--ba));height:calc(var(--fw,400px) + var(--colw))}
   /* (name plates: a pill on the owner's edge of the mat; the end seats' at the bottom) */
   main#play.lt .ohead{position:absolute;left:50%;top:6px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap;
     max-width:calc(100% - 12px);overflow:hidden;padding:3px 12px;border:1px solid var(--felt-edge);border-radius:999px;background:rgba(15,9,30,.92);font-size:12px}
@@ -652,7 +658,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 @keyframes tumble{from{transform:rotate(0) scale(.9)}50%{transform:rotate(180deg) scale(1.05)}to{transform:rotate(360deg) scale(.9)}}
 @keyframes coinspin{from{transform:scaleX(1)}50%{transform:scaleX(.08)}to{transform:scaleX(1)}}
 @keyframes landed{from{transform:scale(1.35)}to{transform:scale(1)}}
-@media (prefers-reduced-motion:reduce){.card,#hand .card,.btn{transition:none}.modal,.modal-card,.tmenu-pop,#defendBox,#atkBar,#pauseBar,#combatBar,.bump{animation:none}.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie svg{animation:none}#turnInfo.mine,#turnSplash,#turnClockBox.over b{animation:none}}
+body.nomotion .card,body.nomotion #hand .card,body.nomotion .btn{transition:none}body.nomotion :is(.modal,.modal-card,.tmenu-pop,#defendBox,#atkBar,#pauseBar,#combatBar,.bump){animation:none}
+body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie svg,#turnInfo.mine,#turnSplash,#turnClockBox.over b){animation:none}
 </style>
 </head>
 <body>
@@ -751,6 +758,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
           <button role="menuitem" class="btn small mitem" id="copyLink">Copy invite link</button>
           <button role="menuitem" class="btn small mitem" id="rulesBtn" title="House rules for this table">House rules</button>
           <button role="menuitem" class="btn small mitem hidden playonly" id="sideBtn" title="Swap cards between your deck and sideboard (for the next game)">Sideboard</button>
+          <button role="menuitem" class="btn small mitem" id="motionBtn" title="Cards gliding, flipping and flying, and the rest of the table's motion">Animations: On</button>
           <button role="menuitem" class="btn small mitem" id="matBtn" title="Pick a playmat for your side of the table (everyone sees it)">Playmat</button>
           <button role="menuitem" class="btn small mitem" id="termsBtn" title="Magic terms and what they mean">Terms</button>
           <button role="menuitem" class="btn small mitem" id="statsBtn">Stats</button>
@@ -1304,7 +1312,7 @@ const conns = {}, calls = {};
 let table = { tv:0, fmt:"cmdr", started:false, gameId:"", turnSeat:0, turnNum:0, phase:0, firstSeat:0, order:[], at:0, monarch:0, initiative:0, day:"", spells:0, turnAt:0, round:0, rules:{} };
 const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:store.get("kt-dig-draw", "1") === "1", autoMana:store.get("kt-dig-mana", "1") === "1", sounds:store.get("kt-dig-sounds", "1") === "1",
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1", logPop:store.get("kt-dig-logpop", "1") === "1",
-                   stackLands:store.get("kt-dig-stack", "1") === "1" };
+                   stackLands:store.get("kt-dig-stack", "1") === "1", motion:store.get("kt-dig-motion", "1") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
 const watchers = {};  // seat -> name, for people watching (seats 7 to 10)  // (commanders taken out of the decklist go back if you pick another)
 
@@ -2437,8 +2445,8 @@ function drawBattlefield(box, list, opts){
 function sizeBoards(){
   const play = $("#play"); if (!play.classList.contains("lt")) return;
   const A = parseFloat(getComputedStyle(play).getPropertyValue("--ba")) || 2.4; let F = Infinity;
-  for (const b of document.querySelectorAll("#play.lt .opp .obody, #play.lt #me")) {
-    const r = b.getBoundingClientRect(), side = /^[LR]$/.test(b.closest(".opp")?.dataset.slot || "");
+  for (const b of document.querySelectorAll("#play.lt .opp .obody, #play.lt #me, #play.lt .oppwait")) {
+    const r = b.getBoundingClientRect(), side = /^[LR]$/.test(b.closest("[data-slot]")?.dataset.slot || "");
     const along = side ? r.height : r.width, depth = side ? r.width : r.height;
     if (along > 0 && depth > 0) F = Math.min(F, (along - 16 - 30) / 1.14, (depth - 16) * A);  // (with the pile columns, --colw)
   }
@@ -2469,8 +2477,8 @@ function render(){
 /* Motion, on every screen: a card that moved since the last render glides from where it was (a land played from
    your hand, a draw from the library, a creature to the graveyard, a tap); one that just appeared fades in; one
    that went somewhere unseen (a hand, the library) flies there and fades. Life totals bump when they change. */
-const motionOK = () => !matchMedia("(prefers-reduced-motion:reduce)").matches;
-const dropFrom = new Map();  // (where a card you dragged was let go: it settles from there, not from where it started)
+const motionOK = () => settings.motion !== false;  // (Game › Animations)
+const dropFrom = new Map(), lately = new Map();  // (where a card you dragged was let go: it settles from there, not from where it started)
 function snapCards(){
   const m = new Map();
   for (const e of document.querySelectorAll(".card[data-iid]:not(.ghost)")) {
@@ -2483,21 +2491,37 @@ function snapCards(){
 }
 function glide(before){
   const after = snapCards(); let fresh = 0;
+  // (cards that left where they were: a new card on a battlefield (a land joining a stack, say) came from one of them)
+  const gone = [...before].filter(([iid]) => !after.has(iid));
+  // (and where cards were a moment ago: a spell cast passes through the stack on its way to the battlefield)
+  const now = Date.now(); for (const [iid, r] of lately) if (now - r.t > 1500) lately.delete(iid);
+  for (const [iid, g] of gone) lately.set(iid, { ...g, t:now });
   for (const [iid, a] of after) {
-    const b = dropFrom.get(iid) || before.get(iid), e = document.querySelector(`.card[data-iid="${CSS.escape(iid)}"]:not(.ghost)`); if (!e) continue;
-    if (!b) { if (before.size && ++fresh < 12) e.animate([{ opacity:0, scale:".8" }, { opacity:1, scale:"1" }], { duration:260, easing:"cubic-bezier(.2,.8,.3,1)" }); continue; }
+    const b = dropFrom.get(iid) || before.get(iid) || (!before.has(iid) && lately.get(iid)), e = document.querySelector(`.card[data-iid="${CSS.escape(iid)}"]:not(.ghost)`); if (!e) continue;
+    if (!b && before.size) {
+      // (a card that wasn't showing: a draw comes off your library, another player's play comes out of their hand,
+      // by their name plate; anything else (a token, say) fades in. Pile tops just appear.)
+      if (e.closest(".pile, .opile, #czone")) continue;
+      const seat = +(e.closest(".opp")?.dataset.seat || mySeat), gi = e.closest("#bf, .obf") ? gone.findIndex(([, g]) => g.seat === seat && !g.zone) : -1;
+      if (gi >= 0) { const [[, g]] = gone.splice(gi, 1); g.used = true; flyIn(e, a, g); ++fresh; continue; }
+      const from = e.closest("#hand") ? $("#libPile") : e.closest(".obf") ? e.closest(".opp")?.querySelector(".ohead") : null, fr = from?.getBoundingClientRect();
+      if (fr?.width && ++fresh < 12) { flyIn(e, a, { x:fr.left + fr.width / 2, y:fr.top + fr.height / 2, w:a.w * .6 }); continue; }
+      if (++fresh < 12) e.animate([{ opacity:0, scale:".8" }, { opacity:1, scale:"1" }], { duration:320, easing:"cubic-bezier(.2,.8,.3,1)" });
+      continue;
+    }
+    if (!b) continue;
     // (turned face up or down, or to its other face: it flips; counters or power/toughness changed: they pop)
     if (b.img && a.img !== b.img && b.zone === "bf" && a.zone === "bf") e.animate([{ rotate:"y 90deg" }, { rotate:"y 0deg" }], { duration:300, easing:"ease-out" });
     if (b.ctr !== undefined && a.ctr && a.ctr !== b.ctr) bumpEl(e.querySelector(".ctrs"));
     if (b.pt !== undefined && a.pt && b.pt && a.pt !== b.pt) bumpEl(e.querySelector(".pt"));
     const dx = b.x - a.x, dy = b.y - a.y, s = b.w / (a.w || 1);
     if (Math.hypot(dx, dy) < 2 && Math.abs(s - 1) < .02) continue;
-    e.animate([{ translate:`${dx}px ${dy}px`, scale:`${s}`, zIndex:40 }, { translate:"0 0", scale:"1", zIndex:40 }],
-      { duration:dropFrom.has(iid) ? 140 : Math.min(520, 240 + Math.hypot(dx, dy) * .35), easing:"cubic-bezier(.25,.8,.3,1)" });
+    if (dropFrom.has(iid) || Math.hypot(dx, dy) < 60) e.animate([{ translate:`${dx}px ${dy}px`, scale:`${s}` }, { translate:"0 0", scale:"1" }], { duration:dropFrom.has(iid) ? 160 : 300, easing:"cubic-bezier(.25,.8,.3,1)" });
+    else flyIn(e, a, b);
   }
   dropFrom.clear();
   for (const [iid, b] of before) {
-    if (after.has(iid)) continue;
+    if (after.has(iid) || b.used) continue;
     const to = whereWent(iid, b.seat); if (!to) continue;
     const t = to.getBoundingClientRect(); if (!t.width) continue;
     const g = el("div", { className:"hitfly" });
@@ -2506,6 +2530,15 @@ function glide(before){
     g.animate([{ transform:"none", opacity:1 }, { transform:`translate(${t.left + t.width / 2 - b.x}px,${t.top + t.height / 2 - b.y}px) scale(.45)`, opacity:0 }],
       { duration:420, easing:"cubic-bezier(.4,0,.6,1)", fill:"both" }).onfinish = () => g.remove();
   }
+}
+// A card's trip across the table: it lifts, arcs over and settles into place
+function flyIn(e, a, b){
+  const dx = b.x - a.x, dy = b.y - a.y, s = (b.w || a.w) / (a.w || 1), d = Math.hypot(dx, dy);
+  e.animate([
+    { translate:`${dx}px ${dy}px`, scale:`${s}`, zIndex:40, boxShadow:"0 2px 6px rgba(0,0,0,.5)" },
+    { translate:`${dx * .45}px ${dy * .45 - Math.min(70, d * .18)}px`, scale:`${(s + 1) / 2 * 1.12}`, zIndex:40, boxShadow:"0 22px 40px rgba(0,0,0,.55)", offset:.5 },
+    { translate:"0 0", scale:"1", zIndex:40, boxShadow:"0 1px 3px rgba(0,0,0,.6)" }
+  ], { duration:Math.min(720, 420 + d * .3), easing:"cubic-bezier(.3,.7,.3,1)" });
 }
 function whereWent(iid, seat){
   if (seat === mySeat && !me.watch) {
@@ -2616,12 +2649,12 @@ function renderOpps(){
   }
   // (open seats at the long table; alone, the one across from you asks for players)
   if (lt && order.length < 4) for (const slot of ["L", "T", "R"].filter(x => !SLOTS.includes(x))) {
-    const w = el("div", { className:"oppwait" }); w.dataset.slot = slot;
+    const o = el("div", { className:"oppwait" }), w = el("div", { className:"waitmat" }); o.dataset.slot = slot; o.append(w);
     if (!order.length && slot === "T") {
       const copy = el("button", { type:"button", className:"btn primary", textContent:"Copy invite link" }); copy.onclick = () => $("#copyLink").click();
       w.append(el("b", { textContent:"Waiting for players" }), el("span", { className:"hint", textContent:"Share your invite link: whoever joins sits across from you." }), copy);
     } else w.append(el("span", { className:"hint", textContent:"Open seat" }));
-    box.append(w);
+    box.append(o);
   }
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
@@ -4320,6 +4353,8 @@ function adjustMat(start, isNew){
     el("div", { className:"matctl" }, el("label", {}, el("span", { textContent:"Zoom" }), zoom), el("label", {}, el("span", { textContent:"Darken" }), dim), arrows)),
     [{ label:"Cancel" }, { label:isNew ? "Use this playmat" : "Save", primary:true, fn:() => setMat(m, !isNew) }], { wide:true });
 }
+$("#motionBtn").onclick = () => { settings.motion = !settings.motion; store.set("kt-dig-motion", settings.motion ? "1" : "0"); document.body.classList.toggle("nomotion", !settings.motion); $("#motionBtn").textContent = `Animations: ${settings.motion ? "On" : "Off"}`; };
+document.body.classList.toggle("nomotion", !settings.motion); $("#motionBtn").textContent = `Animations: ${settings.motion ? "On" : "Off"}`;
 $("#matBtn").onclick = () => {
   const grid = el("div", { className:"matgrid" });
   for (const [k, x] of Object.entries(MATS)) {
