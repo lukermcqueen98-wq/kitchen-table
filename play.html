@@ -482,13 +482,13 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
    sits in the same spot on every screen; each opponent's battlefield, piles and command zone face their seat. A slim
    strip across the middle holds whose turn it is and your life and counters; your hand sits below the table. */
 @media (min-width:901px){
-  main#play.lt{--ba:2;display:grid;gap:12px;padding:22px 26px 10px;isolation:isolate;
+  main#play.lt{--ba:2;display:grid;gap:10px;padding:34px 20px 32px;isolation:isolate;justify-content:center;align-content:start;
     grid-template-columns:minmax(0,.38fr) minmax(0,1fr) minmax(0,.38fr);grid-template-rows:minmax(0,1fr) auto minmax(0,1fr) auto;
-    grid-template-areas:"L T R" "L mid R" "L me R" "bar bar bar";padding-bottom:16px}
+    grid-template-areas:"L T R" "L mid R" "L me R" "bar bar bar"}
   main#play.lt4{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me me R" "bar bar bar bar"}
   main#play.lt5{grid-template-columns:minmax(0,.38fr) repeat(2,minmax(0,.5fr)) minmax(0,.38fr);grid-template-areas:"L T1 T2 R" "L mid mid R" "L me BR R" "bar bar bar bar"}
   /* (the wood: under the mats and the middle strip, not the hand) */
-  main#play.lt::before{content:"";grid-row:1 / 4;grid-column:1 / -1;margin:-14px;border-radius:26px;z-index:-1;
+  main#play.lt::before{content:"";grid-row:1 / 4;grid-column:1 / -1;margin:-31px -14px;border-radius:26px;z-index:-1;
     background:repeating-linear-gradient(2deg,#6b4526 0px,#7a5130 10px,#5e3c20 17px,#714a2b 27px);box-shadow:inset 0 0 0 3px #3a2414,0 24px 60px rgba(0,0,0,.6)}
   main#play.lt #opps{display:contents}
   main#play.lt [data-slot="L"]{grid-area:L} main#play.lt [data-slot="R"]{grid-area:R} main#play.lt [data-slot="T"]{grid-area:T}
@@ -514,13 +514,12 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
     border:2px dashed rgba(232,220,181,.35);border-radius:12px;background:radial-gradient(ellipse at 50% 45%,rgba(42,31,69,.85),rgba(18,11,34,.85) 125%)}
   main#play.lt [data-slot="L"] .waitmat,main#play.lt [data-slot="R"] .waitmat{width:calc(var(--fw,400px) / var(--ba));height:calc(var(--fw,400px) + var(--colw))}
   /* (name plates: a pill on the owner's edge of the mat; the end seats' at the bottom) */
-  main#play.lt .ohead{position:absolute;left:50%;top:6px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap;
+  main#play.lt .ohead{position:absolute;left:50%;top:-28px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap;
     max-width:calc(100% - 12px);overflow:hidden;padding:3px 12px;border:1px solid var(--felt-edge);border-radius:999px;background:rgba(15,9,30,.92);font-size:12px}
-  main#play.lt [data-slot="L"] .ohead,main#play.lt [data-slot="R"] .ohead,main#play.lt [data-slot="BR"] .ohead{top:auto;bottom:6px}
+  main#play.lt [data-slot="L"] .ohead,main#play.lt [data-slot="R"] .ohead,main#play.lt [data-slot="BR"] .ohead{top:auto;bottom:-28px}
   main#play.lt .ohead .oname{order:1} main#play.lt .ohead .olife{order:2;margin-left:0;font-size:18px} main#play.lt .ohead .ocount,main#play.lt .ohead .badge{order:3}
   main#play.lt .ohead .ocount ~ .ocount{display:none}  /* (the plate: name, life and hand, like across a real table) */
-  main#play.lt .obody{position:absolute;inset:30px 0 0;container-type:size}
-  main#play.lt [data-slot="L"] .obody,main#play.lt [data-slot="R"] .obody,main#play.lt [data-slot="BR"] .obody{inset:0 0 30px}
+  main#play.lt .obody{position:absolute;inset:0;container-type:size}  /* (the plate sits on the wood just outside the mat) */
   /* (each battlefield the same shape, as big as fits its mat, turned to face its owner) */
   /* (each seat: a strip as long as its mat (from its owner's side) and as deep as a board; the board, the same size for
      everyone, sits in the middle of it, and the piles at the owner's right-hand end of the mat) */
@@ -2443,14 +2442,27 @@ function drawBattlefield(box, list, opts){
 /* Long table: every battlefield the same size (--fw, its width from its owner's seat): the biggest that fits every mat,
    so a board and its cards look the same on every screen */
 function sizeBoards(){
-  const play = $("#play"); if (!play.classList.contains("lt")) return;
-  const A = parseFloat(getComputedStyle(play).getPropertyValue("--ba")) || 2.4; let F = Infinity;
-  for (const b of document.querySelectorAll("#play.lt .opp .obody, #play.lt #me, #play.lt .oppwait")) {
-    const r = b.getBoundingClientRect(), side = /^[LR]$/.test(b.closest("[data-slot]")?.dataset.slot || "");
-    const along = side ? r.height : r.width, depth = side ? r.width : r.height;
-    if (along > 0 && depth > 0) F = Math.min(F, (along - 16 - 30) / 1.14, (depth - 16) * A);  // (with the pile columns, --colw)
-  }
-  if (isFinite(F)) play.style.setProperty("--fw", `${Math.max(120, Math.floor(F))}px`);
+  const play = $("#play");
+  if (!play.classList.contains("lt")) { play.style.removeProperty("grid-template-columns"); play.style.removeProperty("grid-template-rows"); return; }
+  /* Every mat the same size (fw: the battlefield's width; the mat is that plus the pile column, and fw / A deep),
+     the biggest that fits: the seats across and on your side upright, the end seats turned sideways and running the
+     table's depth. Each seat is then exactly its mat, so the mats fill the table with slight borders between them
+     and line up edge to edge; the wood wraps them, with the name plates on it. */
+  const cs = getComputedStyle(play), g = parseFloat(cs.rowGap) || 12, P = 0;  // (name plates sit on the wood outside the mats)
+  const Wa = play.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const bar = $("#combatBar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + g : g;
+  const hw = $("#handWrap"), handH = hw && hw.parentElement === play && getComputedStyle(hw).position === "static" ? hw.offsetHeight + g : 0;  // (the hand as a strip under the table)
+  const Ha = play.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - handH;
+  const m = Math.max(44, $("#side")?.offsetHeight || 0), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
+  // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
+  const shape = fw => Math.min(3, Math.max(1.5, 2 * fw / (Ha - P - m - 2 * g)));
+  const matW = (fw, A) => { const pw = Math.min(fw * .07, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
+  const fits = fw => { const A = shape(fw), H = fw / A, W = matW(fw, A); return 2 * H + cols * W + (cols + 1) * g <= Wa && 2 * H + P + m + 2 * g <= Ha && W + P <= Ha; };
+  let lo = 120, hi = 3000; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (fits(mid)) lo = mid; else hi = mid; }
+  const fw = lo, A = shape(fw), H = Math.floor(fw / A), W = Math.ceil(matW(fw, A)), midRow = Math.max(m, W + P - 2 * H - P - 2 * g);
+  play.style.setProperty("--fw", `${fw}px`); play.style.setProperty("--ba", `${A}`);
+  play.style.gridTemplateColumns = `${H}px ${cols === 2 ? `${W}px ${W}px` : `${W}px`} ${H}px`;
+  play.style.gridTemplateRows = `${H + P}px ${midRow}px ${H}px auto`;
 }
 addEventListener("resize", () => requestAnimationFrame(sizeBoards));
 /* A shuffle: the player's library pile riffles (its two halves fan apart and snap back) on every screen, when their
