@@ -506,7 +506,7 @@ test("digital table: attacking by hand, each creature at its own opponent (arrow
   await expect(a.locator(".opp")).toHaveCount(2, { timeout:20000 });
   await a.click("#startBtn"); await button(a, "Start the game");
   for (const p of [a, b, c]) await button(p, "Keep");
-  const three = await ktp(a, () => [0, 1, 2].map(() => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); return c.iid; }));
+  const three = await ktp(a, () => [0, 1, 2].map(() => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "bf"); delete c.etb; return c.iid; }));  // (as if there since last turn)
   // (Attack at the top: a box for each player above Luke's battlefield; he drags each creature onto one)
   const attack = async (plan) => {
     await a.click("#attackBtn");

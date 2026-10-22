@@ -8,7 +8,7 @@ const DECK = `12 Gamma Card
 const opp = (page, name) => page.locator(".opp", { hasText:name });
 const ktp = (page, fn, arg) => page.evaluate(fn, arg);
 // Put a card from the library straight into a zone (so the test doesn't depend on the shuffle)
-const fetchTo = (page, name, zone) => ktp(page, ([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); return c.iid; }, [name, zone]);
+const fetchTo = (page, name, zone) => ktp(page, ([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); delete c.etb; return c.iid;  /* (as if it had been there since last turn) */ }, [name, zone]);
 
 test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   test.setTimeout(180000);
@@ -44,6 +44,8 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await a.locator(`#hand .card[data-iid="${bear}"]`).dblclick();
   await expect(a.locator(`#bf .card[data-iid="${bear}"]`)).toHaveCount(1);
   await expect(opp(b, "Luke").locator(`.obf .card[data-iid="${bear}"]`)).toHaveCount(1);
+  // (it came in this turn, so without haste it couldn't attack yet: say it's been there since last turn)
+  await ktp(a, iid => { delete ktPlay.me.zones.bf.find(c => c.iid === iid).etb; }, bear);
 
   // Attacking: on his turn Luke has an Attack button at the top; he sends the creature at Rick. It taps (no vigilance),
   // and an arrow points at Rick on both screens
@@ -70,18 +72,21 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(box).toContainText("You're being attacked");
   await expect(box).toContainText("3 damage to you if you take it.");
   await box.getByRole("button", { name:"Respond", exact:true }).click();
-  await box.locator("select").selectOption({ label:"Block with Gamma Card (3/4)" });
-  await expect(box).toContainText("0 damage to you from the ones not blocked.");
+  await box.getByRole("button", { name:"Block with Gamma Card (3/4)" }).click();  // (his creatures, as cards)
+  await expect(box.getByRole("button", { name:"Block with Gamma Card (3/4)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(box).toContainText("0 damage to you with these blocks.");
   await box.getByRole("button", { name:"Done: take the damage", exact:true }).click();
   await expect(box).toBeHidden();
-  await expect(b.locator(`#bf .card[data-iid="${wall}"].blocking`)).toHaveCount(1);
-  for (const p of [a, b]) await expect(p.locator("#arrows > path.blockline")).toHaveCount(1);
+  await expect(b.locator("#log")).toContainText("You blocked Luke's Gamma Card with Gamma Card.");
   await expect(b.locator("#lifeOut")).toHaveText("20");
   await expect(b.locator("#log")).toContainText("You took no combat damage.");
-  // Clear arrows takes back Luke's attack; he untaps and attacks again, and this time Rick takes the damage
-  await a.click("#clearArrowsBtn");
+  // (two 3/4s: neither dies; then combat is over and both leave it, their marks and lines gone)
+  await expect(b.locator(`#bf .card[data-iid="${wall}"]`)).toHaveCount(1);
+  await expect(a.locator(`#bf .card[data-iid="${bear}"]`)).toHaveCount(1);
   await expect(opp(b, "Luke").locator(".obf .card.attacking")).toHaveCount(0);
-  await expect(a.locator("#arrows > path:not(.blockline)")).toHaveCount(0);
+  await expect(b.locator(`#bf .card.blocking`)).toHaveCount(0);
+  for (const p of [a, b]) await expect(p.locator("#arrows > path")).toHaveCount(0);
+  // He untaps and attacks again, and this time Rick takes the damage
   await tool(a, "#untapAllBtn");
   await attack();
   await expect(box).toBeVisible();

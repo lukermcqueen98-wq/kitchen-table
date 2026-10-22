@@ -203,6 +203,14 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .obf{flex:1;position:relative;min-height:0}
 .atkrow{display:flex;align-items:center;gap:10px;padding:6px;border:1px solid var(--felt-edge);border-radius:8px;margin-bottom:5px;flex-wrap:wrap}
 .atkrow.on{border-color:var(--brass);background:rgba(255,207,90,.08)}
+.blkpick{display:flex;flex-wrap:wrap;gap:6px;width:100%;padding-top:4px}
+.blkopt{position:relative;padding:0;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;line-height:0;transition:transform .12s,border-color .12s}
+.blkopt:hover{transform:translateY(-3px)}
+.blkopt img{width:64px;aspect-ratio:63/88;border-radius:4px;object-fit:cover;display:block}
+.blkopt.none{line-height:1.2;width:64px;aspect-ratio:63/88;border:1px dashed var(--felt-edge);font-size:12px;color:var(--muted);display:grid;place-items:center}
+.blkopt[aria-pressed="true"]{border-color:var(--brass);box-shadow:0 0 0 3px rgba(255,207,90,.35);transform:translateY(-3px)}
+.blkopt.none[aria-pressed="true"]{border-style:solid;color:var(--parchment)}
+.blkpt{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.85);color:#fff;border-radius:5px;padding:1px 4px;font:700 11px/1.2 system-ui}
 .atkrow img,.atkrow .atkph{width:44px;aspect-ratio:63/88;border-radius:4px;object-fit:cover;background:#111}
 .atkname{flex:1;min-width:140px;font-weight:600}
 .atkopts{display:flex;flex-wrap:wrap;gap:4px}
@@ -412,11 +420,15 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .atkrow img{width:46px;border-radius:4px}
 .atkname{display:flex;flex-direction:column;min-width:150px}
 .atkname small{color:var(--muted)}
-#defendBox{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;width:min(620px,calc(100vw - 32px));max-height:60vh;overflow:auto;
+#defendBox,#assignBox{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;width:min(620px,calc(100vw - 32px));max-height:60vh;overflow:auto;
   background:rgba(20,12,40,.97);border:2px solid var(--danger);border-radius:14px;padding:12px 16px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
-#defendBox h2{margin:0 0 6px;font-size:20px}
-#defendBox .atkrow img{width:40px}
-#defendBox .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+#defendBox h2,#assignBox h2{margin:0 0 6px;font-size:20px}
+#defendBox .atkrow img,#assignBox .atkrow img{width:40px}
+#assignBox{border-color:var(--brass)}
+#assignBox .asgn{display:flex;align-items:center;gap:8px;width:100%;padding:3px 0 3px 50px}
+#assignBox .asgn span{flex:1}
+#assignBox .asgn b{min-width:28px;text-align:center;font-size:18px}
+#defendBox .acts,#assignBox .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
 #atkBar{position:fixed;z-index:55;display:flex;gap:8px;align-items:stretch;padding:8px;border-radius:12px;background:rgba(20,12,40,.95);border:2px solid var(--brass);box-shadow:0 8px 30px rgba(0,0,0,.5)}
 #atkBar .atkdrop{flex:1;min-width:120px;min-height:64px;border:2px dashed var(--felt-edge);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
 #atkBar .atkdrop.drop{background:rgba(255,207,90,.15);border-style:solid}
@@ -578,8 +590,6 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   body.handstrip main#play.lt{padding-bottom:10px}
 }
 #turnToken{display:none}
-#pauseBar{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:75;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:12px;background:var(--felt-deep);border:2px solid var(--brass);box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:calc(100vw - 32px)}
-#pauseBar.hidden{display:none}
 /* (motion for everything that opens: dialogs pop, menus drop, combat boxes slide in, buttons give when pressed) */
 @keyframes fadeIn{from{opacity:0}}
 @keyframes popIn{from{opacity:0;transform:translateY(10px) scale(.96)}}
@@ -589,12 +599,14 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .modal{animation:fadeIn .18s ease-out}
 .modal-card{animation:popIn .24s cubic-bezier(.2,.8,.3,1)}
 .tmenu[open]>.tmenu-pop{animation:dropIn .16s ease-out}
-#defendBox,#atkBar,#pauseBar,#combatBar{animation:slideDown .26s cubic-bezier(.2,.8,.3,1)}
+#defendBox,#assignBox,#atkBar,#combatBar{animation:slideDown .26s cubic-bezier(.2,.8,.3,1)}
 .btn{transition:background-color .15s,border-color .15s,color .15s,box-shadow .2s,transform .1s}
 .btn:active{transform:scale(.96)}
 .bump{animation:bump .4s ease-out}
 #arrows path{transition:opacity .2s}
 .hitfly{position:fixed;z-index:80;border-radius:6px;background:#1a1208 url(card-back.jpg) center/cover;box-shadow:0 10px 26px rgba(0,0,0,.65);pointer-events:none}
+.hitfly.trample{box-shadow:0 0 0 2px #ffb347,0 0 24px rgba(255,140,40,.8),0 10px 26px rgba(0,0,0,.65)}
+.burst{position:fixed;z-index:79;width:110px;height:110px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,220,140,.95),rgba(255,120,40,.6) 40%,transparent 70%)}
 .hitnum{position:fixed;z-index:81;font:800 30px/1 var(--serif);color:var(--danger);text-shadow:0 2px 8px #000;pointer-events:none}
 /* (the shuffle riffle: the deck splits into two halves that fan apart and snap back together) */
 .riffling{position:relative}
@@ -657,7 +669,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 @keyframes tumble{from{transform:rotate(0) scale(.9)}50%{transform:rotate(180deg) scale(1.05)}to{transform:rotate(360deg) scale(.9)}}
 @keyframes coinspin{from{transform:scaleX(1)}50%{transform:scaleX(.08)}to{transform:scaleX(1)}}
 @keyframes landed{from{transform:scale(1.35)}to{transform:scale(1)}}
-body.nomotion .card,body.nomotion #hand .card,body.nomotion .btn{transition:none}body.nomotion :is(.modal,.modal-card,.tmenu-pop,#defendBox,#atkBar,#pauseBar,#combatBar,.bump){animation:none}
+body.nomotion .card,body.nomotion #hand .card,body.nomotion .btn{transition:none}body.nomotion :is(.modal,.modal-card,.tmenu-pop,#defendBox,#assignBox,#atkBar,#combatBar,.bump){animation:none}
 body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie svg,#turnInfo.mine,#turnSplash,#turnClockBox.over b){animation:none}
 </style>
 </head>
@@ -790,7 +802,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
     <div id="hub" aria-label="Turn order"></div>
     <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
     <div id="defendBox" class="hidden" role="dialog" aria-label="You're being attacked"></div>
-    <div id="pauseBar" class="hidden" role="status" aria-live="polite"></div>
+    <div id="assignBox" class="hidden" role="dialog" aria-label="Divide your attackers' damage"></div>
     <div id="atkBar" class="hidden" role="region" aria-label="Attack: drag your creatures onto a player"></div>
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
@@ -1329,17 +1341,18 @@ function findCard(iid){ for (const [z, list] of Object.entries(me.zones)) { cons
 // (atk: the player it's attacking; blk: the attacker it's blocking; at: when it went on the stack)
 function pubCard(c, onBf = false){
   const pt = onBf ? showPt(c) : null, ptInfo = onBf ? { pt:pt?.str || "", ptDir:pt?.dir || 0 } : {};
-  if (c.fd) return { ...ptInfo, iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0 };
+  if (c.fd) return { ...ptInfo, iid:c.iid, fd:true, x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0, ...(onBf ? { ck:[...combatKw(c)], col:"" } : {}) };
   const k = cardOf(c);
   return { ...ptInfo, iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
-           own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0, ...(c.mana?.length ? { mana:c.mana } : {}), ...(c.kw?.length ? { kw:c.kw.map(x => ({ n:x.n, eot:!!x.eot })) } : {}) };
+           own:c.owner || 0, att:c.att || "", atk:c.atk || 0, blk:c.blk || "", at:c.at || 0, ...(c.mana?.length ? { mana:c.mana } : {}), ...(c.kw?.length ? { kw:c.kw.map(x => ({ n:x.n, eot:!!x.eot })) } : {}),
+           ...(onBf ? { ck:[...combatKw(c)], col:colorsOf(c) } : {}) };
 }
 function pub(){
   const z = me.zones;
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, shuffles:me.shuffles || 0, cresp:me.cresp || null, atkN:me.atkN || 0, cpause:me.cpause || "" };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, shuffles:me.shuffles || 0, cresp:me.cresp || null, cassign:me.cassign || null, atkN:me.atkN || 0, cpause:me.cpause || "" };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1553,6 +1566,7 @@ function cleanPub(st){
     img:typeof c.img === "string" && /^https:\/\/cards\.scryfall\.io\//.test(c.img) ? c.img : "", x:+c.x || 0, y:+c.y || 0, tapped:!!c.tapped,
     fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), own:clamp(+c.own || 0, 0, MAX), att:String(c.att || "").slice(0, 20),
     atk:clamp(+c.atk || 0, 0, MAX), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [], kw:cleanKw(c.kw),
+    ck:Array.isArray(c.ck) ? c.ck.filter(k => COMBAT_KW.includes(k)) : [], col:String(c.col || "").replace(/[^WUBRG]/g, "").slice(0, 5),
     ...(typeof c.pt === "string" ? { pt:c.pt.slice(0, 16), ptDir:clamp(Math.sign(+c.ptDir || 0), -1, 1) } : {}), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
   } : null).filter(Boolean);
   const num = (v, a, b) => clamp(Math.round(+v || 0), a, b);
@@ -1561,8 +1575,10 @@ function cleanPub(st){
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
            dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, shuffles:num(st.shuffles, 0, 1e6), atkN:num(st.atkN, 0, 1e6), cpause:String(st.cpause || "").slice(0, 600),
-           cresp:st.cresp && typeof st.cresp === "object" ? { key:String(st.cresp.key || "").slice(0, 600), blocks:Object.fromEntries(Object.entries(st.cresp.blocks || {}).slice(0, 30).map(([a, b]) => [String(a).slice(0, 20), String(b).slice(0, 20)])) } : null,
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, shuffles:num(st.shuffles, 0, 1e6), atkN:num(st.atkN, 0, 1e6),
+           cassign:st.cassign && typeof st.cassign === "object" ? { key:String(st.cassign.key || "").slice(0, 600), as:Object.fromEntries(Object.entries(st.cassign.as || {}).slice(0, 30).map(([a, m]) => [String(a).slice(0, 20),
+             Object.fromEntries(Object.entries(m && typeof m === "object" ? m : {}).slice(0, 10).map(([b, n]) => [String(b).slice(0, 20), num(n, 0, 999)]))])) } : null, cpause:String(st.cpause || "").slice(0, 600),
+           cresp:st.cresp && typeof st.cresp === "object" ? { key:String(st.cresp.key || "").slice(0, 600), blocks:Object.fromEntries(Object.entries(st.cresp.blocks || {}).slice(0, 30).map(([a, b]) => [String(a).slice(0, 20), [].concat(b || []).slice(0, 10).map(x => String(x).slice(0, 20)).filter(Boolean)])) } : null,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
@@ -2101,14 +2117,14 @@ function move(iid, to, opt = {}){
   }
   me.zones[from].splice(f.i, 1);
   if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); if (c.gave) removeGiven(c, true); }
-  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; delete c.base; if (to !== "lib") c.fd = false; }
+  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; delete c.etb; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; delete c.base; if (to !== "lib") c.fd = false; }
   if (to === "st") c.at = Date.now();
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
   }
   if (to === "bf") {
     const spot = opt.x != null ? { x:opt.x, y:opt.y } : freeSpot(c);
-    Object.assign(c, clearOfPiles(clamp(spot.x, 0, 0.94), clamp(spot.y, 0, 0.86)));
+    Object.assign(c, clearOfPiles(clamp(spot.x, 0, 0.94), clamp(spot.y, 0, 0.86))); c.etb = table.turnNum;
     if (opt.fd) c.fd = true;
     if ((from === "cz" || (from === "st" && c.fromCz)) && c.cmdr) c.tax = (c.tax || 0) + 1;
     delete c.fromCz;
@@ -2200,6 +2216,24 @@ const isCreature = c => c.fd || /\bCreature\b/.test(typeOf(cardOf(c), c.face || 
 // (a card's keywords: printed ones, plus key terms given to it on the table, "until end of turn" or for as long as it's out)
 const kwGiven = c => (c.kw || []).map(x => typeof x === "string" ? x : x.n).filter(Boolean);
 const kwOf = c => { const k = cards.get(c.id); return c.fd ? kwGiven(c) : [...(k?.card_faces?.[c.face || 0]?.keywords || k?.keywords || []), ...kwGiven(c)]; };
+/* Combat: the key terms that change how a creature attacks, blocks and deals combat damage (from its printed keywords,
+   the ones given on the table, and its rules text: "This can't be blocked.", "This can't block.", "Protection from red"),
+   and its colors (for protection). Each player works these out for their own cards and shares them. */
+const COMBAT_KW = ["flying", "reach", "haste", "vigilance", "trample", "lifelink", "deathtouch", "first strike", "double strike", "menace",
+  "indestructible", "defender", "infect", "wither", "hexproof", "shroud", "ward", "can't be blocked", "can't block",
+  "protection from white", "protection from blue", "protection from black", "protection from red", "protection from green"];
+const COLOR_WORD = { W:"white", U:"blue", B:"black", R:"red", G:"green" };
+function combatKw(c){
+  const out = new Set(kwOf(c).map(x => String(x).toLowerCase()).filter(x => COMBAT_KW.includes(x)));
+  if (c.fd) return out;
+  const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k, text = String(f?.oracle_text ?? k?.oracle_text ?? ""), name = String(f?.name || k?.name || "");
+  const me_ = `(?:${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|This creature)`;
+  if (new RegExp(`(^|\\n)${me_} can't be blocked\\.`, "i").test(text)) out.add("can't be blocked");
+  if (new RegExp(`(^|\\n)${me_} can't block\\.`, "i").test(text)) out.add("can't block");
+  for (const m of text.matchAll(/(?:^|\n)protection from ([a-z]+)(?: and from ([a-z]+))?/gi)) for (const w of [m[1], m[2]]) if (w && COMBAT_KW.includes(`protection from ${w.toLowerCase()}`)) out.add(`protection from ${w.toLowerCase()}`);
+  return out;
+}
+const colorsOf = c => { if (c.fd) return ""; const k = cardOf(c), f = k?.card_faces?.[c.face || 0]; return (f?.colors || k?.colors || []).join(""); };
 function setBlock(b, atk, seat){
   me.arrows = (me.arrows || []).filter(a => a.from !== b.iid);
   b.blk = atk.iid; b.atk = 0;  // (drawn as an arrow from the blocker to the attacker)
@@ -2317,11 +2351,11 @@ function untapAll(){ for (const c of me.zones.bf) c.tapped = false; say("untappe
 function shuffleLib(){ shuffle(me.zones.lib); say("shuffled their library."); changed(); }
 async function createToken(tokenCard, n = 1){
   keep(tokenCard);
-  for (let k = 0; k < n; k++) { const c = newCard(tokenCard.id, { tok:true }); Object.assign(c, freeSpot(c)); me.zones.bf.push(c); }
+  for (let k = 0; k < n; k++) { const c = newCard(tokenCard.id, { tok:true }); Object.assign(c, freeSpot(c)); c.etb = table.turnNum; me.zones.bf.push(c); }
   say(`created ${n === 1 ? "a" : n} ${tokenCard.name} token${n === 1 ? "" : "s"}.`); changed();
 }
 function copyCard(c){
-  const t = newCard(c.id, { tok:true, face:c.face, x:clamp(c.x + 0.03, 0, 0.94), y:clamp(c.y + 0.03, 0, 0.86) });
+  const t = newCard(c.id, { tok:true, face:c.face, x:clamp(c.x + 0.03, 0, 0.94), y:clamp(c.y + 0.03, 0, 0.86) }); t.etb = table.turnNum;
   me.zones.bf.push(t); say(`created a token copy of ${nameOf(c)}.`); changed();
 }
 
@@ -2659,8 +2693,9 @@ function renderOpps(){
     $("#me").style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[mySeat - 1]} 32%, #1a1030)`);
     $("#turnToken").textContent = !table.started ? "Waiting to start" : table.turnSeat === mySeat ? "Your turn" : `${nm(table.turnSeat)} is up`;
   }
-  // (open seats at the long table; alone, the one across from you asks for players)
-  if (lt && order.length < 4) for (const slot of ["L", "T", "R"].filter(x => !SLOTS.includes(x))) {
+  // (open seats at the long table, until the game starts (then it's bare table); alone, the one across from you asks
+  // for players)
+  if (lt && order.length < 4 && !table.started) for (const slot of ["L", "T", "R"].filter(x => !SLOTS.includes(x))) {
     const o = el("div", { className:"oppwait" }), w = el("div", { className:"waitmat" }); o.dataset.slot = slot; o.append(w);
     if (!order.length && slot === "T") {
       const copy = el("button", { type:"button", className:"btn primary", textContent:"Copy invite link" }); copy.onclick = () => $("#copyLink").click();
@@ -2763,13 +2798,14 @@ function renderMine(){
 let lastAtMe = 0;
 // The combat bar, while creatures are attacking: who's attacking whom (the arrows show which creature)
 function renderCombat(){
+  requestAnimationFrame(combatMoves);
   const attackers = Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk).map(c => ({ c, s:+s })));
   const note = $("#combatNote"), atMe = attackers.filter(a => a.c.atk === mySeat);
   $("#combatBar").classList.toggle("hidden", !attackers.length);
   if (atMe.length > lastAtMe) cue("attack");
   lastAtMe = atMe.length;
   note.textContent = atMe.length ? `${atMe.length} attacking you` : attackers.length ? `${attackers.length} attacking` : "";
-  renderDefend(); renderAtkBar(); renderPause(); resolveCombat();
+  cancelCombat(); renderDefend(); renderAssign(); renderAtkBar(); resolveCombat();
 }
 // The middle of a round table (4 or 5 opponents): whose turn it is, and the turn order as seats around a circle,
 // starting with you at the bottom and going clockwise (the next player is on your left)
@@ -3664,6 +3700,11 @@ function planAttack(iid, seat){
   const c = me.zones.bf.find(x => x.iid === iid); if (!c) return;
   if (!isCreature(c)) { toast(`${nameOf(c)} isn't a creature.`); return; }
   if (c.tapped && !c.atk) { toast(`${nameOf(c)} is tapped, so it can't attack.`); return; }
+  if (seat) {
+    const kw = combatKw(c);
+    if (kw.has("defender")) { toast(`${nameOf(c)} has defender, so it can't attack.`); return; }
+    if (c.etb === table.turnNum && !kw.has("haste")) { toast(`${nameOf(c)} came in this turn and doesn't have haste, so it can't attack yet.`); return; }
+  }
   if (seat) atkPlan.set(iid, seat); else atkPlan.delete(iid);
   renderAtkBar();
 }
@@ -3712,6 +3753,120 @@ addEventListener("resize", () => { if (atkPlan) renderAtkBar(); });
 let defend = { key:"", mode:"ask", blocks:{} }, resolvedAtk = new Set(), resolvedTurn = 0;
 const resolvedKeys = new Set();
 const cpw = c => parseInt(c.pt, 10) || 0;
+/* Combat damage, by the rules: each attacker with the creatures blocking it (in the order picked). First strike and
+   double strike creatures deal their damage first, and whatever that kills deals none; then the rest (and double
+   strike again). A blocked attacker gives each blocker lethal damage in order (1 is lethal with deathtouch) and the
+   rest to the last one, or with trample to the player; if its blockers are gone it deals none, unless it has trample.
+   Infect: to a player as poison counters, to creatures as -1/-1 counters; wither: -1/-1 counters to creatures.
+   Lifelink: its controller gains what it dealt. Protection from a color: no damage from sources of that color.
+   Indestructible: lethal damage doesn't destroy it (0 toughness still does).
+   pairs: [{ a:{ c, s, d }, blockers:[{ c, s }] }], the cards as shared (pt "3/4", ck: key terms, col: colors). */
+function fight(pairs, assigns = {}){
+  const out = { player:{}, dies:[], minus:{}, gain:{}, took:{} };
+  const unit = (c, s) => { const m = /^(-?\d+)\/(-?\d+)/.exec(c.pt || ""); return { c, s, p:m ? +m[1] : 0, t:m ? +m[2] : 0, kw:new Set(c.ck || []), col:c.col || "", dmg:0, minus:0, dt:false, dead:false }; };
+  const has = (u, k) => u.kw.has(k), tough = u => u.t - u.minus;
+  const P = d => out.player[d] ||= { life:0, poison:0, cmd:{}, from:[] };
+  const fs = pairs.map(pr => ({ a:pr.a, A:unit(pr.a.c, pr.a.s), B:pr.blockers.map(b => unit(b.c, b.s)), blocked:pr.blockers.length > 0 }));
+  const deal = (src, dst, n) => {
+    if (n <= 0 || [...src.col].some(x => dst.kw.has(`protection from ${COLOR_WORD[x]}`))) return 0;
+    if (has(src, "infect") || has(src, "wither")) dst.minus += n; else dst.dmg += n;
+    if (has(src, "deathtouch")) dst.dt = true;
+    return n;
+  };
+  const toPlayer = (src, f, n) => {
+    if (n <= 0) return 0; const p = P(f.a.d);
+    if (has(src, "infect")) p.poison += n; else p.life += n;
+    if (f.a.c.cmdr) { const k = `${f.a.s}:${f.a.c.iid}`; p.cmd[k] = (p.cmd[k] || 0) + n; }
+    if (!p.from.includes(f.a.c)) p.from.push(f.a.c);
+    return n;
+  };
+  const gain = (u, n) => { if (n && has(u, "lifelink")) out.gain[u.s] = (out.gain[u.s] || 0) + n; };
+  for (const step of ["first", "regular"]) {
+    const strikes = u => step === "first" ? has(u, "first strike") || has(u, "double strike") : !has(u, "first strike") || has(u, "double strike");
+    for (const f of fs) {
+      const { A } = f, live = f.B.filter(b => !b.dead);
+      if (!A.dead && strikes(A) && A.p > 0) {
+        let n = A.p, dealt = 0;
+        if (!f.blocked || (!live.length && has(A, "trample"))) dealt += toPlayer(A, f, n);
+        else if (live.length) {
+          const split = assigns[f.a.c.iid];
+          if (split) {
+            // (as its player divided it; a share for a blocker that's gone goes on to the next, or the player with trample)
+            for (const b of live) { const give = Math.min(n, split[b.c.iid] || 0); n -= give; dealt += deal(A, b, give); }
+            if (n > 0) dealt += has(A, "trample") ? toPlayer(A, f, n) : deal(A, live[live.length - 1], n);
+          } else {
+            live.forEach((b, i) => {
+              let give = Math.min(n, has(A, "deathtouch") ? 1 : Math.max(0, tough(b) - b.dmg));
+              if (i === live.length - 1 && !has(A, "trample")) give = n;
+              n -= give; dealt += deal(A, b, give);
+            });
+            if (n > 0 && has(A, "trample")) dealt += toPlayer(A, f, n);
+          }
+        }
+        gain(A, dealt);
+      }
+      if (!A.dead) for (const b of live) if (strikes(b) && b.p > 0) gain(b, deal(b, A, b.p));
+    }
+    // (then whatever has lethal damage, or a deathtouch hit, is destroyed, unless it's indestructible; 0 toughness always)
+    for (const u of fs.flatMap(f => [f.A, ...f.B])) if (!u.dead) {
+      const t = tough(u);
+      if (t <= 0 || (!has(u, "indestructible") && (u.dmg >= t || (u.dt && u.dmg + u.minus > 0)))) { u.dead = true; out.dies.push(u.c.iid); }
+    }
+  }
+  for (const u of fs.flatMap(f => [f.A, ...f.B])) { if (u.minus) out.minus[u.c.iid] = u.minus; if (u.dmg + u.minus) out.took[u.c.iid] = u.dmg + u.minus; }
+  return out;
+}
+// Lethal damage from this attacker to a blocker: its toughness, or 1 with deathtouch (for dividing damage)
+const lethalTo = (a, b) => (a.ck || []).includes("deathtouch") ? 1 : Math.max(0, parseInt(String(b.pt || "").split("/")[1], 10) || 0);
+// Attackers blocked by two or more creatures: their players divide the damage before it lands
+const assignOf = s => s === mySeat ? me.cassign : players[s]?.cassign;
+function multiBlocked(atk, key){
+  return pairsOf(atk, a => answerOf(a.d)?.key === key ? answerOf(a.d)?.blocks?.[a.c.iid] : []).filter(f => f.blockers.length > 1 && cpw(f.a.c) > 0);
+}
+let assignDraft = { key:"", as:{} };
+function renderAssign(){
+  const box = $("#assignBox"), { atk, key, defenders } = combatNow();
+  const ready = key && !resolvedKeys.has(key) && !pausedBy(key).length && defenders.length && defenders.every(d => answerOf(d)?.key === key);
+  const mine = ready && !me.watch ? multiBlocked(atk, key).filter(f => f.a.s === mySeat) : [];
+  if (!mine.length || me.cassign?.key === key) { box.classList.add("hidden"); return; }
+  if (assignDraft.key !== key) {
+    // (to start: lethal damage to each blocker in turn, the rest to the last one, or to the player with trample)
+    assignDraft = { key, as:Object.fromEntries(mine.map(f => { let n = cpw(f.a.c); const m = {};
+      f.blockers.forEach((b, i) => { const g = i === f.blockers.length - 1 && !(f.a.c.ck || []).includes("trample") ? n : Math.min(n, lethalTo(f.a.c, b.c)); m[b.c.iid] = g; n -= g; });
+      return [f.a.c.iid, m]; })) };
+  }
+  const sig = JSON.stringify(assignDraft); if (!box.classList.contains("hidden") && box.dataset.sig === sig) return; box.dataset.sig = sig;
+  let ok = true;
+  const rows = mine.flatMap(f => {
+    const m = assignDraft.as[f.a.c.iid], P = cpw(f.a.c), tr = (f.a.c.ck || []).includes("trample"), used = Object.values(m).reduce((t, v) => t + v, 0), left = P - used;
+    const allLethal = f.blockers.every(b => (m[b.c.iid] || 0) >= lethalTo(f.a.c, b.c));
+    const bad = tr ? (left < 0 || (left > 0 && !allLethal)) : left !== 0; if (bad) ok = false;
+    const step = (b, dv) => { const v = Math.max(0, (m[b.c.iid] || 0) + dv); if (dv > 0 && used >= P) return; m[b.c.iid] = v; renderAssign(); };
+    return [el("div", { className:"atkrow" }, f.a.c.img ? el("img", { src:f.a.c.img, alt:"" }) : el("span", { style:"width:40px" }),
+      el("span", { className:"atkname" }, el("b", { textContent:`${f.a.c.name}: ${P} damage` }), el("small", { textContent:`blocked by ${f.blockers.length} creatures${tr ? " · trample" : ""}` })),
+      ...f.blockers.map(b => { const mb = el("button", { type:"button", className:"btn small", textContent:"−", ariaLabel:`Less damage to ${b.c.name}` }), pb = el("button", { type:"button", className:"btn small", textContent:"+", ariaLabel:`More damage to ${b.c.name}` });
+        mb.onclick = () => step(b, -1); pb.onclick = () => step(b, 1);
+        return el("div", { className:"asgn" }, el("span", { textContent:`${b.c.name} (${b.c.pt}, ${lethalTo(f.a.c, b.c)} is lethal)` }), mb, el("b", { textContent:m[b.c.iid] || 0, ariaLabel:`Damage to ${b.c.name}` }), pb); }),
+      tr ? el("div", { className:"asgn" }, el("span", { textContent:`Tramples over to ${nm(f.a.d)}${left > 0 && !allLethal ? " (only once every blocker has lethal damage)" : ""}` }), el("b", { textContent:Math.max(0, left) })) : "",
+      !tr && left ? el("p", { className:"hint bad", textContent:left > 0 ? `${left} still to divide.` : `${-left} too many.` }) : "")];
+  });
+  const done = el("button", { type:"button", className:"btn primary", textContent:"Done: deal the damage", disabled:!ok });
+  done.onclick = () => { me.cassign = { key, as:assignDraft.as }; say("divided their attackers' damage."); changed(); };
+  box.replaceChildren(el("h2", { textContent:"Divide your damage" }),
+    el("p", { className:"hint", textContent:"More than one creature blocked your attacker: choose how much of its damage each blocker takes." }), ...rows, el("div", { className:"acts" }, done));
+  box.classList.remove("hidden");
+}
+// Why a creature can't block an attacker ("" if it can): flying, can't be blocked, can't block, protection
+function cantBlock(b, a){
+  const bk = b.ck ? new Set(b.ck) : combatKw(b), ak = new Set(a.ck || []), bc = b.col ?? colorsOf(b);
+  if (ak.has("can't be blocked")) return "it can't be blocked";
+  if (bk.has("can't block")) return "this creature can't block";
+  if (ak.has("flying") && !bk.has("flying") && !bk.has("reach")) return "it has flying (block with flying or reach)";
+  const pro = [...bc].find(x => ak.has(`protection from ${COLOR_WORD[x]}`));
+  return pro ? `it has protection from ${COLOR_WORD[pro]}` : "";
+}
+// The fight as it stands: the attackers, with the blockers each player attacked picked
+const pairsOf = (atk, blocksOf) => atk.map(a => ({ a, blockers:(blocksOf(a) || []).map(id => (players[a.d]?.bf || []).find(x => x.iid === id)).filter(Boolean).map(c => ({ c, s:a.d })) }));
 function combatNow(){
   if (resolvedTurn !== table.turnNum) { resolvedAtk = new Set(); resolvedTurn = table.turnNum; }
   const all = Object.entries(players).flatMap(([s, p]) => (p.bf || []).filter(c => c.atk).map(c => ({ c, s:+s, d:c.atk })));
@@ -3722,15 +3877,20 @@ function combatNow(){
   return { atk, key, defenders };
 }
 const answerOf = d => d === mySeat ? me.cresp : players[d]?.cresp;
-// Interrupt: anyone attacked can stop combat (to cast an instant first, say); no damage happens until they resume it
+// Interrupt: anyone attacked can call off the whole attack (to cast an instant first, say); see cancelCombat
 const pausedBy = key => key ? Object.keys(players).map(Number).filter(s => (s === mySeat ? me.cpause : players[s]?.cpause) === key) : [];
-function renderPause(){
-  const { key } = combatNow(), by = resolvedKeys.has(key) ? [] : pausedBy(key), bar = $("#pauseBar");
-  if (!by.length) { bar.classList.add("hidden"); return; }
-  const mine = by.includes(mySeat), who = by.map(s => s === mySeat ? "You" : nm(s)).join(" and ");
-  const kids = [el("b", { textContent:"Combat paused" }), el("span", { textContent:`${who} interrupted the attack. No combat damage until ${mine && by.length === 1 ? "you resume" : "it's resumed"}.` })];
-  if (mine) { const b = el("button", { type:"button", className:"btn small primary", textContent:"Resume combat" }); b.onclick = () => { me.cpause = ""; say("resumed combat."); changed(); }; kids.push(b); }
-  bar.replaceChildren(...kids); bar.classList.remove("hidden");
+// Interrupted: the whole attack is called off on every screen: no damage, the attackers leave combat (still tapped),
+// blocks and arrows go; the players sort out what happens next by hand
+function cancelCombat(){
+  const { atk, key } = combatNow(); if (!key || resolvedKeys.has(key) || !pausedBy(key).length) return;
+  resolvedKeys.add(key); for (const a of atk) resolvedAtk.add(a.c.iid);
+  const mine = new Set(atk.filter(a => a.s === mySeat).map(a => a.c.iid)), theirs = new Set(atk.map(a => a.c.iid)); let ch = false;
+  for (const c of me.zones.bf) {
+    if (mine.has(c.iid)) { c.atk = 0; ch = true; }
+    if (c.blk && theirs.has(c.blk)) { c.blk = ""; ch = true; }
+  }
+  if (ch) { me.arrows = (me.arrows || []).filter(r => !mine.has(r.from)); changed(); }
+  if (!me.watch) $("#defendBox").classList.add("hidden");
 }
 function renderDefend(){
   const box = $("#defendBox"), { atk:all, key, defenders } = combatNow();
@@ -3738,79 +3898,168 @@ function renderDefend(){
   if (!atk.length || !defenders.includes(mySeat) || resolvedKeys.has(key)) { box.classList.add("hidden"); return; }
   if (key !== defend.key) defend = { key, mode:"ask", blocks:{} };
   if (me.cresp?.key === key) defend.mode = "wait";
-  const waitingOn = defenders.filter(d => d !== mySeat && answerOf(d)?.key !== key).map(nm).join(", ");
-  const paused = me.cpause === key, sig = `${key}|${defend.mode}|${waitingOn}|${paused}`;
+  const answering = defenders.filter(d => d !== mySeat && answerOf(d)?.key !== key).map(nm).join(", ");
+  const dividing = !answering && defenders.every(d => answerOf(d)?.key === key) ? [...new Set(multiBlocked(atk.length ? all : [], key).filter(f => assignOf(f.a.s)?.key !== key).map(f => nm(f.a.s)))].join(", ") : "";
+  const waitingOn = answering || dividing;
+  const sig = `${key}|${defend.mode}|${waitingOn}|${JSON.stringify(defend.blocks)}`;
   if (!box.classList.contains("hidden") && box.dataset.sig === sig) return;
   box.dataset.sig = sig;
-  const unblocked = () => atk.filter(a => !defend.blocks[a.c.iid]);
-  const myBlockers = me.zones.bf.filter(c => isCreature(c) && !c.tapped);
+  const blocksOf = a => defend.blocks[a.c.iid] || [];
+  const myBlockers = (players[mySeat]?.bf || []).filter(c => !c.tapped && me.zones.bf.some(x => x.iid === c.iid && isCreature(x)));
   const rows = atk.map(a => {
     const r = el("div", { className:"atkrow" }, a.c.img ? el("img", { src:a.c.img, alt:"" }) : el("span", { style:"width:40px" }),
-      el("span", { className:"atkname" }, el("b", { textContent:a.c.name || "Face-down creature" }), el("small", { textContent:`${a.c.pt || "?"} · from ${nm(a.s)}${defend.blocks[a.c.iid] && defend.mode === "wait" ? " · blocked" : ""}` })));
+      el("span", { className:"atkname" }, el("b", { textContent:a.c.name || "Face-down creature" }), el("small", { textContent:`${a.c.pt || "?"} · from ${nm(a.s)}${(a.c.ck || []).length ? ` · ${a.c.ck.join(", ")}` : ""}${blocksOf(a).length && defend.mode === "wait" ? " · blocked" : ""}` })));
     if (defend.mode === "respond") {
-      const sel = el("select", { ariaLabel:`Block ${a.c.name || "the attacker"} with` }, el("option", { value:"", textContent:"Not blocked" }),
-        ...myBlockers.map(b => el("option", { value:b.iid, textContent:`Block with ${nameOf(b)}${showPt(b) ? ` (${showPt(b).str})` : ""}` })));
-      sel.value = defend.blocks[a.c.iid] || ""; sel.onchange = () => { defend.blocks[a.c.iid] = sel.value; total.textContent = dmgText(); };
-      r.append(sel);
+      // (your untapped creatures, as cards: click them to block this attacker (several can block one attacker; each
+      // creature blocks one); the ones that can't block it are dimmed, with why)
+      const pick = el("div", { className:"blkpick", role:"group", ariaLabel:`Block ${a.c.name || "the attacker"} with` });
+      const opt = (iid, label, kids, why) => {
+        const on = iid ? blocksOf(a).includes(iid) : !blocksOf(a).length;
+        const b = el("button", { type:"button", className:"blkopt" + (iid ? "" : " none"), ariaLabel:label, title:why ? `${label}: can't, ${why}` : label, ariaPressed:String(on), disabled:!!why }, ...kids);
+        b.onclick = () => {
+          if (!iid) defend.blocks[a.c.iid] = [];
+          else if (on) defend.blocks[a.c.iid] = blocksOf(a).filter(x => x !== iid);
+          else { for (const k of Object.keys(defend.blocks)) defend.blocks[k] = defend.blocks[k].filter(x => x !== iid); defend.blocks[a.c.iid] = [...blocksOf(a), iid]; }
+          box.dataset.sig = ""; renderDefend();
+        };
+        return b;
+      };
+      pick.append(opt("", "Not blocked", [el("span", { textContent:"No block" })]),
+        ...myBlockers.map(b => { const mine = me.zones.bf.find(x => x.iid === b.iid), pt = b.pt, k = cardOf(mine);
+          return opt(b.iid, `Block with ${b.name || "a face-down creature"}${pt ? ` (${pt})` : ""}`, [el("img", { src:mine.fd ? "card-back.jpg" : imgOf(k, mine.face, "normal"), alt:"" }), pt ? el("span", { className:"blkpt", textContent:pt }) : ""], cantBlock(b, a.c)); }));
+      if ((a.c.ck || []).includes("menace")) pick.append(el("span", { className:"hint", textContent:"Menace: block it with two or more creatures, or not at all." }));
+      if (!myBlockers.length) pick.append(el("span", { className:"hint", textContent:"No untapped creatures to block with." }));
+      r.append(pick);
     }
     return r;
   });
-  const dmgText = () => { const n = unblocked().reduce((t, a) => t + cpw(a.c), 0); return `${n} damage to you ${defend.mode === "respond" ? "from the ones not blocked" : defend.mode === "wait" ? "when combat damage happens" : "if you take it"}.`; };
+  const dmgText = () => {
+    const r = fight(pairsOf(atk, blocksOf)).player[mySeat] || { life:0, poison:0 };
+    return `${r.life} damage${r.poison ? ` and ${r.poison} poison counter${r.poison === 1 ? "" : "s"}` : ""} to you ${defend.mode === "respond" ? "with these blocks" : defend.mode === "wait" ? "when combat damage happens" : "if you take it"}.`;
+  };
   const total = el("p", { className:"hint", textContent:dmgText() });
   // (your answer: blockers are declared now; the damage waits for everyone attacked)
   const answer = () => {
-    const blocks = Object.fromEntries(Object.entries(defend.blocks).filter(([a, b]) => b && atk.some(x => x.c.iid === a)));
-    for (const a of atk) { const b = blocks[a.c.iid] && me.zones.bf.find(x => x.iid === blocks[a.c.iid]); if (b) setBlock(b, a.c, a.s); }
+    const blocks = Object.fromEntries(Object.entries(defend.blocks).filter(([a, b]) => b.length && atk.some(x => x.c.iid === a)));
+    const lone = atk.find(a => (a.c.ck || []).includes("menace") && (blocks[a.c.iid] || []).length === 1);
+    if (lone) { toast(`${lone.c.name} has menace: block it with two or more creatures, or not at all.`); return; }
+    for (const a of atk) for (const id of blocks[a.c.iid] || []) { const b = me.zones.bf.find(x => x.iid === id); if (b) setBlock(b, a.c, a.s); }
     me.cresp = { key, blocks }; defend.mode = "wait"; changed();
   };
   const btn = (label, fn, primary) => { const b = el("button", { type:"button", className:"btn" + (primary ? " primary" : ""), textContent:label }); b.onclick = fn; return b; };
-  const interrupt = paused ? btn("Resume combat", () => { me.cpause = ""; say("resumed combat."); changed(); })
-    : btn("Interrupt", () => { me.cpause = key; say("interrupted the attack: combat is paused."); changed(); });
-  interrupt.title = "Stop the attack before any damage (to cast an instant, say); nothing happens until you resume it";
+  const interrupt = btn("Interrupt", () => { me.cpause = key; say("interrupted the attack: it's called off for everyone, with no combat damage. Sort out what happens next by hand."); changed(); });
+  interrupt.title = "Call off the whole attack, for everyone, before any damage (to cast an instant, say); then sort out what happens by hand";
   const acts = el("div", { className:"acts" }, interrupt, ...(defend.mode === "ask"
     ? [btn("Respond", () => { defend.mode = "respond"; renderDefend(); }), btn("Take the damage", answer, true)]
-    : defend.mode === "respond" ? [btn("Back", () => { defend.mode = "ask"; defend.blocks = {}; renderDefend(); }), btn("Done: take the damage", answer, true)]
-    : [el("span", { className:"hint", textContent:waitingOn ? `Waiting for ${waitingOn} to answer: all combat damage happens at once.` : "Combat damage..." })]));
+    : defend.mode === "respond" ? [btn("Back", () => { defend.mode = "ask"; defend.blocks = {}; box.dataset.sig = ""; renderDefend(); }), btn("Done: take the damage", answer, true)]
+    : [el("span", { className:"hint", textContent:answering ? `Waiting for ${answering} to answer: all combat damage happens at once.` : dividing ? `Waiting for ${dividing} to divide damage among your blockers.` : "Combat damage..." })]));
   box.replaceChildren(el("h2", { textContent:"You're being attacked" }),
-    ...(defend.mode === "respond" ? [el("p", { className:"hint", textContent:"Cast spells and use abilities as usual. Pick a blocker for any attacker, then Done." })] : []),
+    ...(defend.mode === "respond" ? [el("p", { className:"hint", textContent:"Cast spells and use abilities as usual. Pick blockers for any attacker (click your creatures), then Done." })] : []),
     ...rows, total, acts);
   box.classList.remove("hidden");
 }
-// Everyone attacked has answered: the damage, all at once, on every screen
+// Everyone attacked has answered: the damage, all at once, on every screen. Each player then sees to their own side:
+// life, poison and commander damage taken, their creatures that died (to the graveyard), -1/-1 counters, life gained
 function resolveCombat(){
   const { atk, key, defenders } = combatNow();
   if (!key || resolvedKeys.has(key) || !defenders.length || !defenders.every(d => answerOf(d)?.key === key) || pausedBy(key).length) return;
+  const multi = multiBlocked(atk.filter(a => defenders.includes(a.d)), key);
+  if (multi.some(f => assignOf(f.a.s)?.key !== key)) return;  // (an attacker's player is still dividing its damage)
   resolvedKeys.add(key);
   for (const a of atk) resolvedAtk.add(a.c.iid);
-  for (const d of defenders) {
-    const blocks = answerOf(d).blocks || {}, hits = atk.filter(a => a.d === d && !blocks[a.c.iid]), n = hits.reduce((t, a) => t + cpw(a.c), 0);
-    hitAnim(d, hits, n);
-    if (d === mySeat) setTimeout(() => {
-      if (n) { noteLife(); me.life -= n; }
-      if (FORMATS[table.fmt].cmdr) for (const a of hits) if (a.c.cmdr && cpw(a.c)) { const k = `${a.s}:${a.c.iid}`; me.cmd[k] = (me.cmd[k] || 0) + cpw(a.c); }
-      say(n ? `took ${n} combat damage from ${hits.map(a => a.c.name || "a face-down creature").join(", ")}.` : "took no combat damage.");
-      changed();
-    }, 650 + Math.max(0, hits.length - 1) * 140);
-  }
-  // (your attackers that got through leave combat: their arrows and attack marks go)
-  const through = atk.filter(a => a.s === mySeat && !answerOf(a.d)?.blocks?.[a.c.iid]).map(a => a.c.iid);
-  if (through.length) setTimeout(() => {
-    for (const c of me.zones.bf) if (through.includes(c.iid)) { c.atk = 0; me.arrows = (me.arrows || []).filter(r => r.from !== c.iid); }
+  const assigns = Object.fromEntries(multi.map(f => [f.a.c.iid, assignOf(f.a.s)?.as?.[f.a.c.iid]]).filter(([, m]) => m));
+  const r = fight(pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]), assigns);
+  const fought = pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]);
+  // (a blocked attacker that still hit the player tramples over: it bursts through its blockers on its way)
+  const via = Object.fromEntries(fought.filter(f => f.blockers.length).map(f => [f.a.c.iid, f.blockers.map(b => cardAt(b.c.iid)).filter(Boolean)]).filter(([, es]) => es.length));
+  for (const d of defenders) { const p = r.player[d]; hitAnim(d, atk.filter(a => p?.from.includes(a.c)), p ? p.life + p.poison : 0, via); }
+  clashAnim(fought, r);
+  const mine = me.watch ? [] : me.zones.bf;
+  setTimeout(() => {
+    if (me.watch) return;
+    const p = r.player[mySeat];
+    if (defenders.includes(mySeat)) {
+      if (p?.life) { noteLife(); me.life -= p.life; }
+      if (p?.poison) me.poison = (me.poison || 0) + p.poison;
+      if (FORMATS[table.fmt].cmdr) for (const [k, n] of Object.entries(p?.cmd || {})) me.cmd[k] = (me.cmd[k] || 0) + n;
+      say(p ? `took ${p.life ? `${p.life} combat damage` : ""}${p.life && p.poison ? " and " : ""}${p.poison ? `${p.poison} poison counter${p.poison === 1 ? "" : "s"}` : ""} from ${p.from.map(c => c.name || "a face-down creature").join(", ")}.` : "took no combat damage.");
+    }
+    if (r.gain[mySeat]) { noteLife(); me.life += r.gain[mySeat]; say(`gained ${r.gain[mySeat]} life (lifelink).`); }
+    for (const c of mine) if (r.minus[c.iid]) { c.ctr = { ...c.ctr, "-1/-1":(c.ctr?.["-1/-1"] || 0) + r.minus[c.iid] }; say(`put ${r.minus[c.iid]} -1/-1 counter${r.minus[c.iid] === 1 ? "" : "s"} on ${nameOf(c)}.`); }
     changed();
-  }, 1300);
+    const dead = mine.filter(c => r.dies.includes(c.iid));
+    for (const c of dead) { say(`${nameOf(c)} died in combat.`); move(c.iid, "gy", { quiet:true }); }
+  }, 650 + Math.max(0, atk.length - 1) * 140 + (Object.keys(via).length ? 340 : 0));  // (after a trampler bursts through)
+  // (combat is over: attackers and blockers leave combat; their arrows and marks go)
+  setTimeout(() => {
+    if (me.watch) return;
+    const ids = new Set(atk.map(a => a.c.iid)); let ch = false;
+    for (const c of me.zones.bf) { if (ids.has(c.iid) && c.atk) { c.atk = 0; ch = true; } if (c.blk && ids.has(c.blk)) { c.blk = ""; ch = true; } }
+    if (ch) { me.arrows = (me.arrows || []).filter(x => !ids.has(x.from)); changed(); }
+  }, 1300 + (Object.keys(via).length ? 340 : 0));
+}
+/* Combat motion, on every screen: an attacker lunges toward the player it attacks when the attack is declared; a
+   blocker steps out toward the attacker it blocks; when the damage lands, each blocked attacker slams into its
+   blockers, every creature that took damage shakes with the damage over it, and the ones that died fade and grey
+   before they go to the graveyard. */
+const cardAt = iid => document.querySelector(`#bf .card[data-iid="${CSS.escape(iid)}"], .obf .card[data-iid="${CSS.escape(iid)}"]`);
+const centerOf = e => { const r = e.getBoundingClientRect(); return { x:r.left + r.width / 2, y:r.top + r.height / 2 }; };
+let seenAtk = new Set(), seenBlk = new Set();
+function combatMoves(){
+  if (!motionOK()) return;
+  const now = Object.entries(players).flatMap(([s, p]) => (p.bf || []).map(c => ({ c, s:+s })));
+  const lunge = (e, to, k) => { const a = centerOf(e), dx = (to.x - a.x) * k, dy = (to.y - a.y) * k;
+    e.animate([{ translate:"0 0" }, { translate:`${dx}px ${dy}px`, offset:.45 }, { translate:"0 0" }], { duration:520, easing:"cubic-bezier(.3,.7,.3,1)" }); };
+  for (const { c } of now) {
+    if (c.atk && !seenAtk.has(c.iid)) {
+      const e = cardAt(c.iid), t = c.atk === mySeat ? $("#lifeOut") : document.querySelector(`.opp[data-seat="${c.atk}"] .olife`);
+      if (e && t) { const tc = centerOf(t), d = Math.hypot(tc.x - centerOf(e).x, tc.y - centerOf(e).y) || 1; lunge(e, tc, Math.min(.35, 70 / d)); }
+    }
+    if (c.blk && !seenBlk.has(c.iid)) { const e = cardAt(c.iid), t = cardAt(c.blk); if (e && t) lunge(e, centerOf(t), .3); }
+  }
+  seenAtk = new Set(now.filter(x => x.c.atk).map(x => x.c.iid)); seenBlk = new Set(now.filter(x => x.c.blk).map(x => x.c.iid));
+}
+function clashAnim(pairs, r){
+  if (!motionOK()) return;
+  const floatNum = (e, text, delay) => setTimeout(() => {
+    const c = centerOf(e), n = el("span", { className:"hitnum", textContent:text }); n.style.left = `${c.x}px`; n.style.top = `${c.y - 20}px`; document.body.append(n);
+    n.animate([{ transform:"translate(-50%,0) scale(.6)", opacity:0 }, { transform:"translate(-50%,-10px) scale(1.15)", opacity:1, offset:.2 }, { transform:"translate(-50%,-44px)", opacity:0 }], { duration:1100, easing:"ease-out" }).onfinish = () => n.remove();
+  }, delay);
+  for (const { a, blockers } of pairs) {
+    if (!blockers.length) continue;
+    const ae = cardAt(a.c.iid), be = blockers.map(b => cardAt(b.c.iid)).filter(Boolean); if (!ae || !be.length) continue;
+    const to = be.map(centerOf).reduce((m, p, i, all) => ({ x:m.x + p.x / all.length, y:m.y + p.y / all.length }), { x:0, y:0 }), from = centerOf(ae);
+    const dx = (to.x - from.x) * .6, dy = (to.y - from.y) * .6;
+    ae.animate([{ translate:"0 0", scale:"1", zIndex:40 }, { translate:`${dx * .3}px ${dy * .3}px`, scale:"1.08", zIndex:40, offset:.25 },
+      { translate:`${dx}px ${dy}px`, scale:"1.08", zIndex:40, offset:.5 }, { translate:"0 0", scale:"1", zIndex:40 }], { duration:620, easing:"cubic-bezier(.5,0,.4,1)" });
+    for (const e of [ae, ...be]) {
+      const iid = e.dataset.iid, hurt = r.took[iid], dies = r.dies.includes(iid);
+      if (hurt) setTimeout(() => e.animate([{ rotate:"0deg" }, { rotate:"-5deg" }, { rotate:"5deg" }, { rotate:"-3deg" }, { rotate:"0deg" }], { duration:320 }), 300);
+      if (hurt) floatNum(e, `−${hurt}`, 300);
+      if (dies) setTimeout(() => e.animate([{ filter:"none", opacity:1 }, { filter:"grayscale(1) brightness(.6) drop-shadow(0 0 10px #ff3b5c)", opacity:.55 }], { duration:300, fill:"forwards" }), 420);
+    }
+  }
 }
 // The hit: each attacker that got through flies into the life total, which shakes and shows what it lost
-function hitAnim(d, hits, n){
+function hitAnim(d, hits, n, via = {}){
   const target = d === mySeat ? $("#lifeOut") : document.querySelector(`.opp[data-seat="${d}"] .olife`); if (!target) return;
-  const t = target.getBoundingClientRect();
+  const t = target.getBoundingClientRect(); let last = 0;
   hits.forEach((a, i) => {
-    const src = document.querySelector(`#bf .card[data-iid="${CSS.escape(a.c.iid)}"], .obf .card[data-iid="${CSS.escape(a.c.iid)}"]`); if (!src) return;
-    const r = src.getBoundingClientRect(), g = el("div", { className:"hitfly" });
+    const src = cardAt(a.c.iid); if (!src) return;
+    // (trample: it starts where it slammed into its blockers, once it has, with a burst there)
+    const over = via[a.c.iid], r0 = { width:src.offsetWidth, height:src.offsetHeight }, from = over ? over.map(centerOf).reduce((m, p, j, all) => ({ x:m.x + p.x / all.length, y:m.y + p.y / all.length }), { x:0, y:0 }) : centerOf(src);
+    const r = { left:from.x - r0.width / 2, top:from.y - r0.height / 2, width:r0.width, height:r0.height }, g = el("div", { className:"hitfly" + (over ? " trample" : "") });
     g.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;${a.c.img ? `background-image:url("${a.c.img}")` : ""}`;
+    const delay = i * 140 + (over ? 320 : 0); last = Math.max(last, delay);
+    if (over) {
+      g.style.opacity = "0";
+      setTimeout(() => { const b = el("span", { className:"burst" }); b.style.left = `${from.x}px`; b.style.top = `${from.y}px`; document.body.append(b);
+        b.animate([{ transform:"translate(-50%,-50%) scale(.2)", opacity:1 }, { transform:"translate(-50%,-50%) scale(1.6)", opacity:0 }], { duration:450, easing:"ease-out" }).onfinish = () => b.remove(); }, delay);
+    }
     document.body.append(g);
     const dx = t.left + t.width / 2 - (r.left + r.width / 2), dy = t.top + t.height / 2 - (r.top + r.height / 2);
-    g.animate([{ transform:"none" }, { transform:`translate(${dx * .9}px,${dy * .9}px) scale(.75) rotate(-8deg)`, offset:.8 }, { transform:`translate(${dx}px,${dy}px) scale(.3)`, opacity:0 }],
-      { duration:650, delay:i * 140, easing:"cubic-bezier(.55,0,.8,.3)", fill:"both" }).onfinish = () => g.remove();
+    g.animate([{ transform:"none", opacity:over ? 0 : 1 }, { transform:`translate(${dx * .1}px,${dy * .1}px)`, opacity:1, offset:.1 }, { transform:`translate(${dx * .9}px,${dy * .9}px) scale(.75) rotate(-8deg)`, opacity:1, offset:.8 }, { transform:`translate(${dx}px,${dy}px) scale(.3)`, opacity:0 }],
+      { duration:650, delay, easing:"cubic-bezier(.55,0,.8,.3)", fill:"both" }).onfinish = () => g.remove();
   });
   if (!n) return;
   setTimeout(() => {
@@ -3818,7 +4067,7 @@ function hitAnim(d, hits, n){
     const num = el("span", { className:"hitnum", textContent:`−${n}` }); num.style.left = `${t.left + t.width / 2}px`; num.style.top = `${t.top}px`;
     document.body.append(num);
     num.animate([{ transform:"translate(-50%,0)", opacity:1 }, { transform:"translate(-50%,-46px)", opacity:0 }], { duration:1300, easing:"ease-out" }).onfinish = () => num.remove();
-  }, 600 + Math.max(0, hits.length - 1) * 140);
+  }, 600 + last);
 }
 // Tokens: the ones your cards make (from Scryfall's related cards), or search for any token
 async function tokenDialog(rel){
@@ -4456,7 +4705,7 @@ window.addEventListener("beforeunload", () => save());
 // For tests: a way to reach the game state
 if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
 if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
-if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, changed, cards, alerts, cues };
+if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, changed, cards, alerts, cues, fight, cantBlock, combatKw, lethalTo };
 })();
 </script>
 </body>

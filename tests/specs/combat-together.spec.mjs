@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { launchBrowser, newPlayer, settle, dragTo } from "../support/players.mjs";
+import { launchBrowser, newPlayer, settle, dragTo, tool } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
 // Gamma Card is a 3/4 creature in the test cards
 const DECK = `12 Gamma Card
 18 Forest`;
 const NAMES = ["Luke", "Rick", "Sam"];
-const fetchTo = (page, name, zone) => page.evaluate(([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); return c.iid; }, [name, zone]);
+const fetchTo = (page, name, zone) => page.evaluate(([name, zone]) => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === name); ktPlay.move(c.iid, zone); delete c.etb; return c.iid;  /* (as if it had been there since last turn) */ }, [name, zone]);
 
-test("digital table: combat damage waits for everyone attacked, Interrupt pauses it, then it all lands at once", async () => {
+test("digital table: combat damage waits for everyone attacked, Interrupt calls the attack off, and a new attack lands all at once", async () => {
   test.setTimeout(180000);
   const browser = await launchBrowser(); const ps = [];
   let room = "";
@@ -35,20 +35,28 @@ test("digital table: combat damage waits for everyone attacked, Interrupt pauses
   await box1.getByRole("button", { name:"Take the damage", exact:true }).click();
   await expect(box1).toContainText(`Waiting for ${n2}`);
   await expect(d1.locator("#lifeOut")).toHaveText("20");
-  // The second interrupts: everyone sees combat paused, and answering doesn't start the damage
+  // The second interrupts: the whole attack is called off on every screen, with no damage, to be sorted out by hand
   await box2.getByRole("button", { name:"Interrupt", exact:true }).click();
-  for (const p of ps) await expect(p.locator("#pauseBar")).toContainText("Combat paused");
-  await box2.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await expect(box1).toBeHidden(); await expect(box2).toBeHidden();
+  await expect(a.locator("#bf .card.attacking")).toHaveCount(0);
+  for (const p of ps) await expect(p.locator("#arrows > path")).toHaveCount(0);
+  await expect(a.locator("#log")).toContainText(`${n2} interrupted the attack`);
+  await a.waitForTimeout(1500);
   await expect(d1.locator("#lifeOut")).toHaveText("20");
   await expect(d2.locator("#lifeOut")).toHaveText("20");
-  // ...until they resume: then both hits land at once, and the attackers leave combat
-  await d2.locator("#pauseBar").getByRole("button", { name:"Resume combat" }).click();
-  for (const p of ps) await expect(p.locator("#pauseBar")).toBeHidden();
+  // A new attack after that works as usual (the attackers stayed tapped: untap them first): both answer and the
+  // damage lands at once
+  await tool(a, "#untapAllBtn");
+  await a.click("#attackBtn");
+  await dragTo(a, a.locator(`#bf .card[data-iid="${x}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${n1}` }));
+  await dragTo(a, a.locator(`#bf .card[data-iid="${y}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${n2}` }));
+  await a.locator("#atkBar").getByRole("button", { name:"Attack (2)", exact:true }).click();
+  await box1.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await expect(box1).toContainText(`Waiting for ${n2}`);
+  await box2.getByRole("button", { name:"Take the damage", exact:true }).click();
   await expect(d1.locator("#lifeOut")).toHaveText("17");
   await expect(d2.locator("#lifeOut")).toHaveText("17");
   await expect(a.locator("#bf .card.attacking")).toHaveCount(0);
-  for (const p of ps) await expect(p.locator("#arrows > path")).toHaveCount(0);
-  await expect(box1).toBeHidden(); await expect(box2).toBeHidden();
   for (const p of ps) expect(p.errors).toEqual([]);
   await browser.close();
 });
