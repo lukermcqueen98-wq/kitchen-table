@@ -7,9 +7,11 @@ test("digital table: your hand docks at the bottom like Arena, and rises when yo
   await a.goto(`${BASE}/play.html?kt-test&dock`);
   await a.fill("#nameIn", "Luke"); await a.selectOption("#fmtSel", "sixty"); await a.fill("#deckIn", "30 Gamma Card\n30 Forest"); await a.click("#joinBtn");
   await expect(a.locator("#table")).toBeVisible({ timeout:15000 }); await settle(a);
+  await expect(a.locator(".oppwait")).toHaveCount(3);  // (open seats around the table until the game starts...)
   await a.click("#startBtn"); await a.locator(".modal").getByRole("button", { name:"Start the game", exact:true }).click();
   await a.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();
   await expect(a.locator("#hand .card")).toHaveCount(7);
+  await expect(a.locator(".oppwait")).toHaveCount(0);  // (...then it's bare table)
   const top = async () => (await a.locator("#handWrap").boundingBox()).y, vh = a.viewportSize().height;
   await a.mouse.move(700, 30);
   await expect.poll(top).toBeGreaterThan(vh - 80);  // (docked: only the tops of the cards show, over the table's edge)

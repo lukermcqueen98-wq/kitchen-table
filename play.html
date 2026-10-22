@@ -2684,8 +2684,9 @@ function renderOpps(){
     $("#me").style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[mySeat - 1]} 32%, #1a1030)`);
     $("#turnToken").textContent = !table.started ? "Waiting to start" : table.turnSeat === mySeat ? "Your turn" : `${nm(table.turnSeat)} is up`;
   }
-  // (open seats at the long table; alone, the one across from you asks for players)
-  if (lt && order.length < 4) for (const slot of ["L", "T", "R"].filter(x => !SLOTS.includes(x))) {
+  // (open seats at the long table, until the game starts (then it's bare table); alone, the one across from you asks
+  // for players)
+  if (lt && order.length < 4 && !table.started) for (const slot of ["L", "T", "R"].filter(x => !SLOTS.includes(x))) {
     const o = el("div", { className:"oppwait" }), w = el("div", { className:"waitmat" }); o.dataset.slot = slot; o.append(w);
     if (!order.length && slot === "T") {
       const copy = el("button", { type:"button", className:"btn primary", textContent:"Copy invite link" }); copy.onclick = () => $("#copyLink").click();
