@@ -474,8 +474,6 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.r3{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,.8fr) auto minmax(0,2fr);grid-template-areas:"L T R" "bar bar bar" "me me me"}
   main#play.r4{grid-template-columns:minmax(0,1fr) 210px minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,2.4fr);grid-template-areas:"L2 hub R1" "L1 hub R2" "bar bar bar" "me me me"}
   main#play.r5{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto minmax(0,2.4fr);grid-template-areas:"L2 T R1" "L1 hub R2" "bar bar bar" "me me me"}
-  main#play.zooming #hub{visibility:hidden}
-  main#play.round .opp.zoomed{position:relative;inset:auto;grid-row:1 / bar-start;grid-column:1 / -1;z-index:5}
   main#play.r4 #hub,main#play.r5 #hub{grid-area:hub;display:flex;align-items:center;justify-content:center;min-height:0}
 }
 /* Long table (the default): a wooden table with one playmat per player. You always have the near mat; the others sit
@@ -508,24 +506,21 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
     max-width:calc(100% - 12px);overflow:hidden;padding:3px 12px;border:1px solid var(--felt-edge);border-radius:999px;background:rgba(15,9,30,.92);font-size:12px}
   main#play.lt [data-slot="L"] .ohead,main#play.lt [data-slot="R"] .ohead,main#play.lt [data-slot="BR"] .ohead{top:auto;bottom:6px}
   main#play.lt .ohead .oname{order:1} main#play.lt .ohead .olife{order:2;margin-left:0;font-size:18px} main#play.lt .ohead .ocount,main#play.lt .ohead .badge{order:3}
-  main#play.lt .ohead .ozoom{order:4;margin-left:2px;font-size:11px;padding:0 7px}
   main#play.lt .ohead .ocount ~ .ocount{display:none}  /* (the plate: name, life and hand, like across a real table) */
   main#play.lt .obody{position:absolute;inset:30px 0 0;container-type:size}
   main#play.lt [data-slot="L"] .obody,main#play.lt [data-slot="R"] .obody,main#play.lt [data-slot="BR"] .obody{inset:0 0 30px}
   /* (each battlefield the same shape, as big as fits its mat, turned to face its owner) */
   /* (each seat: a strip as long as its mat (from its owner's side) and as deep as a board; the board, the same size for
      everyone, sits in the middle of it, and the piles at the owner's right-hand end of the mat) */
-  main#play.lt .oframe,main#play.lt #myFrame{position:absolute;left:50%;top:50%;display:block;width:calc(100cqw - 16px);height:calc(var(--fw,400px) / var(--ba));transform:translate(-50%,-50%)}
-  main#play.lt [data-slot="L"] .oframe,main#play.lt [data-slot="R"] .oframe{width:calc(100cqh - 16px)}
+  main#play.lt .oframe,main#play.lt #myFrame{position:absolute;left:50%;top:50%;display:block;width:calc(var(--fw,400px) + var(--colw));height:calc(var(--fw,400px) / var(--ba));transform:translate(-50%,-50%);
+    isolation:isolate;overflow:hidden;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.45),0 4px 14px rgba(0,0,0,.35)}
   main#play.lt [data-slot^="T"] .oframe{transform:translate(-50%,-50%) rotate(180deg)}
   main#play.lt [data-slot="L"] .oframe{transform:translate(-50%,-50%) rotate(90deg)}
   main#play.lt [data-slot="R"] .oframe{transform:translate(-50%,-50%) rotate(-90deg)}
-  main#play.lt .opp.zoomed .oframe{width:calc(100cqw - 16px) !important;height:calc(100cqh - 60px);transform:translate(-50%,-50%)}  /* (zoomed in: upright to read, and big) */
-  main#play.lt .opp.zoomed .oframe .obf{width:min(calc(100cqw - 16px - var(--colw)),calc((100cqh - 60px) * var(--ba)));height:auto;aspect-ratio:var(--ba);top:0;bottom:auto;left:0}
   /* (the piles at the right-hand edge of every mat, from its owner's seat: command zone, library and exile down the edge,
      the graveyard beside exile; --pw is a pile's width, small enough that three stack in a board's depth) */
   main#play.lt .oframe,main#play.lt #myFrame{--pw:min(calc(var(--fw,400px) * .07),calc((var(--fw,400px) / var(--ba) - 26px) / 4.2));--ph:calc(var(--pw) * 1.397 + 8px);--colw:calc(var(--pw) * 2 + 30px)}
-  main#play.lt .oframe .obf,main#play.lt #myFrame #bf{position:absolute;top:0;bottom:0;left:calc((100% - var(--colw) - var(--fw,400px)) / 2);width:var(--fw,400px);container-type:inline-size;border-radius:8px}
+  main#play.lt .oframe .obf,main#play.lt #myFrame #bf{position:absolute;top:0;bottom:0;left:0;width:var(--fw,400px);container-type:inline-size;border-radius:8px}
   main#play.lt #bf .card,main#play.lt .obf .card{--w:8cqw}
   main#play.lt .oframe .opiles{display:contents}
   main#play.lt .p-cz,main#play.lt .p-lib,main#play.lt .p-gy,main#play.lt .p-ex,main#play.lt .p-dun,
@@ -538,7 +533,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt .oframe .opile,main#play.lt #myFrame .pile{background:rgba(15,9,30,.75);padding:3px;width:auto}
   main#play.lt .opile .card,main#play.lt .opile .ph,main#play.lt .pile .card,main#play.lt .pile .ph{--w:var(--pw);width:var(--pw);margin:0}
   /* (a pile's name and count sit on the card) */
-  main#play.lt .opilelbl,main#play.lt .pilelbl{position:absolute;left:3px;right:3px;bottom:5px;z-index:2;text-align:center;font-size:clamp(7px,calc(var(--pw) * .19),11px);line-height:1.15;padding:1px 0;background:rgba(15,9,30,.8);border-radius:4px;white-space:normal;overflow-wrap:anywhere}
+  main#play.lt .opilelbl,main#play.lt .pilelbl{position:absolute;left:3px;right:3px;bottom:5px;z-index:2;text-align:center;font-size:clamp(6px,calc((var(--pw) - 4px) / 5.6),11px);line-height:1.15;padding:1px 0;background:rgba(15,9,30,.8);border-radius:4px;white-space:nowrap;overflow:hidden}
+  main#play.lt .opilelbl .n,main#play.lt .pilelbl .n{display:block;font-size:1.25em;font-weight:800}
   main#play.lt .oframe .ocz,main#play.lt #myFrame #czone{min-height:var(--ph);min-width:calc(var(--pw) + 10px);border:1px solid var(--felt-edge);border-radius:8px;background:rgba(15,9,30,.6);flex-direction:row;padding:4px}
   main#play.lt #myFrame #czone::before{display:none}
   main#play.lt #side #myPiles{display:none}
@@ -571,15 +567,14 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   body.handstrip main#play.lt{padding-bottom:10px}
 }
 #turnToken{display:none}
+/* (the shuffle riffle: the deck splits into two halves that fan apart and snap back together) */
+.riffling{position:relative}
+.riffling .card.back{animation:riffleA .9s ease-in-out var(--rd,0s) both}
+.riffling::after{content:"";position:absolute;z-index:3;pointer-events:none;width:var(--pw,54px);aspect-ratio:63/88;left:50%;top:3px;margin-left:calc(var(--pw,54px) / -2);
+  border-radius:4.75%/3.5%;background:#1a1208 url(card-back.jpg) center/100% 100% no-repeat;box-shadow:0 2px 6px rgba(0,0,0,.6);animation:riffleB .9s ease-in-out var(--rd,0s) both}
+@keyframes riffleA{0%,100%{transform:none}20%{transform:translateX(-38%) rotate(-10deg)}45%{transform:translateX(-30%) rotate(-6deg)}70%{transform:translateX(-8%) rotate(-2deg)}}
+@keyframes riffleB{0%{opacity:0;transform:none}10%{opacity:1}20%{transform:translateX(38%) rotate(10deg)}45%{transform:translateX(30%) rotate(6deg)}70%{transform:translateX(8%) rotate(2deg)}90%{opacity:1}100%{opacity:0;transform:none}}
 .oframe{display:contents}
-/* Zoomed in on one player's battlefield (click its empty space): it covers the other boards, bigger cards */
-.opp.zoomed{position:fixed;inset:12px;z-index:45;background:var(--felt-deep);box-shadow:0 20px 60px rgba(0,0,0,.6)}
-.opp.zoomed .obf{container-type:size}
-#opps .opp.zoomed .obf .card{--w:min(110px,28cqh)}  /* (as big as fits: the same share of the height as on a small board) */
-.ozoom{margin-left:auto;font-size:12px;padding:2px 8px}
-.ozoom + .olife{margin-left:0}
-.obf{cursor:zoom-in}
-.opp.zoomed .obf{cursor:zoom-out}
 .hubring{position:relative;height:min(100%,210px);aspect-ratio:1;border-radius:50%;border:2px dashed var(--felt-edge);display:flex;align-items:center;justify-content:center}
 .hubmid{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;max-width:62%}
 .hubmid .who{font:700 20px/1.1 var(--serif)}
@@ -828,7 +823,11 @@ const params = new URLSearchParams(location.search);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 function rnd(n){ const a = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n; do crypto.getRandomValues(a); while (a[0] >= lim); return (a[0] % n) + 1; }
-function shuffle(a){ for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1) - 1; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function shuffle(a){
+  for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1) - 1; [a[i], a[j]] = [a[j], a[i]]; }
+  if (typeof me !== "undefined" && me && a === me.zones?.lib) me.shuffles = (me.shuffles || 0) + 1;  // (everyone's screen riffles your library: see riffle)
+  return a;
+}
 function norm(t){ return String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9/]+/g, " ").trim(); }
 function el(tag, props = {}, ...kids){ const e = document.createElement(tag); Object.assign(e, props); for (const k of kids) if (k != null) e.append(k); return e; }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1286,7 +1285,6 @@ const settings = { autoUntap:store.get("kt-dig-untap", "1") === "1", autoDraw:st
                    turnAlert:store.get("kt-dig-alert", "1") === "1", hoverPop:store.get("kt-dig-pop", "1") === "1", logPop:store.get("kt-dig-logpop", "1") === "1",
                    stackLands:store.get("kt-dig-stack", "1") === "1", round:store.get("kt-dig-round", "0") === "1" };
 let deckIds = [], cmdrIds = [], cmdrFromDeck = [], sideIds = [], deckName = "";
-let zoomSeat = 0;  // the player whose battlefield is zoomed in on (0: none)
 const watchers = {};  // seat -> name, for people watching (seats 7 to 10)  // (commanders taken out of the decklist go back if you pick another)
 
 function blankMe(name){
@@ -1313,7 +1311,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, shuffles:me.shuffles || 0 };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1535,7 +1533,7 @@ function cleanPub(st){
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
            dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out,
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, shuffles:num(st.shuffles, 0, 1e6),
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
 }
@@ -2404,18 +2402,30 @@ function drawBattlefield(box, list, opts){
 function sizeBoards(){
   const play = $("#play"); if (!play.classList.contains("lt")) return;
   const A = parseFloat(getComputedStyle(play).getPropertyValue("--ba")) || 2.4; let F = Infinity;
-  for (const b of document.querySelectorAll("#play.lt .opp:not(.zoomed) .obody, #play.lt #me")) {
+  for (const b of document.querySelectorAll("#play.lt .opp .obody, #play.lt #me")) {
     const r = b.getBoundingClientRect(), side = /^[LR]$/.test(b.closest(".opp")?.dataset.slot || "");
     const along = side ? r.height : r.width, depth = side ? r.width : r.height;
-    if (along > 0 && depth > 0) F = Math.min(F, (along - 16 - 44) / 1.124, (depth - 16) * A);  // (the pile columns: --colw)
+    if (along > 0 && depth > 0) F = Math.min(F, (along - 16 - 30) / 1.14, (depth - 16) * A);  // (with the pile columns, --colw)
   }
   if (isFinite(F)) play.style.setProperty("--fw", `${Math.max(120, Math.floor(F))}px`);
 }
 addEventListener("resize", () => requestAnimationFrame(sizeBoards));
+/* A shuffle: the player's library pile riffles (its two halves fan apart and snap back) on every screen, when their
+   shuffle count goes up */
+const seenShuffles = {}, riffleUntil = {};
+function riffle(seat, n, pileEl){
+  if (!pileEl) return;
+  if (seenShuffles[seat] !== undefined && n > seenShuffles[seat]) riffleUntil[seat] = Date.now() + 900;
+  seenShuffles[seat] = n;
+  const left = (riffleUntil[seat] || 0) - Date.now();
+  if (left > 0) { pileEl.classList.add("riffling"); pileEl.style.setProperty("--rd", `${(900 - left) / -1000}s`); setTimeout(() => pileEl.classList.remove("riffling"), left); }
+}
 function render(){
   if (!me) return;
   if (!me.watch) players[mySeat] = { ...pub(), seat:mySeat };
-  renderOpps(); if (!me.watch) renderMine(); renderCombat(); renderTurn(); relinkLog(); applyMats(); sizeBoards();
+  renderOpps(); if (!me.watch) { renderMine(); riffle(mySeat, me.shuffles || 0, $("#libPile")); }
+  for (const o of document.querySelectorAll(".opp")) riffle(+o.dataset.seat, players[+o.dataset.seat]?.shuffles || 0, o.querySelector(".p-lib"));
+  renderCombat(); renderTurn(); relinkLog(); applyMats(); sizeBoards();
   const w = Object.values(watchers); $("#watchers").textContent = w.length ? `Watching: ${w.join(", ")}` : "";
   requestAnimationFrame(drawArrows);
 }
@@ -2465,11 +2475,10 @@ function renderOpps(){
   // Round table: each board's place around you (L1 is on your left, next in turn order; see the CSS)
   const POS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L1", "L2", "R1", "R2"], ["L1", "L2", "T", "R1", "R2"]][order.length];
   const round = !lt && order.length > 0 && !!POS && !me.watch;  // (alone at the table: your board fills it)
-  if (!order.includes(zoomSeat)) zoomSeat = 0;
   // Long table: each player's place, in turn order from your left (see the CSS); with five opponents one shares your side
   // (the same four seats for 1 to 3 opponents, the empty ones open; four or five: two across, the fifth beside you)
   const SLOTS = [[], ["T"], ["L", "R"], ["L", "T", "R"], ["L", "T1", "T2", "R"], ["L", "T1", "T2", "R", "BR"]][order.length];
-  $("#play").className = lt ? `lt lt${order.length}${zoomSeat ? " zooming" : ""}` : round ? `round r${order.length}${zoomSeat ? " zooming" : ""}` : "";
+  $("#play").className = lt ? `lt lt${order.length}` : round ? `round r${order.length}` : "";
   const hw = $("#handWrap"); if (lt ? hw.parentElement === $("#me") : hw.parentElement !== $("#me")) (lt ? $("#play") : $("#me")).append(hw);
   // (long table: your side panel becomes the middle strip; your piles and command zone go on your mat)
   const side = $("#side");
@@ -2508,7 +2517,7 @@ function renderOpps(){
       const b = el("button", { type:"button", className:"opile" + (list.length ? "" : " empty"), title:list.length ? `${p.name}'s ${ZONE_NAME[zone]}: click to see all ${list.length}` : `${p.name}'s ${ZONE_NAME[zone]} is empty` });
       const top = list[list.length - 1];
       if (top) { const e = cardEl(top, { small:true }); e.style.position = "relative"; b.append(e); } else b.append(el("div", { className:"ph" }));
-      b.append(el("span", { className:"opilelbl", textContent:`${ZONE_NAME[zone].replace(/^./, x => x.toUpperCase())} ${list.length}` }));
+      b.append(el("span", { className:"opilelbl" }, `${ZONE_NAME[zone].replace(/^./, x => x.toUpperCase())} `, el("span", { className:"n", textContent:list.length })));
       if (list.length) b.onclick = () => viewZone(`${p.name}'s ${ZONE_NAME[zone]}`, list, null, s);
       return b;
     };
@@ -2521,15 +2530,13 @@ function renderOpps(){
       p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
       p.picking ? el("span", { className:"badge", textContent:"Choosing a deck..." }) : null,
       p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
-      el("button", { type:"button", className:"btn small ozoom", textContent:s === zoomSeat ? "Back to the table" : "Zoom in",
-        title:s === zoomSeat ? "Back to everyone's boards (Esc)" : `See ${p.name}'s battlefield up close (or click its empty space)`, onclick:() => zoomTo(s === zoomSeat ? 0 : s) }),
       el("span", { className:"olife", title:"Life", textContent:p.life })));
     const cz = el("div", { className:"ocz" }); for (const c of p.cz) cz.append(cardEl(c, { small:true, cz:true }));
     const bfEl = el("div", { className:"obf" });
     drawBattlefield(bfEl, p.bf, { small:true });
     // (oframe: their battlefield and piles, turned to face their seat at the long table)
     // (at the long table their library sits with their other piles)
-    const libOf = () => { const b = el("div", { className:"opile" + (p.lib ? "" : " empty"), title:`${p.name}'s library: ${p.lib} cards` }); b.append(p.lib ? el("div", { className:"card back", style:"position:relative" }) : el("div", { className:"ph" }), el("span", { className:"opilelbl", textContent:`Library ${p.lib}` })); return b; };
+    const libOf = () => { const b = el("div", { className:"opile" + (p.lib ? "" : " empty"), title:`${p.name}'s library: ${p.lib} cards` }); b.append(p.lib ? el("div", { className:"card back", style:"position:relative" }) : el("div", { className:"ph" }), el("span", { className:"opilelbl" }, "Library ", el("span", { className:"n", textContent:p.lib }))); return b; };
     const libPile = p.libTop ? libTopOf(p) : lt ? libOf() : null, gyPile = pileOf(p.gy, "gy"), exPile = pileOf(p.ex, "ex"), dun = dungeonCard(s, p.dungeon, false);
     // (at the long table each pile has its place at the right-hand edge of their mat: p-cz, p-lib, p-gy, p-ex)
     cz.classList.add("p-cz"); libPile?.classList.add("p-lib"); gyPile.classList.add("p-gy"); exPile.classList.add("p-ex"); dun?.classList.add("p-dun");
@@ -2539,17 +2546,9 @@ function renderOpps(){
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
     if (lt) { o.dataset.slot = SLOTS[order.indexOf(s)]; o.style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[s - 1]} 32%, #1a1030)`); }
-    o.classList.toggle("zoomed", s === zoomSeat);
     box.append(o);
   }
 }
-// Zooming in on one player's battlefield: click its empty space (or Zoom in); click again, Back, or Esc to go back
-function zoomTo(s){ zoomSeat = s; render(); }
-document.addEventListener("click", e => {
-  if (e.button !== 0 || targeting) return;
-  const b = e.target.closest?.(".opp .obf"); if (!b || e.target.closest(".card")) return;
-  const s = +b.closest(".opp").dataset.seat; zoomTo(zoomSeat === s ? 0 : s);
-});
 function renderMine(){
   const z = me.zones;
   $("#me").classList.toggle("turn", table.turnSeat === mySeat);
@@ -2564,7 +2563,7 @@ function renderMine(){
     else if (back && list.length) { const b = el("div", { className:"card back mine" }); b.dataset.zone = "lib"; if (list[0]) b.dataset.iid = list[0].iid; p.append(b); }
     else if (!back && top) p.append(cardEl(top, { mine:true, zone:id === "#gyPile" ? "gy" : "ex" }));
     else p.append(el("div", { className:"ph" }));
-    p.append(el("span", { className:"pilelbl", textContent:`${label} ${list.length}` }));
+    p.append(el("span", { className:"pilelbl" }, `${label} `, el("span", { className:"n", textContent:list.length })));
   };
   pile("#libPile", z.lib, "Library", true); pile("#gyPile", z.gy, "Graveyard", false); pile("#exPile", z.ex, "Exile", false);
   const cz = $("#czone"); cz.innerHTML = ""; z.cz.forEach(c => cz.append(cardEl(c, { mine:true, zone:"cz" })));
@@ -2707,6 +2706,7 @@ document.addEventListener("pointerdown", e => {
   swallowClick = false;  // (only the click from the press that picked a target is swallowed)
   if (targeting && e.button === 0) { e.preventDefault(); e.stopPropagation(); swallowClick = true; pickTarget(e); return; }
   if (!$("#menu").contains(e.target)) closeMenu();
+  if (!drag) document.querySelectorAll(".card.ghost").forEach(g => g.remove());  // (a leftover from a drag that never ended)
   const ce = e.target.closest?.(".card.mine"); if (!ce || e.button !== 0 || !$("#modal").classList.contains("hidden")) return;
   const iid = ce.dataset.iid, zone = ce.dataset.zone; if (!iid) return;
   drag = { iid, zone, el:ce, sx:e.clientX, sy:e.clientY, moved:false, ghost:null };
@@ -2727,6 +2727,19 @@ document.addEventListener("pointermove", e => {
   document.querySelectorAll(".drop").forEach(x => x.classList.remove("drop"));
   dropTarget(e)?.classList.add("drop");
 });
+// A drag that never ends (you switched away mid-drag, or the browser took the pointer): drop it, and the picture of the
+// card that followed the mouse with it, so no stuck copy is left on the table
+function cancelDrag(){
+  clearTimeout(longPress);
+  document.querySelectorAll(".card.ghost").forEach(g => g.remove());
+  document.querySelectorAll(".dragging").forEach(x => x.classList.remove("dragging"));
+  document.querySelectorAll(".drop").forEach(x => x.classList.remove("drop"));
+  drag = null;
+}
+addEventListener("blur", cancelDrag);
+document.addEventListener("visibilitychange", () => { if (document.hidden) cancelDrag(); });
+document.addEventListener("pointercancel", cancelDrag);
+document.addEventListener("contextmenu", () => { if (drag?.moved) cancelDrag(); }, true);
 function dropTarget(e){
   const hit = document.elementsFromPoint(e.clientX, e.clientY).find(x => x.dataset?.drop);
   return hit || null;
@@ -2823,7 +2836,6 @@ document.addEventListener("keydown", e => {
   if (!me || e.target.matches("input,textarea,select") || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape" && targeting) { stopTargeting(); return; }
   if (e.key === "Escape" && $("#inspect")) { closeInspect(); return; }
-  if (e.key === "Escape" && zoomSeat && $("#modal").classList.contains("hidden") && $("#menu").classList.contains("hidden")) { zoomTo(0); return; }
   if (e.key === "Escape") { closeMenu(); if (!$("#modal").classList.contains("hidden") && modalClosable) closeModal(); return; }
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
@@ -3100,6 +3112,7 @@ function related(k){ return (k?.all_parts || []).filter(p => p.component === "to
    ===================================================================== */
 let modalClosable = true;
 function openModal(title, body, buttons = [{ label:"Close" }], { closable = true, wide = false } = {}){
+  if (drag?.moved || document.querySelector(".card.ghost")) cancelDrag();  // (a menu opening mid-drag leaves no stuck copy of the card)
   modalClosable = closable; hidePop();
   const m = $("#modal"); m.innerHTML = "";
   const card = el("div", { className:"modal-card" + (wide ? " wide" : "") }, el("h2", { textContent:title }), body);
@@ -4073,10 +4086,11 @@ function paintMat(box, m, slot){
 function sendMat(conn){ if (conn && !me?.watch) send(conn, { type:"mat", mat:myMat }); }
 function applyMats(){
   // (at the long table a playmat covers its player's whole mat; otherwise just the battlefield)
-  const lt = $("#play").classList.contains("lt"), mine = lt ? $("#me") : $("#bf"), off = lt ? $("#bf") : $("#me");
-  if (off) { off.style.background = ""; off.classList.remove("mat"); [...off.children].find(x => x.classList.contains("matlayer"))?.remove(); }
+  // (at the long table a playmat is the same box on every screen, board and piles, so it lines up with the cards exactly)
+  const lt = $("#play").classList.contains("lt"), mine = lt ? $("#myFrame") : $("#bf");
+  for (const off of [$("#bf"), $("#me")].filter(x => x && x !== mine)) { off.style.background = ""; off.classList.remove("mat"); [...off.children].find(x => x.classList.contains("matlayer"))?.remove(); }
   if (mine) paintMat(mine, myMat, "me");
-  for (const o of document.querySelectorAll(".opp")) { const b = lt ? o : o.querySelector(".obody"); if (b) paintMat(b, mats[+o.dataset.seat], +o.dataset.seat); }
+  for (const o of document.querySelectorAll(".opp")) { const b = o.querySelector(lt ? ".oframe" : ".obody"); if (b) paintMat(b, mats[+o.dataset.seat], +o.dataset.seat); }
 }
 function setMat(m, quiet = false){
   myMat = cleanMat(m);
