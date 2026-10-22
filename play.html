@@ -420,11 +420,15 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .atkrow img{width:46px;border-radius:4px}
 .atkname{display:flex;flex-direction:column;min-width:150px}
 .atkname small{color:var(--muted)}
-#defendBox{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;width:min(620px,calc(100vw - 32px));max-height:60vh;overflow:auto;
+#defendBox,#assignBox{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;width:min(620px,calc(100vw - 32px));max-height:60vh;overflow:auto;
   background:rgba(20,12,40,.97);border:2px solid var(--danger);border-radius:14px;padding:12px 16px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
-#defendBox h2{margin:0 0 6px;font-size:20px}
-#defendBox .atkrow img{width:40px}
-#defendBox .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+#defendBox h2,#assignBox h2{margin:0 0 6px;font-size:20px}
+#defendBox .atkrow img,#assignBox .atkrow img{width:40px}
+#assignBox{border-color:var(--brass)}
+#assignBox .asgn{display:flex;align-items:center;gap:8px;width:100%;padding:3px 0 3px 50px}
+#assignBox .asgn span{flex:1}
+#assignBox .asgn b{min-width:28px;text-align:center;font-size:18px}
+#defendBox .acts,#assignBox .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
 #atkBar{position:fixed;z-index:55;display:flex;gap:8px;align-items:stretch;padding:8px;border-radius:12px;background:rgba(20,12,40,.95);border:2px solid var(--brass);box-shadow:0 8px 30px rgba(0,0,0,.5)}
 #atkBar .atkdrop{flex:1;min-width:120px;min-height:64px;border:2px dashed var(--felt-edge);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
 #atkBar .atkdrop.drop{background:rgba(255,207,90,.15);border-style:solid}
@@ -595,7 +599,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .modal{animation:fadeIn .18s ease-out}
 .modal-card{animation:popIn .24s cubic-bezier(.2,.8,.3,1)}
 .tmenu[open]>.tmenu-pop{animation:dropIn .16s ease-out}
-#defendBox,#atkBar,#combatBar{animation:slideDown .26s cubic-bezier(.2,.8,.3,1)}
+#defendBox,#assignBox,#atkBar,#combatBar{animation:slideDown .26s cubic-bezier(.2,.8,.3,1)}
 .btn{transition:background-color .15s,border-color .15s,color .15s,box-shadow .2s,transform .1s}
 .btn:active{transform:scale(.96)}
 .bump{animation:bump .4s ease-out}
@@ -665,7 +669,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 @keyframes tumble{from{transform:rotate(0) scale(.9)}50%{transform:rotate(180deg) scale(1.05)}to{transform:rotate(360deg) scale(.9)}}
 @keyframes coinspin{from{transform:scaleX(1)}50%{transform:scaleX(.08)}to{transform:scaleX(1)}}
 @keyframes landed{from{transform:scale(1.35)}to{transform:scale(1)}}
-body.nomotion .card,body.nomotion #hand .card,body.nomotion .btn{transition:none}body.nomotion :is(.modal,.modal-card,.tmenu-pop,#defendBox,#atkBar,#combatBar,.bump){animation:none}
+body.nomotion .card,body.nomotion #hand .card,body.nomotion .btn{transition:none}body.nomotion :is(.modal,.modal-card,.tmenu-pop,#defendBox,#assignBox,#atkBar,#combatBar,.bump){animation:none}
 body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie svg,#turnInfo.mine,#turnSplash,#turnClockBox.over b){animation:none}
 </style>
 </head>
@@ -798,6 +802,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
     <div id="hub" aria-label="Turn order"></div>
     <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
     <div id="defendBox" class="hidden" role="dialog" aria-label="You're being attacked"></div>
+    <div id="assignBox" class="hidden" role="dialog" aria-label="Divide your attackers' damage"></div>
     <div id="atkBar" class="hidden" role="region" aria-label="Attack: drag your creatures onto a player"></div>
     <div id="me" class="me">
       <div id="bf" data-drop="bf" aria-label="Your battlefield"></div>
@@ -1347,7 +1352,7 @@ function pub(){
   return { name:me.name, life:me.life, poison:me.poison, energy:me.energy, exp:me.exp, cmd:me.cmd, mana:me.mana, lands:me.lands,
            lib:z.lib.length, hand:z.hand.length, handShown:me.revealHand ? z.hand.map(c => pubCard(c)) : null,
            bf:z.bf.map(c => pubCard(c, true)), gy:z.gy.map(c => pubCard(c)), ex:z.ex.map(c => pubCard(c)), cz:z.cz.map(c => pubCard(c)), st:(z.st || []).map(c => pubCard(c)), gameId:me.gameId, arrows:me.arrows || [], deck:deckName, out:!!me.out,
-           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, shuffles:me.shuffles || 0, cresp:me.cresp || null, atkN:me.atkN || 0, cpause:me.cpause || "" };
+           dungeon:{ room:me.dungeon?.room || "", done:me.dungeon?.done || 0 }, libTop:me.topRevealed && z.lib[0] ? pubCard(z.lib[0]) : null, turns:me.turns || 0, picking:!!me.picking, shuffles:me.shuffles || 0, cresp:me.cresp || null, cassign:me.cassign || null, atkN:me.atkN || 0, cpause:me.cpause || "" };
 }
 let pushTimer = null;
 /* Undo: each change to your side of the table is remembered (the last 30), and Undo puts the one before back.
@@ -1570,7 +1575,9 @@ function cleanPub(st){
            mana:Object.fromEntries(COLORS.map(k => [k, num(st.mana?.[k], 0, 999)])),
            dungeon:{ room:UNDERCITY[st.dungeon?.room] ? st.dungeon.room : "", done:num(st.dungeon?.done, 0, 99) }, libTop:st.libTop ? cl([st.libTop])[0] || null : null, turns:num(st.turns, 0, 9999),
            lib:num(st.lib, 0, 999), hand:num(st.hand, 0, 999), handShown:st.handShown ? cl(st.handShown) : null, lands:num(st.lands, 0, 99),
-           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, shuffles:num(st.shuffles, 0, 1e6), atkN:num(st.atkN, 0, 1e6), cpause:String(st.cpause || "").slice(0, 600),
+           bf:cl(st.bf), gy:cl(st.gy), ex:cl(st.ex), cz:cl(st.cz), st:cl(st.st), deck:String(st.deck || "").slice(0, 40), picking:!!st.picking, gameId:String(st.gameId || "").slice(0, 30), out:!!st.out, shuffles:num(st.shuffles, 0, 1e6), atkN:num(st.atkN, 0, 1e6),
+           cassign:st.cassign && typeof st.cassign === "object" ? { key:String(st.cassign.key || "").slice(0, 600), as:Object.fromEntries(Object.entries(st.cassign.as || {}).slice(0, 30).map(([a, m]) => [String(a).slice(0, 20),
+             Object.fromEntries(Object.entries(m && typeof m === "object" ? m : {}).slice(0, 10).map(([b, n]) => [String(b).slice(0, 20), num(n, 0, 999)]))])) } : null, cpause:String(st.cpause || "").slice(0, 600),
            cresp:st.cresp && typeof st.cresp === "object" ? { key:String(st.cresp.key || "").slice(0, 600), blocks:Object.fromEntries(Object.entries(st.cresp.blocks || {}).slice(0, 30).map(([a, b]) => [String(a).slice(0, 20), [].concat(b || []).slice(0, 10).map(x => String(x).slice(0, 20)).filter(Boolean)])) } : null,
            arrows:(Array.isArray(st.arrows) ? st.arrows : []).slice(0, 30).filter(a => a && typeof a === "object").map(a => ({
              from:String(a.from || "").slice(0, 20), card:String(a.card || "").slice(0, 20), player:clamp(+a.player || 0, 0, MAX) })) };
@@ -2798,7 +2805,7 @@ function renderCombat(){
   if (atMe.length > lastAtMe) cue("attack");
   lastAtMe = atMe.length;
   note.textContent = atMe.length ? `${atMe.length} attacking you` : attackers.length ? `${attackers.length} attacking` : "";
-  cancelCombat(); renderDefend(); renderAtkBar(); resolveCombat();
+  cancelCombat(); renderDefend(); renderAssign(); renderAtkBar(); resolveCombat();
 }
 // The middle of a round table (4 or 5 opponents): whose turn it is, and the turn order as seats around a circle,
 // starting with you at the bottom and going clockwise (the next player is on your left)
@@ -3754,7 +3761,7 @@ const cpw = c => parseInt(c.pt, 10) || 0;
    Lifelink: its controller gains what it dealt. Protection from a color: no damage from sources of that color.
    Indestructible: lethal damage doesn't destroy it (0 toughness still does).
    pairs: [{ a:{ c, s, d }, blockers:[{ c, s }] }], the cards as shared (pt "3/4", ck: key terms, col: colors). */
-function fight(pairs){
+function fight(pairs, assigns = {}){
   const out = { player:{}, dies:[], minus:{}, gain:{}, took:{} };
   const unit = (c, s) => { const m = /^(-?\d+)\/(-?\d+)/.exec(c.pt || ""); return { c, s, p:m ? +m[1] : 0, t:m ? +m[2] : 0, kw:new Set(c.ck || []), col:c.col || "", dmg:0, minus:0, dt:false, dead:false }; };
   const has = (u, k) => u.kw.has(k), tough = u => u.t - u.minus;
@@ -3782,12 +3789,19 @@ function fight(pairs){
         let n = A.p, dealt = 0;
         if (!f.blocked || (!live.length && has(A, "trample"))) dealt += toPlayer(A, f, n);
         else if (live.length) {
-          live.forEach((b, i) => {
-            let give = Math.min(n, has(A, "deathtouch") ? 1 : Math.max(0, tough(b) - b.dmg));
-            if (i === live.length - 1 && !has(A, "trample")) give = n;
-            n -= give; dealt += deal(A, b, give);
-          });
-          if (n > 0 && has(A, "trample")) dealt += toPlayer(A, f, n);
+          const split = assigns[f.a.c.iid];
+          if (split) {
+            // (as its player divided it; a share for a blocker that's gone goes on to the next, or the player with trample)
+            for (const b of live) { const give = Math.min(n, split[b.c.iid] || 0); n -= give; dealt += deal(A, b, give); }
+            if (n > 0) dealt += has(A, "trample") ? toPlayer(A, f, n) : deal(A, live[live.length - 1], n);
+          } else {
+            live.forEach((b, i) => {
+              let give = Math.min(n, has(A, "deathtouch") ? 1 : Math.max(0, tough(b) - b.dmg));
+              if (i === live.length - 1 && !has(A, "trample")) give = n;
+              n -= give; dealt += deal(A, b, give);
+            });
+            if (n > 0 && has(A, "trample")) dealt += toPlayer(A, f, n);
+          }
         }
         gain(A, dealt);
       }
@@ -3801,6 +3815,46 @@ function fight(pairs){
   }
   for (const u of fs.flatMap(f => [f.A, ...f.B])) { if (u.minus) out.minus[u.c.iid] = u.minus; if (u.dmg + u.minus) out.took[u.c.iid] = u.dmg + u.minus; }
   return out;
+}
+// Lethal damage from this attacker to a blocker: its toughness, or 1 with deathtouch (for dividing damage)
+const lethalTo = (a, b) => (a.ck || []).includes("deathtouch") ? 1 : Math.max(0, parseInt(String(b.pt || "").split("/")[1], 10) || 0);
+// Attackers blocked by two or more creatures: their players divide the damage before it lands
+const assignOf = s => s === mySeat ? me.cassign : players[s]?.cassign;
+function multiBlocked(atk, key){
+  return pairsOf(atk, a => answerOf(a.d)?.key === key ? answerOf(a.d)?.blocks?.[a.c.iid] : []).filter(f => f.blockers.length > 1 && cpw(f.a.c) > 0);
+}
+let assignDraft = { key:"", as:{} };
+function renderAssign(){
+  const box = $("#assignBox"), { atk, key, defenders } = combatNow();
+  const ready = key && !resolvedKeys.has(key) && !pausedBy(key).length && defenders.length && defenders.every(d => answerOf(d)?.key === key);
+  const mine = ready && !me.watch ? multiBlocked(atk, key).filter(f => f.a.s === mySeat) : [];
+  if (!mine.length || me.cassign?.key === key) { box.classList.add("hidden"); return; }
+  if (assignDraft.key !== key) {
+    // (to start: lethal damage to each blocker in turn, the rest to the last one, or to the player with trample)
+    assignDraft = { key, as:Object.fromEntries(mine.map(f => { let n = cpw(f.a.c); const m = {};
+      f.blockers.forEach((b, i) => { const g = i === f.blockers.length - 1 && !(f.a.c.ck || []).includes("trample") ? n : Math.min(n, lethalTo(f.a.c, b.c)); m[b.c.iid] = g; n -= g; });
+      return [f.a.c.iid, m]; })) };
+  }
+  const sig = JSON.stringify(assignDraft); if (!box.classList.contains("hidden") && box.dataset.sig === sig) return; box.dataset.sig = sig;
+  let ok = true;
+  const rows = mine.flatMap(f => {
+    const m = assignDraft.as[f.a.c.iid], P = cpw(f.a.c), tr = (f.a.c.ck || []).includes("trample"), used = Object.values(m).reduce((t, v) => t + v, 0), left = P - used;
+    const allLethal = f.blockers.every(b => (m[b.c.iid] || 0) >= lethalTo(f.a.c, b.c));
+    const bad = tr ? (left < 0 || (left > 0 && !allLethal)) : left !== 0; if (bad) ok = false;
+    const step = (b, dv) => { const v = Math.max(0, (m[b.c.iid] || 0) + dv); if (dv > 0 && used >= P) return; m[b.c.iid] = v; renderAssign(); };
+    return [el("div", { className:"atkrow" }, f.a.c.img ? el("img", { src:f.a.c.img, alt:"" }) : el("span", { style:"width:40px" }),
+      el("span", { className:"atkname" }, el("b", { textContent:`${f.a.c.name}: ${P} damage` }), el("small", { textContent:`blocked by ${f.blockers.length} creatures${tr ? " · trample" : ""}` })),
+      ...f.blockers.map(b => { const mb = el("button", { type:"button", className:"btn small", textContent:"−", ariaLabel:`Less damage to ${b.c.name}` }), pb = el("button", { type:"button", className:"btn small", textContent:"+", ariaLabel:`More damage to ${b.c.name}` });
+        mb.onclick = () => step(b, -1); pb.onclick = () => step(b, 1);
+        return el("div", { className:"asgn" }, el("span", { textContent:`${b.c.name} (${b.c.pt}, ${lethalTo(f.a.c, b.c)} is lethal)` }), mb, el("b", { textContent:m[b.c.iid] || 0, ariaLabel:`Damage to ${b.c.name}` }), pb); }),
+      tr ? el("div", { className:"asgn" }, el("span", { textContent:`Tramples over to ${nm(f.a.d)}${left > 0 && !allLethal ? " (only once every blocker has lethal damage)" : ""}` }), el("b", { textContent:Math.max(0, left) })) : "",
+      !tr && left ? el("p", { className:"hint bad", textContent:left > 0 ? `${left} still to divide.` : `${-left} too many.` }) : "")];
+  });
+  const done = el("button", { type:"button", className:"btn primary", textContent:"Done: deal the damage", disabled:!ok });
+  done.onclick = () => { me.cassign = { key, as:assignDraft.as }; say("divided their attackers' damage."); changed(); };
+  box.replaceChildren(el("h2", { textContent:"Divide your damage" }),
+    el("p", { className:"hint", textContent:"More than one creature blocked your attacker: choose how much of its damage each blocker takes." }), ...rows, el("div", { className:"acts" }, done));
+  box.classList.remove("hidden");
 }
 // Why a creature can't block an attacker ("" if it can): flying, can't be blocked, can't block, protection
 function cantBlock(b, a){
@@ -3844,7 +3898,9 @@ function renderDefend(){
   if (!atk.length || !defenders.includes(mySeat) || resolvedKeys.has(key)) { box.classList.add("hidden"); return; }
   if (key !== defend.key) defend = { key, mode:"ask", blocks:{} };
   if (me.cresp?.key === key) defend.mode = "wait";
-  const waitingOn = defenders.filter(d => d !== mySeat && answerOf(d)?.key !== key).map(nm).join(", ");
+  const answering = defenders.filter(d => d !== mySeat && answerOf(d)?.key !== key).map(nm).join(", ");
+  const dividing = !answering && defenders.every(d => answerOf(d)?.key === key) ? [...new Set(multiBlocked(atk.length ? all : [], key).filter(f => assignOf(f.a.s)?.key !== key).map(f => nm(f.a.s)))].join(", ") : "";
+  const waitingOn = answering || dividing;
   const sig = `${key}|${defend.mode}|${waitingOn}|${JSON.stringify(defend.blocks)}`;
   if (!box.classList.contains("hidden") && box.dataset.sig === sig) return;
   box.dataset.sig = sig;
@@ -3896,7 +3952,7 @@ function renderDefend(){
   const acts = el("div", { className:"acts" }, interrupt, ...(defend.mode === "ask"
     ? [btn("Respond", () => { defend.mode = "respond"; renderDefend(); }), btn("Take the damage", answer, true)]
     : defend.mode === "respond" ? [btn("Back", () => { defend.mode = "ask"; defend.blocks = {}; box.dataset.sig = ""; renderDefend(); }), btn("Done: take the damage", answer, true)]
-    : [el("span", { className:"hint", textContent:waitingOn ? `Waiting for ${waitingOn} to answer: all combat damage happens at once.` : "Combat damage..." })]));
+    : [el("span", { className:"hint", textContent:answering ? `Waiting for ${answering} to answer: all combat damage happens at once.` : dividing ? `Waiting for ${dividing} to divide damage among your blockers.` : "Combat damage..." })]));
   box.replaceChildren(el("h2", { textContent:"You're being attacked" }),
     ...(defend.mode === "respond" ? [el("p", { className:"hint", textContent:"Cast spells and use abilities as usual. Pick blockers for any attacker (click your creatures), then Done." })] : []),
     ...rows, total, acts);
@@ -3907,9 +3963,12 @@ function renderDefend(){
 function resolveCombat(){
   const { atk, key, defenders } = combatNow();
   if (!key || resolvedKeys.has(key) || !defenders.length || !defenders.every(d => answerOf(d)?.key === key) || pausedBy(key).length) return;
+  const multi = multiBlocked(atk.filter(a => defenders.includes(a.d)), key);
+  if (multi.some(f => assignOf(f.a.s)?.key !== key)) return;  // (an attacker's player is still dividing its damage)
   resolvedKeys.add(key);
   for (const a of atk) resolvedAtk.add(a.c.iid);
-  const r = fight(pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]));
+  const assigns = Object.fromEntries(multi.map(f => [f.a.c.iid, assignOf(f.a.s)?.as?.[f.a.c.iid]]).filter(([, m]) => m));
+  const r = fight(pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]), assigns);
   const fought = pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]);
   // (a blocked attacker that still hit the player tramples over: it bursts through its blockers on its way)
   const via = Object.fromEntries(fought.filter(f => f.blockers.length).map(f => [f.a.c.iid, f.blockers.map(b => cardAt(b.c.iid)).filter(Boolean)]).filter(([, es]) => es.length));
@@ -4646,7 +4705,7 @@ window.addEventListener("beforeunload", () => save());
 // For tests: a way to reach the game state
 if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
 if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
-if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, changed, cards, alerts, cues, fight, cantBlock, combatKw };
+if (params.has("kt-test")) window.ktPlay = { get me(){ return me; }, get table(){ return table; }, players, conns, draw, move, changed, cards, alerts, cues, fight, cantBlock, combatKw, lethalTo };
 })();
 </script>
 </body>

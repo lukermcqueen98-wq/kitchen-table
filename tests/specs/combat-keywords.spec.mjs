@@ -91,6 +91,12 @@ test("combat rules: every key term on the list, worked out the way Magic does", 
       const Bk = C("2/2", [`protection from ${w}`]), Ak = C("5/5", [], c), y = one(Ak, [Bk]);
       return [blockedBy, other, y.dies.includes(Bk.iid), y.dies.includes(Ak.iid) ];
     });
+    // dividing damage among several blockers, as the attacker's player chose
+    A = C("4/4"); B = C("2/2"); B2 = C("2/2"); x = fight([{ a:{ c:A, s:1, d:2 }, blockers:[{ c:B, s:2 }, { c:B2, s:2 }] }], { [A.iid]:{ [B.iid]:4, [B2.iid]:0 } });
+    out.divided = [x.dies.includes(B.iid), x.dies.includes(B2.iid)];
+    A = C("5/5", ["trample"]); B = C("2/2"); B2 = C("2/2"); x = fight([{ a:{ c:A, s:1, d:2 }, blockers:[{ c:B, s:2 }, { c:B2, s:2 }] }], { [A.iid]:{ [B.iid]:2, [B2.iid]:2 } });
+    out.dividedTrample = [x.player[2].life, x.dies.length];
+    out.lethal = [ktPlay.lethalTo(C("3/3"), C("2/5")), ktPlay.lethalTo(C("3/3", ["deathtouch"]), C("2/5"))];
     // commander damage
     A = C("4/4", [], "", { cmdr:true }); out.cmdr = one(A).player[2].cmd;
     return out;
@@ -114,6 +120,7 @@ test("combat rules: every key term on the list, worked out the way Magic does", 
   expect(r.targeting).toEqual([["", "", 3], ["", "", 3], ["", "", 3]]);
   for (const [blockedBy, other, dies, atkDies] of r.pro) { expect(blockedBy).toMatch(/protection/); expect(other).toBe(""); expect(dies).toBe(false); expect(atkDies).toBe(false); }
   expect(Object.values(r.cmdr)).toEqual([4]);
+  expect(r.divided).toEqual([true, false]); expect(r.dividedTrample).toEqual([1, 2]); expect(r.lethal).toEqual([5, 1]);
   await browser.close();
 });
 
@@ -201,6 +208,22 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   await attack([big]); await block("Viper"); await done(); await settleCombat();
   await expect(a.locator(`#bf .card[data-iid="${big}"]`)).toHaveCount(0);
   await expect(d.locator(`#bf .card[data-iid="${dt}"]`)).toHaveCount(0);
+
+  // Two blockers on one attacker: its player divides the damage (here all 4 to one), and the other blocker lives
+  await a.evaluate(() => { for (const c of ktPlay.me.zones.bf) c.tapped = false; ktPlay.changed(); });
+  const sp4 = await put(a, { name:"Splitter", pt:"4/4" }), lg = await put(d, { name:"Left Guard", pt:"2/2" }), rg = await put(d, { name:"Right Guard", pt:"2/2" });
+  await attack([sp4]); await block("Left Guard", "Right Guard"); await done();
+  const asg = a.locator("#assignBox");
+  await expect(asg).toBeVisible(); await expect(asg).toContainText("Divide your damage");
+  await expect(box).toContainText("to divide damage");
+  await expect(asg.getByLabel("Damage to Left Guard")).toHaveText("2"); await expect(asg.getByLabel("Damage to Right Guard")).toHaveText("2");
+  for (let i = 0; i < 2; i++) await asg.getByRole("button", { name:"Less damage to Right Guard" }).click();
+  await expect(asg.getByRole("button", { name:"Done: deal the damage" })).toBeDisabled();
+  for (let i = 0; i < 2; i++) await asg.getByRole("button", { name:"More damage to Left Guard" }).click();
+  await asg.getByRole("button", { name:"Done: deal the damage" }).click(); await settleCombat();
+  await expect(d.locator(`#bf .card[data-iid="${lg}"]`)).toHaveCount(0);
+  await expect(d.locator(`#bf .card[data-iid="${rg}"]`)).toHaveCount(1);
+  await expect(a.locator(`#bf .card[data-iid="${sp4}"]`)).toHaveCount(0);   // (both blockers hit back: 2 + 2 on a 4/4)
   for (const p of [a, d]) expect(p.errors).toEqual([]);
   await browser.close();
 });
