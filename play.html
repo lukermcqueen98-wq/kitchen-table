@@ -509,7 +509,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt .oppwait b{font:700 20px var(--serif)}
   /* (an open seat: bare table with a dashed outline of the playmat that goes there, the same size as everyone's) */
   main#play.lt .oppwait{border:0;background:none;box-shadow:none;display:grid;place-items:center;overflow:visible}
-  main#play.lt .waitmat{--pw:min(calc(var(--fw,400px) * .07),calc((var(--fw,400px) / var(--ba) - 26px) / 4.2));--colw:calc(var(--pw) * 2 + 30px);
+  main#play.lt .waitmat{--pw:min(calc(var(--fw,400px) * .095),calc((var(--fw,400px) / var(--ba) - 26px) / 4.2));--colw:calc(var(--pw) * 2 + 30px);
     width:calc(var(--fw,400px) + var(--colw));height:calc(var(--fw,400px) / var(--ba));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
     border:2px dashed rgba(232,220,181,.35);border-radius:12px;background:radial-gradient(ellipse at 50% 45%,rgba(42,31,69,.85),rgba(18,11,34,.85) 125%)}
   main#play.lt [data-slot="L"] .waitmat,main#play.lt [data-slot="R"] .waitmat{width:calc(var(--fw,400px) / var(--ba));height:calc(var(--fw,400px) + var(--colw))}
@@ -530,9 +530,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt [data-slot="R"] .oframe{transform:translate(-50%,-50%) rotate(-90deg)}
   /* (the piles at the right-hand edge of every mat, from its owner's seat: command zone, library and exile down the edge,
      the graveyard beside exile; --pw is a pile's width, small enough that three stack in a board's depth) */
-  main#play.lt .oframe,main#play.lt #myFrame{--pw:min(calc(var(--fw,400px) * .07),calc((var(--fw,400px) / var(--ba) - 26px) / 4.2));--ph:calc(var(--pw) * 1.397 + 8px);--colw:calc(var(--pw) * 2 + 30px)}
+  main#play.lt .oframe,main#play.lt #myFrame{--pw:min(calc(var(--fw,400px) * .095),calc((var(--fw,400px) / var(--ba) - 26px) / 4.2));--ph:calc(var(--pw) * 1.397 + 8px);--colw:calc(var(--pw) * 2 + 30px)}
   main#play.lt .oframe .obf,main#play.lt #myFrame #bf{position:absolute;top:0;bottom:0;left:0;width:calc(var(--fw,400px) + var(--colw));container-type:inline-size;border-radius:8px}
-  main#play.lt #bf .card,main#play.lt .obf .card{--w:8cqw}
+  main#play.lt #bf .card,main#play.lt .obf .card{--w:10.5cqw}
   main#play.lt .oframe .opiles{display:contents}
   main#play.lt .p-cz,main#play.lt .p-lib,main#play.lt .p-gy,main#play.lt .p-ex,main#play.lt .p-dun,
   main#play.lt #myFrame #czone,main#play.lt #myFrame #libPile,main#play.lt #myFrame #gyPile,main#play.lt #myFrame #exPile{position:absolute;z-index:3;margin:0}
@@ -2456,7 +2456,7 @@ function sizeBoards(){
   const m = Math.max(44, $("#side")?.offsetHeight || 0), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
   // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
   const shape = fw => Math.min(3, Math.max(1.5, 2 * fw / (Ha - P - m - 2 * g)));
-  const matW = (fw, A) => { const pw = Math.min(fw * .07, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
+  const matW = (fw, A) => { const pw = Math.min(fw * .095, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
   const fits = fw => { const A = shape(fw), H = fw / A, W = matW(fw, A); return 2 * H + cols * W + (cols + 1) * g <= Wa && 2 * H + P + m + 2 * g <= Ha && W + P <= Ha; };
   let lo = 120, hi = 3000; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (fits(mid)) lo = mid; else hi = mid; }
   const fw = lo, A = shape(fw), H = Math.floor(fw / A), W = Math.ceil(matW(fw, A)), midRow = Math.max(m, W + P - 2 * H - P - 2 * g);
