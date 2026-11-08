@@ -284,6 +284,9 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .badge{font-size:12px;border:1px solid var(--brass);color:var(--brass);border-radius:12px;padding:0 8px;white-space:nowrap}
 #myBadges{display:flex;gap:6px;flex-wrap:wrap}
 .badge.out{border-color:var(--danger);color:var(--danger)}
+.badge.cmd{border-color:#ff7d9c;color:#ff7d9c;font-weight:700}
+.badge.cmd.danger{background:#ff7d9c;color:#2a0a14}
+.ctrl.cmdc{border-left:4px solid var(--pc,#888)}
 .badge.away{border-color:#f5a524;color:#f5a524;animation:awayblink 1.6s ease-in-out infinite}
 @keyframes awayblink{50%{opacity:.45}}
 .opp.away .obody,.opp.away .oframe{opacity:.55;filter:grayscale(.5)}
@@ -461,7 +464,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .modal-card.wide .gcard{width:164px}
 .modal-card.wide .gcard .card{--w:164px}
 #pop{position:fixed;z-index:85;pointer-events:none;filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))}
-#pop img{width:100%;display:block;border-radius:4.75%/3.5%;aspect-ratio:63/88;background:#000}
+#pop{display:flex;gap:8px}
+#pop img.hidden{display:none}
+#pop img{flex:1;min-width:0;width:100%;display:block;border-radius:4.75%/3.5%;aspect-ratio:63/88;background:#000}
 .modal-card h2{font:700 22px var(--serif);margin:0 0 10px}
 .grid{display:flex;flex-wrap:wrap;gap:8px}
 .gcard{width:120px;display:flex;flex-direction:column;gap:3px;align-items:stretch}
@@ -837,7 +842,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
 
 <ul id="feed" aria-hidden="true"></ul>
 <div id="menu" class="hidden" role="menu"></div>
-<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""></div>
+<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""><img id="popImg2" alt="" class="hidden"></div>
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
 <div id="toast" class="hidden" role="status"></div>
 <div id="audios" class="hidden"></div>
@@ -2529,7 +2534,8 @@ function sizeBoards(){
   const bar = $("#combatBar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + g : g;
   const hw = $("#handWrap"), handH = hw && hw.parentElement === play && getComputedStyle(hw).position === "static" ? hw.offsetHeight + g : 0;  // (the hand as a strip under the table)
   const Ha = play.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - handH;
-  const m = Math.max(44, $("#side")?.offsetHeight || 0), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
+  const side = $("#side"), top = side?.getBoundingClientRect().top || 0, kids = side ? [...side.children].filter(e => e.offsetParent) : [];
+  const m = Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4)), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
   // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
   const shape = fw => Math.min(3, Math.max(1.5, 2 * fw / (Ha - P - m - 2 * g)));
   const matW = (fw, A) => { const pw = Math.min(fw * .095, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
@@ -2765,7 +2771,7 @@ function renderOpps(){
       el("span", { className:"ocount", textContent:`Hand ${p.hand}` }), el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
       table.started ? el("span", { className:"ocount", title:"Turns they've taken this game", textContent:`Turns ${p.turns || 0}` }) : null,
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
-      cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
+      cmdTaken ? el("span", { className:"badge cmd" + (cmdTaken >= ruleNum("cmdrDmg") - 5 ? " danger" : ""), title:`Commander damage you've taken from ${p.name}'s commander (${ruleNum("cmdrDmg")} knocks you out)`, textContent:`Cmdr hit you: ${cmdTaken}` }) : null,
       p.away ? el("span", { className:"badge away", title:"Their connection dropped or they left: their cards stay, and they come back to this seat when they rejoin", textContent:"Reconnecting..." }) : null,
       p.picking ? el("span", { className:"badge", textContent:"Choosing a deck..." }) : null,
       p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
@@ -2822,6 +2828,7 @@ function renderMine(){
     const minus = el("button", { innerHTML:"&minus;", ariaLabel:`${label} minus 1` }), plus = el("button", { textContent:"+", ariaLabel:`${label} plus 1` });
     minus.onclick = () => { set(Math.max(0, get() - 1)); changed(); }; plus.onclick = () => { set(get() + 1); changed(); };
     r.append(el("span", { textContent:label }), minus, el("b", { textContent:get() }), plus); box.append(r);
+    return r;
   };
   ctrl("Poison", () => me.poison, v => { me.poison = v; }, ruleNum("poison"));
   if (me.energy || settings.showEnergy) ctrl("Energy", () => me.energy, v => { me.energy = v; });
@@ -2829,10 +2836,11 @@ function renderMine(){
   if (theirCmdrs.length) box.append(el("div", { className:"ctrlhead", textContent:"Commander damage you've taken" }));
   for (const [s, c] of theirCmdrs) {
     const key = `${s}:${c.iid}`;
-    ctrl(`${(c.name || "Commander").split(",")[0].slice(0, 12)}`, () => me.cmd[key] || 0, v => {
+    const r = ctrl(`${players[s]?.name || "Seat " + s}'s ${(c.name || "commander").split(",")[0].slice(0, 14)}`, () => me.cmd[key] || 0, v => {
       const d = v - (me.cmd[key] || 0); me.cmd[key] = v; me.life -= d;
       if (d) say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${players[s]?.name}).`);
     }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
+    r.classList.add("cmdc"); r.style.setProperty("--pc", SEAT_HEX[s - 1]);
   }
   const db = $("#dungeonBox"); db.innerHTML = "";
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
@@ -3038,7 +3046,7 @@ document.addEventListener("pointerover", e => {
   const cl = e.target.closest?.(".clink");
   if (cl) {
     hoverIid = null; const src = cl.dataset.img, id = cl.dataset.cid;
-    if (src) { $("#zoomImg").src = src; if (e.pointerType === "mouse" && settings.hoverPop && !drag) popOut(cl, src); }
+    if (src) { $("#zoomImg").src = src; if (e.pointerType === "mouse" && settings.hoverPop && !drag) { popOut(cl, src); bothFaces(cl, id, src, () => !hoverIid); } }
     cardById(id).then(c => { if (c) $("#zoomText").textContent = textOf(c, 0); });
     return;
   }
@@ -3050,22 +3058,34 @@ document.addEventListener("pointerover", e => {
   else { const img = ce.querySelector("img"); src = img ? img.src.replace("/small/", "/normal/") : ""; id = findPub(iid)?.id || ""; }
   if (!src) return;
   $("#zoomImg").src = src;
-  if (e.pointerType === "mouse" && settings.hoverPop && !drag) popOut(ce, src);
+  if (e.pointerType === "mouse" && settings.hoverPop && !drag) { popOut(ce, src); if (!mineC?.fd || !ce.closest("#opps")) bothFaces(ce, id, src, () => hoverIid === iid); }
   const face = mineC?.face || 0;
   cardById(id).then(c => { if (c && hoverIid === iid) $("#zoomText").textContent = textOf(c, face); });
 });
 /* Pop-out: the card you're pointing at, large, next to it (on the table, in your hand, and in "Keep this hand?") */
-function popOut(ce, src){
-  const pop = $("#pop"), img = $("#popImg"), r = ce.getBoundingClientRect();
-  const w = Math.min(340, innerWidth * 0.42), h = w * 88 / 63;
-  if (r.width >= w * 0.9) { hidePop(); return; }  // (already big)
+function popOut(ce, src, back = ""){
+  const pop = $("#pop"), img = $("#popImg"), img2 = $("#popImg2"), r = ce.getBoundingClientRect();
+  // (a double-faced card: both faces side by side, a little smaller each)
+  const one = back ? Math.min(300, (innerWidth - 40) / 2 * 0.9) : Math.min(340, innerWidth * 0.42), w = back ? one * 2 + 8 : one, h = one * 88 / 63;
+  if (r.width >= one * 0.9) { hidePop(); return; }  // (already big)
   if (img.getAttribute("src") !== src) img.src = src;
+  img2.classList.toggle("hidden", !back); if (back && img2.getAttribute("src") !== back) img2.src = back;
   let x = r.right + 12; if (x + w > innerWidth - 8) x = r.left - w - 12; if (x < 8) x = clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8);
   const y = clamp(r.top + r.height / 2 - h / 2, 8, Math.max(8, innerHeight - h - 8));
   pop.style.width = w + "px"; pop.style.left = x + "px"; pop.style.top = y + "px";
   pop.dataset.iid = ce.dataset.iid || ""; pop.classList.remove("hidden");
 }
 function hidePop(){ $("#pop").classList.add("hidden"); }
+// The other face of a double-faced card (transform, modal double-faced): looked up, then shown beside the one you see
+function bothFaces(ce, id, src, still){
+  if (!id) return;
+  cardById(id).then(c => {
+    const f = faces(c); if (!f || f.length < 2 || !still() || $("#pop").classList.contains("hidden")) return;
+    const all = f.map((x, i) => imgOf(c, i)), base = u => String(u || "").replace(/\/(small|normal|large)\//, "/").split("?")[0];
+    const shown = Math.max(0, all.findIndex(u => base(u) === base(src)));
+    popOut(ce, src, all[(shown + 1) % all.length]);
+  });
+}
 document.addEventListener("pointerout", e => { const ce = e.target.closest?.(".card, .clink"); if (ce && !ce.contains(e.relatedTarget)) hidePop(); });
 document.addEventListener("pointerdown", hidePop, true);
 document.addEventListener("wheel", hidePop, { passive:true });

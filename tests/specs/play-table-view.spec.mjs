@@ -568,6 +568,15 @@ test("digital table: inspecting shows both sides of a two-sided card, and cards 
   await expect(a.locator(".modal .inspecttext")).toHaveCount(2);
   await expect(a.locator(".modal")).toContainText("When this enters, draw a card.");
   await button(a, "Close");
+  // Pointing at it pops out both faces, the one showing first (Luke's screen, and Rick's, who knows the card too)
+  await ktp(b, () => { ktPlay.cards.set("00000000-dfc0-4000-8000-000000000000", { id:"00000000-dfc0-4000-8000-000000000000", name:"Test Pup // Test Wolf", layout:"transform",
+    card_faces:[1, 2].map(n => ({ name:`Face ${n}`, image_uris:{ small:`https://cards.scryfall.io/small/${n}.png`, normal:`https://cards.scryfall.io/normal/${n}.png` } })) }); });
+  for (const [p, card] of [[a, a.locator('#bf .card[data-iid="dfccard"]')], [b, opp(b, "Luke").locator('.obf .card[data-iid="dfccard"]')]]) {
+    await p.mouse.move(5, 5); await card.hover();
+    await expect(p.locator("#popImg2")).toBeVisible();
+    expect(await p.evaluate(() => [document.querySelector("#popImg").src, document.querySelector("#popImg2").src].map(u => /\/(\d)\.png/.exec(u)?.[1]))).toEqual(["2", "1"]);
+  }
+  await a.mouse.move(5, 5);
   // Clicking a card in a list (Luke's graveyard) opens it on top; closing goes back to the list
   await ktp(a, () => { for (let i = 0; i < 2; i++) ktPlay.move(ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card").iid, "gy"); });
   await a.locator("#gyPile").click();
