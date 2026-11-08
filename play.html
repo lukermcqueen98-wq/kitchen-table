@@ -879,7 +879,7 @@ const COLORS = ["W", "U", "B", "R", "G", "C"], ORDER5 = ["W", "U", "B", "R", "G"
 const $ = s => document.querySelector(s);
 const store = {
   get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
-  set(k, v){ try { localStorage.setItem(k, v); } catch {} },
+  set(k, v){ try { localStorage.setItem(k, v); return true; } catch { return false; } },
   del(k){ try { localStorage.removeItem(k); } catch {} }
 };
 const params = new URLSearchParams(location.search);
@@ -1320,6 +1320,7 @@ const saveKey = room => `kt-dig-save:${room}`;
 function savedGame(room){ try { const s = JSON.parse(store.get(saveKey(room), "null")); return s && Date.now() - s.at < 12 * 3600e3 ? s : null; } catch { return null; } }
 {
   const room = params.get("room"), s = room && savedGame(room);
+  pruneSaves(room || "");
   if (s) {
     $("#resume").classList.remove("hidden");
     $("#resumeText").textContent = `You have a game at table ${room} as ${s.me.name}, seat ${s.seat} (life ${s.me.life}, ${s.me.zones.hand.length} cards in hand, ${s.me.zones.bf.length} on the battlefield). Rejoin to pick it up where you left off.`;
@@ -1448,10 +1449,36 @@ function undo(){
   say("undid their last move.");
 }
 function pushState(){ if (me.watch) return; players[mySeat] = { ...pub(), seat:mySeat }; broadcast({ type:"state", state:pub() }); }
+/* Your game is saved in this browser as you play (to pick it back up after a refresh). Saves are kept small (only
+   what the table uses of each card) and old ones are cleared out, so they never fill the browser's storage; if a
+   save fails anyway, you're told once. */
+const CARD_KEEP = ["id", "name", "layout", "mana_cost", "cmc", "type_line", "oracle_text", "power", "toughness", "loyalty", "defense", "colors",
+  "color_identity", "keywords", "produced_mana", "image_uris", "card_faces", "all_parts"];
+function slimCard(c){
+  const o = {}; for (const k of CARD_KEEP) if (c[k] !== undefined) o[k] = c[k];
+  const img = u => u && { small:u.small, normal:u.normal, art_crop:u.art_crop };
+  if (o.image_uris) o.image_uris = img(o.image_uris);
+  if (o.card_faces) o.card_faces = o.card_faces.map(f => { const g = {}; for (const k of CARD_KEEP) if (f[k] !== undefined) g[k] = f[k]; if (g.image_uris) g.image_uris = img(g.image_uris); return g; });
+  if (o.all_parts) o.all_parts = o.all_parts.map(x => ({ id:x.id, name:x.name, component:x.component, type_line:x.type_line, uri:x.uri }));
+  return o;
+}
+function pruneSaves(keepRoom){
+  try {
+    const saves = Object.keys(localStorage).filter(k => k.startsWith("kt-dig-save:") && k !== saveKey(keepRoom))
+      .map(k => { let at = 0; try { at = JSON.parse(localStorage.getItem(k))?.at || 0; } catch {} return { k, at }; }).sort((a, b) => b.at - a.at);
+    // (expired ones, and all but the newest other two)
+    saves.forEach((x, i) => { if (i >= 2 || Date.now() - x.at > 12 * 3600e3) store.del(x.k); });
+  } catch {}
+}
+let saveWarned = false;
 function save(){
-  if (!roomCode || !me || me.watch) return;
-  store.set(saveKey(roomCode), JSON.stringify({ at:Date.now(), seat:mySeat, me, deckIds, cmdrIds, cmdrFromDeck, sideIds, deckName, table,
-    cardData:[...new Set([...Object.values(me.zones).flat().map(c => c.id), ...sideIds, ...deckIds])].map(id => cards.get(id)).filter(Boolean) }));
+  if (!roomCode || !me || me.watch || recovering) return;
+  const data = JSON.stringify({ at:Date.now(), seat:mySeat, me, deckIds, cmdrIds, cmdrFromDeck, sideIds, deckName, table,
+    cardData:[...new Set([...Object.values(me.zones).flat().map(c => c.id), ...sideIds, ...deckIds, ...cmdrIds])].map(id => cards.get(id)).filter(Boolean).map(slimCard) });
+  if (store.set(saveKey(roomCode), data)) return;
+  // (full: clear every other save and try again)
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith("kt-dig-save:") && k !== saveKey(roomCode)) store.del(k); } catch {}
+  if (!store.set(saveKey(roomCode), data) && !saveWarned) { saveWarned = true; toast("Your browser's storage is full, so this game can't be saved for a refresh. If you refresh, take your seat back from the table (see Rejoin)."); }
 }
 
 /* =====================================================================
@@ -1509,7 +1536,8 @@ async function sitDown(resume){
     err.textContent = e.message || "Could not reach the connection server. Check your internet and try again.";
     btn.disabled = false; btn.textContent = "Sit down"; return;
   }
-  try { history.replaceState(null, "", `?room=${roomCode}`); } catch {}
+  // (the address now names this table, so a refresh comes back to it; other options in it are kept)
+  try { const u = new URL(location.href); u.searchParams.set("room", roomCode); u.searchParams.delete("rejoin"); history.replaceState(null, "", u.search); } catch {}
   try { localStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, ...($("#micSel").value ? { deviceId:{ exact:$("#micSel").value } } : {}) }, video:false }); }
   catch { localStream = null; }
   // Your mic starts muted at the table; the Mic button turns it on (kt-media-on: the tests start with it on)
@@ -1529,7 +1557,7 @@ async function sitDown(resume){
 }
 // Leaving (closing the tab, a refresh, going to another page): hang up properly, so the others see you go at once and
 // your seat is free for you straight away when you come back
-addEventListener("pagehide", () => { try { if (me) save(); peer?.destroy(); } catch {} });
+addEventListener("pagehide", () => { try { if (me && !recovering) save(); peer?.destroy(); } catch {} });
 function seatOf(id){ const m = /-(\d+)$/.exec(id); return m ? +m[1] : 0; }
 function peerId(s){ return `${PREFIX}-${roomCode}-${s}`; }
 function wirePeer(){
@@ -1595,7 +1623,7 @@ function tick(){
     // (c.hb: it has sent a heartbeat, so it's a version that sends them; a player who hasn't reloaded isn't dropped)
     if (c.hb && now - (c.seen || now) > 12000) { try { c.close(); } catch {} c.gone?.(); if (conns[s] === c) delete conns[s]; }
   }
-  netStatus(now);
+  netStatus(now); offerRecover();
   for (let s = 1; s < mySeat; s++) {
     // an attempt that never opened is given up after 10 seconds
     if (conns[s] && !conns[s].open && Date.now() - (dialAt[s] || 0) > 10000) { try { conns[s].close(); } catch {} delete conns[s]; }
@@ -1605,6 +1633,45 @@ function tick(){
 }
 /* Your own connection: when you can't reach anyone at the table (lost Wi-Fi, the connection server dropped you) a
    bar says so; the table keeps trying, and Reconnect saves your game and sits you back down in your seat */
+/* Your seat from before a refresh, without a save in this browser (another device, or storage was full): sitting down
+   with the same name at a game in progress offers to take it back. The table still shows your battlefield, graveyard,
+   exile, command zone, life and counters; your library is rebuilt from your deck (minus those cards) and shuffled, and
+   your hand is the same number of cards drawn from it. */
+let recoverAsked = "", seatBack = null;  // (seatBack: your own seat as the others last saw it, when you're back in it)
+function offerRecover(){
+  if (!me || me.watch || !table.started || recoverAsked === table.gameId || !$("#modal").classList.contains("hidden")) return;
+  let old = Object.keys(players).map(Number).find(s => s !== mySeat && players[s]?.away && players[s].name.toLowerCase() === me.name.toLowerCase() && players[s].gameId === table.gameId);
+  let p = old && players[old];
+  if (!old && seatBack?.gameId === table.gameId) { old = mySeat; p = seatBack; }
+  if (!old) return;
+  recoverAsked = table.gameId;
+  openModal("Take your seat back?", el("div", {},
+    el("p", { textContent:`Your seat from before (seat ${old}) is still at the table: life ${p.life}, ${p.bf.length} cards on the battlefield, ${p.gy.length} in the graveyard, ${p.hand} in hand.` }),
+    el("p", { className:"hint", textContent:"Your battlefield, graveyard, exile, command zone, life and counters come back as everyone sees them. Your library is rebuilt from your deck and shuffled, and you draw the same number of cards you had in hand (new cards, since your hand wasn't saved). Face-down cards can't come back." })),
+    [{ label:old === mySeat ? "Start over with a new hand" : "Stay in this seat" }, { label:"Take it back", primary:true, fn:() => recoverSeat(old, p) }]);
+}
+function recoverSeat(old, p){
+  if (!p) return;
+  recovering = true;  // (from here on, nothing saves over the seat being taken back)
+  const isC = FORMATS[table.fmt].cmdr; let lib = [...deckIds, ...(isC ? [] : cmdrFromDeck)];
+  const conv = c => {
+    if (!c.id) return null;
+    if (!c.tok && !c.cmdr) { const i = lib.indexOf(c.id); if (i >= 0) lib.splice(i, 1); }
+    return newCard(c.id, { x:c.x, y:c.y, tapped:!!c.tapped, ctr:{ ...(c.ctr || {}) }, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0, ...(c.kw?.length ? { kw:c.kw } : {}) });
+  };
+  const zones = { bf:p.bf.map(conv).filter(Boolean), gy:p.gy.map(conv).filter(Boolean), ex:p.ex.map(conv).filter(Boolean), cz:p.cz.map(conv).filter(Boolean), st:[], hand:[], lib:[] };
+  const deck = shuffle(lib.map(id => newCard(id))); zones.hand = deck.splice(0, p.hand); zones.lib = deck;
+  const m = { ...blankMe(me.name), life:p.life, poison:p.poison, energy:p.energy, exp:p.exp, cmd:{ ...p.cmd }, mana:{ ...me.mana, ...p.mana }, lands:p.lands, turns:p.turns,
+    gameId:table.gameId, out:!!p.out, dungeon:p.dungeon, zones };
+  store.set(saveKey(roomCode), JSON.stringify({ at:Date.now(), seat:old, me:m, deckIds, cmdrIds, cmdrFromDeck, sideIds, deckName, table,
+    cardData:[...new Set([...deckIds, ...cmdrIds, ...sideIds, ...Object.values(zones).flat().map(c => c.id)])].map(id => cards.get(id)).filter(Boolean).map(slimCard) }));
+  if (old !== mySeat) broadcast({ type:"bye" });
+  say("took their old seat back.");
+  setTimeout(() => { try { peer?.destroy(); } catch {} location.href = rejoinUrl(); }, 300);
+}
+let recovering = false;
+// (back to this table, straight into your seat; any other options in the address are kept)
+const rejoinUrl = () => { const u = new URL(location.href); u.searchParams.set("room", roomCode); u.searchParams.set("rejoin", "1"); return u.href; };
 let lostSince = 0;
 function netStatus(now){
   const bar = $("#netBar"), others = Object.keys(players).map(Number).filter(s => s !== mySeat);
@@ -1613,7 +1680,7 @@ function netStatus(now){
   if (!cut || now - lostSince < 6000) { bar.classList.add("hidden"); return; }
   if (!bar.classList.contains("hidden")) return;
   const b = el("button", { type:"button", className:"btn small primary", textContent:"Reconnect" });
-  b.onclick = () => { save(); location.href = `${location.pathname}?room=${roomCode}&rejoin=1`; };
+  b.onclick = () => { save(); location.href = rejoinUrl(); };
   bar.replaceChildren(el("b", { textContent:"Connection lost" }), el("span", { textContent:peer?.disconnected ? "Can't reach the connection server. Trying again..." : "Can't reach the other players. Trying again..." }), b);
   bar.classList.remove("hidden");
 }
@@ -1657,6 +1724,10 @@ function onMessage(s, msg){
       players[s] = { ...st, seat:s };
       if (msg.type === "hello") {
         if (!was || was.away) log(`${st.name} sat down.`);
+        // (back in their old seat but without their game (a refresh with no save, another device): send them the seat as
+        // the table last saw it, so they can take it back)
+        if (!me.watch && was?.away && table.started && was.gameId === table.gameId && st.gameId !== table.gameId && st.name.toLowerCase() === was.name.toLowerCase())
+          send(conns[s], { type:"yourseat", state:was });
         if (!me.watch) { sendMat(conns[s]); send(conns[s], { type:"state", state:pub() }); send(conns[s], { type:"records", recs:loadRecords().filter(r => r.players.some(p => p.name === st.name)).slice(-200) }); }
       }
       if (msg.table) takeTable(msg.table);
@@ -1665,6 +1736,8 @@ function onMessage(s, msg){
     case "alive": break;  // (the heartbeat: only says the connection is alive; "ping" is a target being pointed at)
     case "table": takeTable(msg.table); break;
     case "mat": { const m = cleanMat(msg.mat); if (m) mats[s] = m; else delete mats[s]; render(); break; }
+    case "yourseat": { const st = cleanPub(msg.state); if (st && !seatBack) seatBack = st; break; }
+    case "bye": if (players[s]) { delete players[s]; render(); } break;  // (they moved back to their old seat: not away, gone)
     case "chat": if (typeof msg.text === "string" && msg.text.trim()) chatLine(players[s]?.name || watchers[s] || "Someone", msg.text.slice(0, 300), s); break;
     case "record": saveRecord(cleanRecord(msg.rec)); break;
     case "records": { const n = mergeRecords(msg.recs, true); if (n) log(`Added ${n} of your past games from ${players[s]?.name || "another player"}'s records.`); break; }
@@ -4802,7 +4875,7 @@ function linkCards(text){
   if (at < text.length) out.push(text.slice(at));
   return out;
 }
-window.addEventListener("beforeunload", () => save());
+window.addEventListener("beforeunload", () => { if (!recovering) save(); });
 
 // For tests: a way to reach the game state
 if (params.has("kt-test") && !params.has("dock")) document.body.classList.add("handstrip");
