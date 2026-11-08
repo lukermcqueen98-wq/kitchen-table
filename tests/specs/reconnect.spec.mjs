@@ -48,6 +48,35 @@ test("digital table: a player whose connection dies quietly is shown reconnectin
   expect(await luke.evaluate(() => Object.keys(ktPlay.players).sort())).toEqual(["1", "2", "3"]);  // (the same seat, not a new one)
   await sam.locator("#lifeMinus").click();
   for (const p of [luke, rick]) await expect(opp(p, "Sam").locator(".olife")).toHaveText("18", { timeout:15000 });
+
+  // C. Sam's save is gone (another device, or storage was full): he sits down again with his name and deck, and the
+  // table offers his old seat back, rebuilt from what everyone can see of it
+  await sam.locator("#hand .card").first().dblclick();  // (a card on the battlefield to come back)
+  await expect(opp(luke, "Sam").locator(".obf .card")).toHaveCount(1, { timeout:15000 });
+  const handC = await sam.evaluate(() => ktPlay.me.zones.hand.length);
+  await sam.close();
+  for (const p of [luke, rick]) await expect(opp(p, "Sam").locator(".badge.away")).toBeVisible({ timeout:30000 });
+  sam = await ctx.newPage(); sam.errors = [];
+  // (old saves from other tables are cleared out when the page opens: only the newest two are kept)
+  await sam.goto(`${BASE}/play.html?kt-test`);
+  await sam.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith("kt-dig-save:")) localStorage.removeItem(k); });  // (his save is gone)
+  await sam.evaluate(() => { for (let i = 0; i < 4; i++) localStorage.setItem(`kt-dig-save:old${i}`, JSON.stringify({ at:Date.now() - i * 1000 })); localStorage.setItem("kt-dig-save:ancient", JSON.stringify({ at:Date.now() - 13 * 3600e3 })); });
+  await sam.goto(`${BASE}/play.html?kt-test&room=${room}`);
+  expect(await sam.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("kt-dig-save:")).sort())).toEqual(["kt-dig-save:old0", "kt-dig-save:old1"]);
+  await expect(sam.locator("#resume")).toBeHidden();
+  await sam.fill("#nameIn", "Sam"); await sam.selectOption("#fmtSel", "sixty"); await sam.fill("#deckIn", DECK); await sam.click("#joinBtn");
+  await expect(sam.locator("#table")).toBeVisible({ timeout:20000 });
+  const keep = sam.locator(".modal").getByRole("button", { name:"Keep", exact:true });
+  await keep.click({ timeout:15000 }).catch(() => {});
+  await expect(sam.locator(".modal-card h2")).toHaveText("Take your seat back?", { timeout:20000 });
+  await expect(sam.locator(".modal")).toContainText("seat 3");
+  await sam.locator(".modal").getByRole("button", { name:"Take it back", exact:true }).click();
+  await sam.waitForURL(/rejoin=1/, { timeout:15000 });
+  await expect(sam.locator("#table")).toBeVisible({ timeout:40000 });
+  await expect.poll(() => sam.evaluate(() => ktPlay?.me && [ktPlay.me.life, ktPlay.me.zones.bf.length, ktPlay.me.zones.hand.length]).catch(() => null), { timeout:20000 }).toEqual([18, 1, handC]);  // (the same number of cards in hand as before)
+  for (const p of [luke, rick]) await expect(opp(p, "Sam").locator(".badge.away")).toHaveCount(0, { timeout:40000 });
+  for (const p of [luke, rick]) await expect(p.locator(".opp")).toHaveCount(2, { timeout:20000 });  // (no extra seat left behind)
+  expect(await luke.evaluate(() => Object.keys(ktPlay.players).sort())).toEqual(["1", "2", "3"]);
   for (const p of [luke, rick]) expect(p.errors).toEqual([]);
   await browser.close();
 });

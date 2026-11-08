@@ -55,6 +55,9 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   const wall = await fetchTo(b, "Gamma Card", "bf");
   // (Attack shows a box for each player above Luke's battlefield: he drags the creature onto Rick's, then Attack)
   const attack = async () => {
+    // (it came in this turn: say it's been there since last turn, right before attacking, so the cast finishing
+    // late can't mark it new again)
+    await ktp(a, iid => { const c = ktPlay.me.zones.bf.find(x => x.iid === iid); if (c) delete c.etb; }, bear);
     await a.click("#attackBtn");
     await dragTo(a, a.locator(`#bf .card[data-iid="${bear}"]`), a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" }));
     await expect(a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" })).toContainText("Gamma Card");

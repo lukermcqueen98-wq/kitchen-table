@@ -31,6 +31,9 @@ jobs:
             tools/package-lock.json
             tests/package-lock.json
       - name: Install the index builder and the test tools
+        # (onnxruntime-node's optional GPU binaries aren't needed and their download can be refused)
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: |
           npm ci --prefix tools --no-audit --no-fund
           npm ci --prefix tests --no-audit --no-fund
