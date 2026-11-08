@@ -28,6 +28,8 @@ jobs:
           cache: npm
           cache-dependency-path: tools/package-lock.json
       - run: npm ci --prefix tools --no-audit --no-fund
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip  # (its optional GPU binaries aren't needed and their download can be refused)
       - name: Get the published card index's card list
         run: |
           mkdir -p site/index

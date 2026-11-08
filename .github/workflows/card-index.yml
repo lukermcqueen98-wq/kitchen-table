@@ -51,6 +51,9 @@ jobs:
           fi
 
       - name: Install the index builder
+        # (onnxruntime-node's optional GPU binaries aren't needed and their download can be refused)
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: npm ci --prefix tools --no-audit --no-fund
 
       - name: Build or update the card index
