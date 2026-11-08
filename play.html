@@ -1510,6 +1510,9 @@ async function sitDown(resume){
   else if (!resume && !watch) checkMyDeck();
   setInterval(tick, 1000);
 }
+// Leaving (closing the tab, a refresh, going to another page): hang up properly, so the others see you go at once and
+// your seat is free for you straight away when you come back
+addEventListener("pagehide", () => { try { if (me) save(); peer?.destroy(); } catch {} });
 function seatOf(id){ const m = /-(\d+)$/.exec(id); return m ? +m[1] : 0; }
 function peerId(s){ return `${PREFIX}-${roomCode}-${s}`; }
 function wirePeer(){
