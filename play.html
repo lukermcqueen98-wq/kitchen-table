@@ -292,6 +292,9 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 main#play.lt [data-slot^="T"] .ocmd{top:6px;left:auto;right:6px}
 main#play.lt [data-slot="L"] .ocmd,main#play.lt [data-slot="BR"] .ocmd{top:6px}
 main#play.lt [data-slot="R"] .ocmd{top:auto;bottom:6px}
+.orderlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.orderlist li{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--felt-edge);border-radius:10px}
+.orderlist li b{flex:1}
 .badge.cmd{border-color:#ff7d9c;color:#ff7d9c;font-weight:700}
 .badge.cmd.danger{background:#ff7d9c;color:#2a0a14}
 .ctrl.cmdc{border-left:4px solid var(--pc,#888)}
@@ -784,6 +787,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
           <button role="menuitem" class="btn small mitem playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
           <button role="menuitem" class="btn small mitem playonly" id="tokenBtn">Tokens</button>
           <button role="menuitem" class="btn small mitem playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
+          <button role="menuitem" class="btn small mitem playonly" id="orderBtn" title="Change the turn order, and whose turn it is, any time">Turn order...</button>
           <button role="menuitem" class="btn small mitem playonly" id="desigBtn" title="The monarch, the initiative, and day and night">Monarch...</button>
         </div></details>
         <details class="tmenu"><summary class="btn small">Game</summary><div class="tmenu-pop" role="menu" aria-label="Game">
@@ -3615,6 +3619,32 @@ $("#sideBtn").onclick = () => sideboardDialog(() => { if (table.started && me.ga
 
 /* The monarch, the initiative, and day and night: kept with the table, so everyone sees them. A player who deals
    combat damage to the monarch (or the initiative's holder) takes it from this menu; the monarch draws as their turn ends. */
+/* Turn order, any time: move players up and down the list (the table lays itself out around you in this order too),
+   and pick whose turn it is now if that should change as well; everyone gets the new order */
+$("#orderBtn").onclick = () => {
+  const seats = Object.keys(players).map(Number).filter(s => s === mySeat || players[s]);
+  let order = inTurnOrder(seats), turn = table.turnSeat || order[0];
+  const list = el("ol", { className:"orderlist" });
+  const draw_ = () => {
+    list.replaceChildren(...order.map((s, i) => {
+      const btn = (t, label, fn, on = true) => { const b = el("button", { type:"button", className:"btn small", textContent:t, ariaLabel:label, disabled:!on }); b.onclick = fn; return b; };
+      const mv = d => () => { [order[i], order[i + d]] = [order[i + d], order[i]]; draw_(); };
+      const now = el("button", { type:"button", className:"btn small" + (turn === s ? " primary" : ""), textContent:turn === s ? "Their turn" : "Their turn now", ariaPressed:String(turn === s) });
+      now.onclick = () => { turn = s; draw_(); };
+      const pip = el("span", { className:"pip" }); pip.style.background = SEAT_HEX[s - 1];
+      return el("li", {}, pip, el("b", { textContent:nm(s) + (s === mySeat ? " (you)" : "") + (isOut(s) ? " (out)" : players[s]?.away ? " (away)" : "") }),
+        btn("↑", `Move ${nm(s)} earlier`, mv(-1), i > 0), btn("↓", `Move ${nm(s)} later`, mv(1), i < order.length - 1), table.started ? now : "");
+    }));
+  };
+  draw_();
+  openModal("Turn order", el("div", {}, el("p", { className:"hint", textContent:"Top to bottom is the order turns go in (after the last, back to the first). The table lays itself out around you in this order." }), list),
+    [{ label:"Cancel" }, { label:"Save", primary:true, fn:() => {
+      const patch = { order:order.slice() };
+      if (table.started && turn !== table.turnSeat) Object.assign(patch, { turnSeat:turn, turnAt:Date.now(), phase:0 });
+      changeTable(patch);
+      say(`changed the turn order: ${order.map(nm).join(", ")}${patch.turnSeat ? `. It's ${nm(turn)}'s turn` : ""}.`);
+    } }]);
+};
 $("#desigBtn").onclick = e => {
   const r = e.currentTarget.getBoundingClientRect();
   const items = [{ head:"The monarch" },
