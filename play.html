@@ -284,6 +284,9 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .badge{font-size:12px;border:1px solid var(--brass);color:var(--brass);border-radius:12px;padding:0 8px;white-space:nowrap}
 #myBadges{display:flex;gap:6px;flex-wrap:wrap}
 .badge.out{border-color:var(--danger);color:var(--danger)}
+.badge.cmd{border-color:#ff7d9c;color:#ff7d9c;font-weight:700}
+.badge.cmd.danger{background:#ff7d9c;color:#2a0a14}
+.ctrl.cmdc{border-left:4px solid var(--pc,#888)}
 .badge.away{border-color:#f5a524;color:#f5a524;animation:awayblink 1.6s ease-in-out infinite}
 @keyframes awayblink{50%{opacity:.45}}
 .opp.away .obody,.opp.away .oframe{opacity:.55;filter:grayscale(.5)}
@@ -2529,7 +2532,8 @@ function sizeBoards(){
   const bar = $("#combatBar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + g : g;
   const hw = $("#handWrap"), handH = hw && hw.parentElement === play && getComputedStyle(hw).position === "static" ? hw.offsetHeight + g : 0;  // (the hand as a strip under the table)
   const Ha = play.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - handH;
-  const m = Math.max(44, $("#side")?.offsetHeight || 0), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
+  const side = $("#side"), top = side?.getBoundingClientRect().top || 0, kids = side ? [...side.children].filter(e => e.offsetParent) : [];
+  const m = Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4)), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
   // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
   const shape = fw => Math.min(3, Math.max(1.5, 2 * fw / (Ha - P - m - 2 * g)));
   const matW = (fw, A) => { const pw = Math.min(fw * .095, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
@@ -2765,7 +2769,7 @@ function renderOpps(){
       el("span", { className:"ocount", textContent:`Hand ${p.hand}` }), el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
       table.started ? el("span", { className:"ocount", title:"Turns they've taken this game", textContent:`Turns ${p.turns || 0}` }) : null,
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
-      cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
+      cmdTaken ? el("span", { className:"badge cmd" + (cmdTaken >= ruleNum("cmdrDmg") - 5 ? " danger" : ""), title:`Commander damage you've taken from ${p.name}'s commander (${ruleNum("cmdrDmg")} knocks you out)`, textContent:`Cmdr hit you: ${cmdTaken}` }) : null,
       p.away ? el("span", { className:"badge away", title:"Their connection dropped or they left: their cards stay, and they come back to this seat when they rejoin", textContent:"Reconnecting..." }) : null,
       p.picking ? el("span", { className:"badge", textContent:"Choosing a deck..." }) : null,
       p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
@@ -2822,6 +2826,7 @@ function renderMine(){
     const minus = el("button", { innerHTML:"&minus;", ariaLabel:`${label} minus 1` }), plus = el("button", { textContent:"+", ariaLabel:`${label} plus 1` });
     minus.onclick = () => { set(Math.max(0, get() - 1)); changed(); }; plus.onclick = () => { set(get() + 1); changed(); };
     r.append(el("span", { textContent:label }), minus, el("b", { textContent:get() }), plus); box.append(r);
+    return r;
   };
   ctrl("Poison", () => me.poison, v => { me.poison = v; }, ruleNum("poison"));
   if (me.energy || settings.showEnergy) ctrl("Energy", () => me.energy, v => { me.energy = v; });
@@ -2829,10 +2834,11 @@ function renderMine(){
   if (theirCmdrs.length) box.append(el("div", { className:"ctrlhead", textContent:"Commander damage you've taken" }));
   for (const [s, c] of theirCmdrs) {
     const key = `${s}:${c.iid}`;
-    ctrl(`${(c.name || "Commander").split(",")[0].slice(0, 12)}`, () => me.cmd[key] || 0, v => {
+    const r = ctrl(`${players[s]?.name || "Seat " + s}'s ${(c.name || "commander").split(",")[0].slice(0, 14)}`, () => me.cmd[key] || 0, v => {
       const d = v - (me.cmd[key] || 0); me.cmd[key] = v; me.life -= d;
       if (d) say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${players[s]?.name}).`);
     }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
+    r.classList.add("cmdc"); r.style.setProperty("--pc", SEAT_HEX[s - 1]);
   }
   const db = $("#dungeonBox"); db.innerHTML = "";
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
