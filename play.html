@@ -1546,7 +1546,7 @@ function setupConn(s, conn){
     send(conn, me.watch ? { type:"hello", watch:me.name, table, hb:1 } : { type:"hello", state:pub(), table, hb:1 });
     if (mySeat > s && !calls[s]) setupCall(s, peer.call(peerId(s), localStream || new MediaStream(), CALL_OPTS));
   });
-  conn.on("data", msg => { conn.seen = Date.now(); if (msg?.type === "ping" || msg?.hb) conn.hb = true; onMessage(s, msg); });
+  conn.on("data", msg => { conn.seen = Date.now(); if (msg?.type === "alive" || msg?.hb) conn.hb = true; onMessage(s, msg); });
   const gone = conn.gone = () => { if (conns[s] === conn) { delete conns[s]; if (watchers[s]) { log(`${watchers[s]} stopped watching.`); delete watchers[s]; render(); } if (players[s]) { log(`${players[s].name} left the table. Their cards stay until they come back or a new game starts.`); players[s].away = true; render(); } } };
   conn.on("close", gone); conn.on("error", gone);
 }
@@ -1571,7 +1571,7 @@ function tick(){
   const now = Date.now();
   for (const [s, c] of Object.entries(conns)) {
     if (!c.open) continue;
-    if (now - (c.pinged || 0) > 3000) { c.pinged = now; send(c, { type:"ping" }); }
+    if (now - (c.pinged || 0) > 3000) { c.pinged = now; send(c, { type:"alive" }); }
     // (c.hb: it has sent a heartbeat, so it's a version that sends them; a player who hasn't reloaded isn't dropped)
     if (c.hb && now - (c.seen || now) > 12000) { try { c.close(); } catch {} c.gone?.(); if (conns[s] === c) delete conns[s]; }
   }
@@ -1642,7 +1642,7 @@ function onMessage(s, msg){
       if (msg.table) takeTable(msg.table);
       render(); break;
     }
-    case "ping": break;  // (the heartbeat: only says the connection is alive)
+    case "alive": break;  // (the heartbeat: only says the connection is alive; "ping" is a target being pointed at)
     case "table": takeTable(msg.table); break;
     case "mat": { const m = cleanMat(msg.mat); if (m) mats[s] = m; else delete mats[s]; render(); break; }
     case "chat": if (typeof msg.text === "string" && msg.text.trim()) chatLine(players[s]?.name || watchers[s] || "Someone", msg.text.slice(0, 300), s); break;
