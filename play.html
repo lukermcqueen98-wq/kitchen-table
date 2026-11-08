@@ -284,6 +284,14 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .badge{font-size:12px;border:1px solid var(--brass);color:var(--brass);border-radius:12px;padding:0 8px;white-space:nowrap}
 #myBadges{display:flex;gap:6px;flex-wrap:wrap}
 .badge.out{border-color:var(--danger);color:var(--danger)}
+.ocmd{position:absolute;z-index:5;left:6px;top:36px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;max-width:70%;padding:3px 6px;border-radius:10px;background:rgba(15,9,30,.85);font-size:11px;pointer-events:none}
+.ocmd>span{color:var(--muted)}
+.ocmd.mid{position:static;max-width:none;background:none;padding:0 4px;font-size:12px;border-left:3px solid var(--pc,#888);border-radius:0}
+.ocmd b{border:1px solid var(--pc,#888);border-left-width:4px;border-radius:7px;padding:0 6px;color:var(--parchment)}
+.ocmd b.danger{background:#ff7d9c;border-color:#ff7d9c;color:#2a0a14}
+main#play.lt [data-slot^="T"] .ocmd{top:6px;left:auto;right:6px}
+main#play.lt [data-slot="L"] .ocmd,main#play.lt [data-slot="BR"] .ocmd{top:6px}
+main#play.lt [data-slot="R"] .ocmd{top:auto;bottom:6px}
 .badge.cmd{border-color:#ff7d9c;color:#ff7d9c;font-weight:700}
 .badge.cmd.danger{background:#ff7d9c;color:#2a0a14}
 .ctrl.cmdc{border-left:4px solid var(--pc,#888)}
@@ -580,7 +588,11 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #side .lifebox{order:1;gap:8px}
   main#play.lt #side .lifebox output{font-size:24px}
   main#play.lt #side .row{order:3;gap:10px}
-  main#play.lt #ctrlBox{order:4;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 14px}
+  /* (your counters and everyone's commander damage: a line each, one line however many there are (it scrolls sideways),
+     so the middle of the table is always the same size and the boards never move) */
+  main#play.lt #ctrlBox{order:4;display:flex;flex-wrap:nowrap;align-items:center;justify-content:safe center;gap:4px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none}
+  main#play.lt #ctrlBox .ocmd.mid{flex:none;flex-wrap:nowrap}
+  main#play.lt #ctrlBox .cmdsep{flex:none;align-self:stretch;width:1px;background:var(--felt-edge);margin:2px 0}
   main#play.lt #ctrlBox .ctrlhead{display:none}
   main#play.lt #ctrlBox .ctrl{gap:6px}
   main#play.lt #dungeonBox{order:5}
@@ -2535,7 +2547,8 @@ function sizeBoards(){
   const hw = $("#handWrap"), handH = hw && hw.parentElement === play && getComputedStyle(hw).position === "static" ? hw.offsetHeight + g : 0;  // (the hand as a strip under the table)
   const Ha = play.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - handH;
   const side = $("#side"), top = side?.getBoundingClientRect().top || 0, kids = side ? [...side.children].filter(e => e.offsetParent) : [];
-  const m = Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4)), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
+  // (in whole pixels: measured from the layout it sizes, a fraction of a pixel would otherwise creep in and nudge the boards)
+  const m = Math.ceil(Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4))), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
   // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
   const shape = fw => Math.min(3, Math.max(1.5, 2 * fw / (Ha - P - m - 2 * g)));
   const matW = (fw, A) => { const pw = Math.min(fw * .095, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
@@ -2712,6 +2725,17 @@ function cardW(box){
   const v = getComputedStyle(box).getPropertyValue("--cw").trim();
   return v.endsWith("cqw") ? parseFloat(v) / 100 * box.clientWidth : parseFloat(v) || 84;
 }
+// Commander damage a player has taken: a chip per commander that's hit them ("Luke 6", "You 18"), in its player's
+// color (with the commander's name when one player has two, partners), red when they're close to being knocked out
+function cmdHits(p){
+  const hits = FORMATS[table.fmt].cmdr ? Object.entries(p?.cmd || {}).filter(([, v]) => v > 0) : [];
+  return hits.map(([k, v]) => {
+    const [src, iid] = k.split(":"), from = +src, who = from === mySeat ? "You" : players[from]?.name || `Seat ${from}`;
+    const two = hits.filter(([k2]) => k2.split(":")[0] === src).length > 1, c = two ? [...(players[from]?.cz || []), ...(players[from]?.bf || [])].find(x => x.iid === iid) : null;
+    const chip = el("b", { className:v >= ruleNum("cmdrDmg") - 5 ? "danger" : "", textContent:`${who}${c ? ` (${String(c.name).split(",")[0]})` : ""} ${v}` });
+    chip.style.setProperty("--pc", SEAT_HEX[from - 1]); return chip;
+  });
+}
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = seatsAfter(mySeat, seats).filter(s => s !== mySeat);
@@ -2791,6 +2815,12 @@ function renderOpps(){
     if (p.handShown) o.append(el("div", { className:"ohead" }, el("span", { className:"hint", textContent:"Revealed hand:" }), ...p.handShown.map(c => { const e = cardEl(c, { small:true }); e.style.position = "relative"; e.style.setProperty("--w", "40px"); return e; })));
     if (round) o.dataset.pos = POS[order.indexOf(s)];
     if (lt) { o.dataset.slot = SLOTS[order.indexOf(s)]; o.style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[s - 1]} 32%, #1a1030)`); }
+    // Commander damage this player has taken, for everyone: a chip per commander that's hit them, in its player's color
+    // (with the commander's name too when one player has two, partners), red when they're close to being knocked out
+    // (at the long table these sit in the middle of the table instead: see renderMine)
+    const hits = cmdHits(p);
+    if (hits.length && !lt) o.append(el("div", { className:"ocmd", title:`Commander damage ${p.name} has taken (${ruleNum("cmdrDmg")} from one commander knocks them out)` },
+      el("span", { textContent:"Cmdr dmg" }), ...hits));
     box.append(o);
   }
 }
@@ -2841,6 +2871,16 @@ function renderMine(){
       if (d) say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${players[s]?.name}).`);
     }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
     r.classList.add("cmdc"); r.style.setProperty("--pc", SEAT_HEX[s - 1]);
+  }
+  // (the long table: what each other player has taken, on the same line as your counters in the middle of the table,
+  // so the middle never grows and the boards never move; the line scrolls sideways if it's long)
+  if ($("#play").classList.contains("lt") && FORMATS[table.fmt].cmdr) {
+    const rows = presentSeats().filter(x => x !== mySeat).map(s => [s, cmdHits(players[s])]).filter(([, h]) => h.length);
+    if (rows.length) box.append(el("span", { className:"cmdsep", ariaHidden:"true" }));
+    for (const [s, hits] of rows) {
+      const row = el("div", { className:"ocmd mid", title:`Commander damage ${players[s].name} has taken (${ruleNum("cmdrDmg")} from one commander knocks them out)` }, el("span", { textContent:`${players[s].name} took:` }), ...hits);
+      row.dataset.seat = s; row.style.setProperty("--pc", SEAT_HEX[s - 1]); box.append(row);
+    }
   }
   const db = $("#dungeonBox"); db.innerHTML = "";
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
