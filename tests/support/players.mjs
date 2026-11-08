@@ -148,8 +148,12 @@ export async function dragTo(page, from, to){
   // (the table redraws often: measure again if an element was just replaced)
   const box = async l => { for (let i = 0; i < 40; i++) { const r = await l.boundingBox().catch(() => null); if (r) return r; await page.waitForTimeout(50); } throw new Error("dragTo: element not visible"); };
   await from.evaluate(e => Promise.all(e.getAnimations().map(x => x.finished.catch(() => {})))).catch(() => {});  // (a card still gliding into place)
-  const a = await box(from), b = await box(to);
+  const a = await box(from);
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
   await page.mouse.move(a.x + a.width / 2 + 20, a.y + a.height / 2 + 20, { steps:3 });
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps:6 }); await page.mouse.up();
+  // (where the target is now: the table can redraw mid-drag, and boxes placed by it, like the attack bar, can shift)
+  const b2 = await box(to);
+  await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2, { steps:6 });
+  const b3 = await box(to); if (Math.abs(b3.x - b2.x) + Math.abs(b3.y - b2.y) > 1) await page.mouse.move(b3.x + b3.width / 2, b3.y + b3.height / 2, { steps:2 });
+  await page.mouse.up();
 }
