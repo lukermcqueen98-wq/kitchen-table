@@ -284,6 +284,11 @@ main#play{display:flex;flex-direction:column;min-height:0;min-width:0}
 .badge{font-size:12px;border:1px solid var(--brass);color:var(--brass);border-radius:12px;padding:0 8px;white-space:nowrap}
 #myBadges{display:flex;gap:6px;flex-wrap:wrap}
 .badge.out{border-color:var(--danger);color:var(--danger)}
+.badge.away{border-color:#f5a524;color:#f5a524;animation:awayblink 1.6s ease-in-out infinite}
+@keyframes awayblink{50%{opacity:.45}}
+.opp.away .obody,.opp.away .oframe{opacity:.55;filter:grayscale(.5)}
+#netBar{position:fixed;left:50%;top:60px;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:12px;background:var(--felt-deep);border:2px solid #f5a524;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:calc(100vw - 32px)}
+#netBar.hidden{display:none}
 .opp.is-out .obody,#me.is-out #bf{opacity:.45;filter:grayscale(.6)}
 #myBadges:empty{display:none}
 #dayChip{background:none;cursor:pointer}
@@ -801,6 +806,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
     <div id="opps"></div>
     <div id="hub" aria-label="Turn order"></div>
     <div id="combatBar" class="hidden"><span id="combatNote" class="chip"></span></div>
+    <div id="netBar" class="hidden" role="alert"></div>
     <div id="defendBox" class="hidden" role="dialog" aria-label="You're being attacked"></div>
     <div id="assignBox" class="hidden" role="dialog" aria-label="Divide your attackers' damage"></div>
     <div id="atkBar" class="hidden" role="region" aria-label="Attack: drag your creatures onto a player"></div>
@@ -1299,8 +1305,10 @@ function savedGame(room){ try { const s = JSON.parse(store.get(saveKey(room), "n
   const room = params.get("room"), s = room && savedGame(room);
   if (s) {
     $("#resume").classList.remove("hidden");
-    $("#resumeText").textContent = `You have a game at table ${room} as ${s.me.name} (life ${s.me.life}, ${s.me.zones.bf.length} cards on the battlefield).`;
+    $("#resumeText").textContent = `You have a game at table ${room} as ${s.me.name}, seat ${s.seat} (life ${s.me.life}, ${s.me.zones.hand.length} cards in hand, ${s.me.zones.bf.length} on the battlefield). Rejoin to pick it up where you left off.`;
+    $("#resumeBtn").textContent = `Rejoin as ${s.me.name}`;
     $("#resumeBtn").onclick = () => { askAlerts(); sitDown(s); };
+    if (params.get("rejoin")) setTimeout(() => sitDown(s));  // (Reconnect at the table: straight back to your seat)
     $("#resumeDrop").onclick = () => { store.del(saveKey(room)); $("#resume").classList.add("hidden"); };
   }
 }
@@ -1472,8 +1480,12 @@ async function sitDown(resume){
     const seatsUp = n => Array.from({ length:n }, (_, i) => i + 1);
     const order = watch ? seatsUp(4).map(i => MAX + i) : [resume?.seat, ...seatsUp(MAX)].filter((s, i, a) => s && a.indexOf(s) === i);
     for (const s of order) {
-      try { peer = await openPeer(`${PREFIX}-${roomCode}-${s}`); mySeat = s; break; }
-      catch (e) { if (e.type !== "unavailable-id") throw e; }
+      // (coming back: your old seat can stay taken for a few seconds after you left; keep trying it before another)
+      for (let tries = s === resume?.seat ? 7 : 1; tries > 0 && !peer; tries--) {
+        try { peer = await openPeer(`${PREFIX}-${roomCode}-${s}`); mySeat = s; }
+        catch (e) { if (e.type !== "unavailable-id") throw e; if (tries > 1) { btn.textContent = "Getting your seat back..."; await new Promise(r => setTimeout(r, 3000)); } }
+      }
+      if (peer) break;
     }
     if (!peer) throw new Error(watch ? "This table already has 4 people watching." : `This table already has ${MAX} players.`);
   } catch (e) {
@@ -1528,13 +1540,14 @@ function dial(s){
 }
 const CALL_OPTS = { constraints:{ offerToReceiveAudio:true, offerToReceiveVideo:false } };
 function setupConn(s, conn){
-  conns[s] = conn;
+  conns[s] = conn; conn.seen = Date.now();
   conn.on("open", () => {
-    send(conn, me.watch ? { type:"hello", watch:me.name, table } : { type:"hello", state:pub(), table });
+    conn.seen = Date.now();
+    send(conn, me.watch ? { type:"hello", watch:me.name, table, hb:1 } : { type:"hello", state:pub(), table, hb:1 });
     if (mySeat > s && !calls[s]) setupCall(s, peer.call(peerId(s), localStream || new MediaStream(), CALL_OPTS));
   });
-  conn.on("data", msg => onMessage(s, msg));
-  const gone = () => { if (conns[s] === conn) { delete conns[s]; if (watchers[s]) { log(`${watchers[s]} stopped watching.`); delete watchers[s]; render(); } if (players[s]) { log(`${players[s].name} left the table. Their cards stay until they come back or a new game starts.`); players[s].away = true; render(); } } };
+  conn.on("data", msg => { conn.seen = Date.now(); if (msg?.type === "ping" || msg?.hb) conn.hb = true; onMessage(s, msg); });
+  const gone = conn.gone = () => { if (conns[s] === conn) { delete conns[s]; if (watchers[s]) { log(`${watchers[s]} stopped watching.`); delete watchers[s]; render(); } if (players[s]) { log(`${players[s].name} left the table. Their cards stay until they come back or a new game starts.`); players[s].away = true; render(); } } };
   conn.on("close", gone); conn.on("error", gone);
 }
 function setupCall(s, call){
@@ -1552,12 +1565,37 @@ function broadcast(msg){ for (const c of Object.values(conns)) send(c, msg); }
 // Connections: each player dials the seats below theirs, so two players never dial each other at once; a lower seat
 // that isn't connected (a player who refreshed or joined later) is tried again every few seconds
 function tick(){
+  /* Heartbeat: a connection whose player left without saying so (a closed laptop, lost Wi-Fi) can still look open;
+     every connection says hello every 3 seconds, and one that's been quiet for 12 is dropped, so the seats reconnect
+     (the higher seat dials) when that player comes back */
+  const now = Date.now();
+  for (const [s, c] of Object.entries(conns)) {
+    if (!c.open) continue;
+    if (now - (c.pinged || 0) > 3000) { c.pinged = now; send(c, { type:"ping" }); }
+    // (c.hb: it has sent a heartbeat, so it's a version that sends them; a player who hasn't reloaded isn't dropped)
+    if (c.hb && now - (c.seen || now) > 12000) { try { c.close(); } catch {} c.gone?.(); if (conns[s] === c) delete conns[s]; }
+  }
+  netStatus(now);
   for (let s = 1; s < mySeat; s++) {
     // an attempt that never opened is given up after 10 seconds
     if (conns[s] && !conns[s].open && Date.now() - (dialAt[s] || 0) > 10000) { try { conns[s].close(); } catch {} delete conns[s]; }
     if (!conns[s] && Date.now() - (dialAt[s] || 0) > 4000 + rnd(3000)) dial(s);
   }
   renderTurn();
+}
+/* Your own connection: when you can't reach anyone at the table (lost Wi-Fi, the connection server dropped you) a
+   bar says so; the table keeps trying, and Reconnect saves your game and sits you back down in your seat */
+let lostSince = 0;
+function netStatus(now){
+  const bar = $("#netBar"), others = Object.keys(players).map(Number).filter(s => s !== mySeat);
+  const cut = peer?.disconnected || (others.length && !Object.values(conns).some(c => c.open));
+  lostSince = cut ? lostSince || now : 0;
+  if (!cut || now - lostSince < 6000) { bar.classList.add("hidden"); return; }
+  if (!bar.classList.contains("hidden")) return;
+  const b = el("button", { type:"button", className:"btn small primary", textContent:"Reconnect" });
+  b.onclick = () => { save(); location.href = `${location.pathname}?room=${roomCode}&rejoin=1`; };
+  bar.replaceChildren(el("b", { textContent:"Connection lost" }), el("span", { textContent:peer?.disconnected ? "Can't reach the connection server. Trying again..." : "Can't reach the other players. Trying again..." }), b);
+  bar.classList.remove("hidden");
 }
 function cleanPub(st){
   if (!st || typeof st !== "object") return null;
@@ -1604,6 +1642,7 @@ function onMessage(s, msg){
       if (msg.table) takeTable(msg.table);
       render(); break;
     }
+    case "ping": break;  // (the heartbeat: only says the connection is alive)
     case "table": takeTable(msg.table); break;
     case "mat": { const m = cleanMat(msg.mat); if (m) mats[s] = m; else delete mats[s]; render(); break; }
     case "chat": if (typeof msg.text === "string" && msg.text.trim()) chatLine(players[s]?.name || watchers[s] || "Someone", msg.text.slice(0, 300), s); break;
@@ -2705,7 +2744,7 @@ function renderOpps(){
   }
   for (const s of order) {
     const p = players[s]; ctrlSeat = s;
-    const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") }); o.dataset.seat = s;
+    const o = el("div", { className:"opp" + (table.turnSeat === s ? " turn" : "") + (p.out ? " is-out" : "") + (p.away ? " away" : "") }); o.dataset.seat = s;
     const pip = el("span", { className:"pip" }); pip.style.background = SEAT_HEX[s - 1];
     // The top of their library, while they play with it revealed (Future Sight, Courser of Kruphix...)
     const libTopOf = p => { const b = el("div", { className:"opile", title:`The top card of ${p.name}'s library (revealed)` }); const e = cardEl(p.libTop, { small:true }); e.style.position = "relative"; b.append(e, el("span", { className:"opilelbl", textContent:"Library top" })); return b; };
@@ -2724,7 +2763,7 @@ function renderOpps(){
       table.started ? el("span", { className:"ocount", title:"Turns they've taken this game", textContent:`Turns ${p.turns || 0}` }) : null,
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
       cmdTaken ? el("span", { className:"ocount", title:"Commander damage you've taken from them", textContent:`Their commander hit you: ${cmdTaken}` }) : null,
-      p.away ? el("span", { className:"ocount", textContent:"(away)" }) : null,
+      p.away ? el("span", { className:"badge away", title:"Their connection dropped or they left: their cards stay, and they come back to this seat when they rejoin", textContent:"Reconnecting..." }) : null,
       p.picking ? el("span", { className:"badge", textContent:"Choosing a deck..." }) : null,
       p.out ? el("span", { className:"badge out", textContent:"Out" }) : null,
       el("span", { className:"olife", title:"Life", textContent:p.life })));
