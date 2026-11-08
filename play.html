@@ -590,10 +590,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #side .row{order:3;gap:10px}
   /* (your counters and everyone's commander damage: a line each, one line however many there are (it scrolls sideways),
      so the middle of the table is always the same size and the boards never move) */
-  main#play.lt #ctrlBox,main#play.lt #cmdAll{flex:0 0 100%;display:flex;flex-wrap:nowrap;align-items:center;justify-content:safe center;gap:4px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin}
-  main#play.lt #ctrlBox{order:4;height:36px} main#play.lt #cmdAll{order:5;height:28px;font-size:12px}
-  main#play.lt #cmdAll.hidden{display:none}
-  main#play.lt #cmdAll .ocmd.mid{flex:none;flex-wrap:nowrap}
+  main#play.lt #ctrlBox{order:4;display:flex;flex-wrap:nowrap;align-items:center;justify-content:safe center;gap:4px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none}
+  main#play.lt #ctrlBox .ocmd.mid{flex:none;flex-wrap:nowrap}
+  main#play.lt #ctrlBox .cmdsep{flex:none;align-self:stretch;width:1px;background:var(--felt-edge);margin:2px 0}
   main#play.lt #ctrlBox .ctrlhead{display:none}
   main#play.lt #ctrlBox .ctrl{gap:6px}
   main#play.lt #dungeonBox{order:5}
@@ -841,8 +840,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
         </div>
         <div class="row" style="justify-content:space-between"><span id="landChip" class="chip"></span><span class="hint" id="handCount"></span></div>
         <div id="czone" data-drop="cz"></div>
-        <div id="ctrlBox"></div>
-        <div id="cmdAll" class="hidden" aria-label="Commander damage everyone has taken"></div>  <!-- (below the piles, so a long commander damage list at a big table doesn't push them out of view) -->
+        <div id="ctrlBox"></div>  <!-- (below the piles, so a long commander damage list at a big table doesn't push them out of view) -->
         <div id="dungeonBox"></div>
       </div>
     </div>
@@ -2549,8 +2547,8 @@ function sizeBoards(){
   const hw = $("#handWrap"), handH = hw && hw.parentElement === play && getComputedStyle(hw).position === "static" ? hw.offsetHeight + g : 0;  // (the hand as a strip under the table)
   const Ha = play.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - handH;
   const side = $("#side"), top = side?.getBoundingClientRect().top || 0, kids = side ? [...side.children].filter(e => e.offsetParent) : [];
-  // (rounded up to a step of 8, so a pixel here or there in what's showing never resizes the boards)
-  const m = Math.ceil(Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4)) / 8) * 8, cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
+  // (in whole pixels: measured from the layout it sizes, a fraction of a pixel would otherwise creep in and nudge the boards)
+  const m = Math.ceil(Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4))), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
   // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
   const shape = fw => Math.min(3, Math.max(1.5, 2 * fw / (Ha - P - m - 2 * g)));
   const matW = (fw, A) => { const pw = Math.min(fw * .095, (fw / A - 26) / 4.2); return fw + pw * 2 + 30; };
@@ -2874,17 +2872,15 @@ function renderMine(){
     }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
     r.classList.add("cmdc"); r.style.setProperty("--pc", SEAT_HEX[s - 1]);
   }
-  // (the long table: what each other player has taken, on its own line in the middle of the table; the line is always
-  // there in Commander, so the boards never move when damage comes in)
-  const all = $("#cmdAll"), ltCmdr = $("#play").classList.contains("lt") && FORMATS[table.fmt].cmdr;
-  all.classList.toggle("hidden", !ltCmdr); all.innerHTML = "";
-  if (ltCmdr) {
-    for (const s of presentSeats().filter(x => x !== mySeat)) {
-      const hits = cmdHits(players[s]); if (!hits.length) continue;
+  // (the long table: what each other player has taken, on the same line as your counters in the middle of the table,
+  // so the middle never grows and the boards never move; the line scrolls sideways if it's long)
+  if ($("#play").classList.contains("lt") && FORMATS[table.fmt].cmdr) {
+    const rows = presentSeats().filter(x => x !== mySeat).map(s => [s, cmdHits(players[s])]).filter(([, h]) => h.length);
+    if (rows.length) box.append(el("span", { className:"cmdsep", ariaHidden:"true" }));
+    for (const [s, hits] of rows) {
       const row = el("div", { className:"ocmd mid", title:`Commander damage ${players[s].name} has taken (${ruleNum("cmdrDmg")} from one commander knocks them out)` }, el("span", { textContent:`${players[s].name} took:` }), ...hits);
-      row.dataset.seat = s; row.style.setProperty("--pc", SEAT_HEX[s - 1]); all.append(row);
+      row.dataset.seat = s; row.style.setProperty("--pc", SEAT_HEX[s - 1]); box.append(row);
     }
-    if (!all.childElementCount) all.append(el("span", { className:"hint", textContent:"No commander damage taken by the others yet" }));
   }
   const db = $("#dungeonBox"); db.innerHTML = "";
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
