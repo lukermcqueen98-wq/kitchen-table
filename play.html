@@ -464,7 +464,9 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 .modal-card.wide .gcard{width:164px}
 .modal-card.wide .gcard .card{--w:164px}
 #pop{position:fixed;z-index:85;pointer-events:none;filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))}
-#pop img{width:100%;display:block;border-radius:4.75%/3.5%;aspect-ratio:63/88;background:#000}
+#pop{display:flex;gap:8px}
+#pop img.hidden{display:none}
+#pop img{flex:1;min-width:0;width:100%;display:block;border-radius:4.75%/3.5%;aspect-ratio:63/88;background:#000}
 .modal-card h2{font:700 22px var(--serif);margin:0 0 10px}
 .grid{display:flex;flex-wrap:wrap;gap:8px}
 .gcard{width:120px;display:flex;flex-direction:column;gap:3px;align-items:stretch}
@@ -840,7 +842,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
 
 <ul id="feed" aria-hidden="true"></ul>
 <div id="menu" class="hidden" role="menu"></div>
-<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""></div>
+<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""><img id="popImg2" alt="" class="hidden"></div>
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
 <div id="toast" class="hidden" role="status"></div>
 <div id="audios" class="hidden"></div>
@@ -3044,7 +3046,7 @@ document.addEventListener("pointerover", e => {
   const cl = e.target.closest?.(".clink");
   if (cl) {
     hoverIid = null; const src = cl.dataset.img, id = cl.dataset.cid;
-    if (src) { $("#zoomImg").src = src; if (e.pointerType === "mouse" && settings.hoverPop && !drag) popOut(cl, src); }
+    if (src) { $("#zoomImg").src = src; if (e.pointerType === "mouse" && settings.hoverPop && !drag) { popOut(cl, src); bothFaces(cl, id, src, () => !hoverIid); } }
     cardById(id).then(c => { if (c) $("#zoomText").textContent = textOf(c, 0); });
     return;
   }
@@ -3056,22 +3058,34 @@ document.addEventListener("pointerover", e => {
   else { const img = ce.querySelector("img"); src = img ? img.src.replace("/small/", "/normal/") : ""; id = findPub(iid)?.id || ""; }
   if (!src) return;
   $("#zoomImg").src = src;
-  if (e.pointerType === "mouse" && settings.hoverPop && !drag) popOut(ce, src);
+  if (e.pointerType === "mouse" && settings.hoverPop && !drag) { popOut(ce, src); if (!mineC?.fd || !ce.closest("#opps")) bothFaces(ce, id, src, () => hoverIid === iid); }
   const face = mineC?.face || 0;
   cardById(id).then(c => { if (c && hoverIid === iid) $("#zoomText").textContent = textOf(c, face); });
 });
 /* Pop-out: the card you're pointing at, large, next to it (on the table, in your hand, and in "Keep this hand?") */
-function popOut(ce, src){
-  const pop = $("#pop"), img = $("#popImg"), r = ce.getBoundingClientRect();
-  const w = Math.min(340, innerWidth * 0.42), h = w * 88 / 63;
-  if (r.width >= w * 0.9) { hidePop(); return; }  // (already big)
+function popOut(ce, src, back = ""){
+  const pop = $("#pop"), img = $("#popImg"), img2 = $("#popImg2"), r = ce.getBoundingClientRect();
+  // (a double-faced card: both faces side by side, a little smaller each)
+  const one = back ? Math.min(300, (innerWidth - 40) / 2 * 0.9) : Math.min(340, innerWidth * 0.42), w = back ? one * 2 + 8 : one, h = one * 88 / 63;
+  if (r.width >= one * 0.9) { hidePop(); return; }  // (already big)
   if (img.getAttribute("src") !== src) img.src = src;
+  img2.classList.toggle("hidden", !back); if (back && img2.getAttribute("src") !== back) img2.src = back;
   let x = r.right + 12; if (x + w > innerWidth - 8) x = r.left - w - 12; if (x < 8) x = clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8);
   const y = clamp(r.top + r.height / 2 - h / 2, 8, Math.max(8, innerHeight - h - 8));
   pop.style.width = w + "px"; pop.style.left = x + "px"; pop.style.top = y + "px";
   pop.dataset.iid = ce.dataset.iid || ""; pop.classList.remove("hidden");
 }
 function hidePop(){ $("#pop").classList.add("hidden"); }
+// The other face of a double-faced card (transform, modal double-faced): looked up, then shown beside the one you see
+function bothFaces(ce, id, src, still){
+  if (!id) return;
+  cardById(id).then(c => {
+    const f = faces(c); if (!f || f.length < 2 || !still() || $("#pop").classList.contains("hidden")) return;
+    const all = f.map((x, i) => imgOf(c, i)), base = u => String(u || "").replace(/\/(small|normal|large)\//, "/").split("?")[0];
+    const shown = Math.max(0, all.findIndex(u => base(u) === base(src)));
+    popOut(ce, src, all[(shown + 1) % all.length]);
+  });
+}
 document.addEventListener("pointerout", e => { const ce = e.target.closest?.(".card, .clink"); if (ce && !ce.contains(e.relatedTarget)) hidePop(); });
 document.addEventListener("pointerdown", hidePop, true);
 document.addEventListener("wheel", hidePop, { passive:true });
