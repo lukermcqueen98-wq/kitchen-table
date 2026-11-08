@@ -593,7 +593,8 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #side .row{order:3;gap:10px}
   /* (your counters and everyone's commander damage: a line each, one line however many there are (it scrolls sideways),
      so the middle of the table is always the same size and the boards never move) */
-  main#play.lt #ctrlBox{order:4;display:flex;flex-wrap:nowrap;align-items:center;justify-content:safe center;gap:4px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none}
+  main#play.lt #ctrlBox{order:4;box-sizing:border-box;height:36px;display:flex;flex-wrap:nowrap;align-items:center;justify-content:safe center;gap:4px 14px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none}
+  main#play.lt #ctrlBox::-webkit-scrollbar{display:none}
   main#play.lt #ctrlBox .ocmd.mid{flex:none;flex-wrap:nowrap}
   main#play.lt #ctrlBox .cmdsep{flex:none;align-self:stretch;width:1px;background:var(--felt-edge);margin:2px 0}
   main#play.lt #ctrlBox .ctrlhead{display:none}
