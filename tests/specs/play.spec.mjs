@@ -177,7 +177,7 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await a.goto(`${BASE}/play.html?kt-test&room=${room}`);
   await expect(a.locator("#resume")).toBeVisible();
   await a.click("#resumeBtn");
-  await expect(a.locator("#table")).toBeVisible({ timeout:15000 });
+  await expect(a.locator("#table")).toBeVisible({ timeout:40000 });  // (it may wait a few seconds for its seat)
   await expect(a.locator("#bf .card")).toHaveCount(bfCount);
   await expect(a.locator("#hand .card")).toHaveCount(handCount);
   await expect(a.locator("#lifeOut")).toHaveText("37");

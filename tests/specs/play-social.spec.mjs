@@ -52,8 +52,8 @@ test("digital table: chat, watching, a dropped connection, and game records", as
 
   // Rick's connection drops (every WebRTC link of his closes, as when the internet cuts out); it comes back by itself
   await b.evaluate(() => window.__pcs.forEach(pc => pc.close()));
-  await expect(opp(a, "Rick")).toContainText("(away)", { timeout:15000 });
-  await expect(opp(a, "Rick")).not.toContainText("(away)", { timeout:30000 });
+  await expect(opp(a, "Rick").locator(".badge.away")).toHaveText("Reconnecting...", { timeout:15000 });
+  await expect(opp(a, "Rick").locator(".badge.away")).toHaveCount(0, { timeout:30000 });
   await b.locator("#hand .card").first().dblclick();
   await expect(opp(a, "Rick").locator(".obf .card")).toHaveCount(1, { timeout:10000 });
   await expect(opp(c, "Rick").locator(".obf .card")).toHaveCount(1, { timeout:30000 });
