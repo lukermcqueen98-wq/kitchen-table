@@ -39,6 +39,16 @@ test("digital table: the turn order (and whose turn it is) can be changed any ti
   await ps[want[next] - 1].click("#nextTurn");
   const keep = ps[want[next] - 1].locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
   await expect.poll(() => luke.evaluate(() => ktPlay.table.turnSeat), { timeout:15000 }).toBe(want[(next + 1) % 3]);
+  // Everyone's lands played this turn show on their name plate, by their hand count (red past one)
+  const plate = (p, n) => p.locator(`.opp[data-seat="${n}"] .ohead`);
+  await expect(plate(ps[1], 1).locator(".ocount.lands")).toHaveText("Lands 0");
+  await luke.evaluate(() => { ktPlay.me.lands = 2; ktPlay.changed(); });
+  for (const p of [ps[1], ps[2]]) {
+    await expect(plate(p, 1).locator(".ocount.lands")).toHaveText("Lands 2", { timeout:15000 });
+    await expect(plate(p, 1).locator(".ocount.lands")).toHaveClass(/warn/);
+    await expect(plate(p, 1).locator(".ocount.lands")).toBeVisible();
+    await expect(plate(p, 1)).toContainText("Hand");
+  }
   for (const p of ps) expect(p.errors).toEqual([]);
   await browser.close();
 });

@@ -313,6 +313,8 @@ main#play.lt [data-slot="R"] .ocmd{top:auto;bottom:6px}
 .sbcols li{margin:3px 0}
 .sbcols li button{width:100%;text-align:left}
 .chip.warn{border-color:var(--danger);color:var(--danger)}
+.ocount.lands{border:1px solid var(--felt-edge);border-radius:8px;padding:0 6px}
+.ocount.lands.warn{border-color:var(--danger);color:var(--danger);font-weight:700}
 #handWrap{grid-area:hand;min-width:0;border-top:1px solid var(--felt-edge);padding:6px 10px;display:flex;gap:10px;align-items:center}
 #hand{flex:1;display:flex;min-height:134px;align-items:flex-end;overflow-x:auto;overflow-y:visible;padding-top:10px}
 #hand .card{--w:124px;position:relative;margin-right:-26px;transition:transform .2s cubic-bezier(.25,.8,.3,1)}
@@ -551,7 +553,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
     max-width:calc(100% - 12px);overflow:hidden;padding:3px 12px;border:1px solid var(--felt-edge);border-radius:999px;background:rgba(15,9,30,.92);font-size:12px}
   main#play.lt [data-slot="L"] .ohead,main#play.lt [data-slot="R"] .ohead,main#play.lt [data-slot="BR"] .ohead{top:auto;bottom:-28px}
   main#play.lt .ohead .oname{order:1} main#play.lt .ohead .olife{order:2;margin-left:0;font-size:18px} main#play.lt .ohead .ocount,main#play.lt .ohead .badge{order:3}
-  main#play.lt .ohead .ocount ~ .ocount{display:none}  /* (the plate: name, life and hand, like across a real table) */
+  main#play.lt .ohead .ocount ~ .ocount:not(.lands){display:none}  /* (the plate: name, life and hand, like across a real table) */
   main#play.lt .obody{position:absolute;inset:0;container-type:size}  /* (the plate sits on the wood just outside the mat) */
   /* (each battlefield the same shape, as big as fits its mat, turned to face its owner) */
   /* (each seat: a strip as long as its mat (from its owner's side) and as deep as a board; the board, the same size for
@@ -2870,7 +2872,10 @@ function renderOpps(){
     };
     const cmdTaken = Object.entries(me.cmd).filter(([k, v]) => k.startsWith(s + ":") && v).reduce((a, [, v]) => a + v, 0);
     o.append(el("div", { className:"ohead" }, pip, el("span", { className:"oname", textContent:p.name }), ...desigBadges(s),
-      el("span", { className:"ocount", textContent:`Hand ${p.hand}` }), el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
+      el("span", { className:"ocount", textContent:`Hand ${p.hand}` }),
+      // (lands they've played this turn, by their hand count; red past one)
+      table.started ? el("span", { className:"ocount lands" + (p.lands > 1 ? " warn" : ""), title:`Lands ${p.name} has played this turn`, textContent:`Lands ${p.lands || 0}` }) : null,
+      el("span", { className:"ocount", textContent:`Library ${p.lib}` }),
       table.started ? el("span", { className:"ocount", title:"Turns they've taken this game", textContent:`Turns ${p.turns || 0}` }) : null,
       p.poison ? el("span", { className:"ocount", textContent:`Poison ${p.poison}` }) : null,
       cmdTaken ? el("span", { className:"badge cmd" + (cmdTaken >= ruleNum("cmdrDmg") - 5 ? " danger" : ""), title:`Commander damage you've taken from ${p.name}'s commander (${ruleNum("cmdrDmg")} knocks you out)`, textContent:`Cmdr hit you: ${cmdTaken}` }) : null,
