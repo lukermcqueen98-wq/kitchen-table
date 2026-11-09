@@ -39,7 +39,7 @@ test("Commander on the digital table: six players, each sees five opponents in t
   }
   for (const p of ps.slice(0, 6)) await expect(p.locator(".opp")).toHaveCount(5, { timeout:30000 });
   await expect(ps[0].locator("#opps")).toHaveClass(/\bmany\b/);
-  await expect(ps[0].locator("#ctrlBox .ctrlhead")).toHaveText("Commander damage you've taken");
+  await expect(ps[0].locator("#cmdGrid .cg-name")).toHaveCount(6);  // (commander damage: a row for each player in the middle)
   await expect(ps[0].locator("#libPile")).toBeInViewport();  // (the commander damage list for five opponents sits below the piles)
   await expect(ps[5].locator(".opp").first()).toContainText("Luke");
   // Long table (the default): you on the near side; the others around it in turn order from your left (left end,

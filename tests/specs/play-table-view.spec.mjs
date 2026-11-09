@@ -576,6 +576,10 @@ test("digital table: inspecting shows both sides of a two-sided card, and cards 
     await expect(p.locator("#popImg2")).toBeVisible();
     expect(await p.evaluate(() => [document.querySelector("#popImg").src, document.querySelector("#popImg2").src].map(u => /\/(\d)\.png/.exec(u)?.[1]))).toEqual(["2", "1"]);
   }
+  // (and the key terms on the face showing, with what they mean, beside it: the wolf's trample)
+  await a.mouse.move(5, 5); await a.locator('#bf .card[data-iid="dfccard"]').hover();
+  await expect(a.locator("#popTerms")).toBeVisible();
+  await expect(a.locator("#popTerms")).toContainText("Trample");
   await a.mouse.move(5, 5);
   // Clicking a card in a list (Luke's graveyard) opens it on top; closing goes back to the list
   await ktp(a, () => { for (let i = 0; i < 2; i++) ktPlay.move(ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card").iid, "gy"); });

@@ -295,6 +295,25 @@ main#play.lt [data-slot="R"] .ocmd{top:auto;bottom:6px}
 .orderlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
 .orderlist li{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--felt-edge);border-radius:10px}
 .orderlist li b{flex:1}
+main#play.lt.cmdgrid #side{display:grid;grid-template-columns:auto auto minmax(0,1fr);grid-template-areas:"life turn grid" "row ctrl grid";row-gap:6px;column-gap:10px;align-items:center;justify-items:start}
+main#play.lt.cmdgrid #side .lifebox{grid-area:life} main#play.lt.cmdgrid #turnToken{grid-area:turn}
+main#play.lt.cmdgrid #side .row{grid-area:row} main#play.lt.cmdgrid #ctrlBox{grid-area:ctrl;justify-content:flex-start}
+main#play.lt.cmdgrid #myBadges{grid-column:1 / -1}
+/* (its height is the two lines', never more: it never pushes the boards) */
+#cmdGrid{grid-area:grid;justify-self:stretch;align-self:stretch;height:0;min-height:100%;box-sizing:border-box;display:grid;column-gap:4px;row-gap:1px;align-items:center;
+  padding:3px 10px !important;border-radius:12px !important;font-size:11px;line-height:1;overflow:hidden}
+#cmdGrid.hidden{display:none}
+#cmdGrid .cg-corner{color:var(--muted);font-size:10px;white-space:nowrap}
+#cmdGrid .cg-head{text-align:center;border-bottom:3px solid var(--pc,#888);padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+#cmdGrid .cg-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px}
+#cmdGrid .cg-n,#cmdGrid .cg-self{text-align:center;font-weight:700}
+#cmdGrid .cg-self{color:#6b5f8c;font-weight:400}
+#cmdGrid .zero{color:#8d82ad;font-weight:400}
+#cmdGrid .danger{background:#ff7d9c;color:#2a0a14;border-radius:5px;font-weight:800}
+#cmdGrid button.cg-n{border:0;background:none;color:inherit;font:inherit;font-weight:700;padding:0;cursor:pointer;border-radius:5px;text-decoration:underline dotted;text-underline-offset:2px}
+#cmdGrid button.cg-n.zero{font-weight:400}
+#cmdGrid button.cg-n.danger{background:#ff7d9c;color:#2a0a14}
+#cmdGrid button.cg-n:hover,#cmdGrid button.cg-n:focus-visible{outline:1px solid var(--brass)}
 .badge.cmd{border-color:#ff7d9c;color:#ff7d9c;font-weight:700}
 .badge.cmd.danger{background:#ff7d9c;color:#2a0a14}
 .ctrl.cmdc{border-left:4px solid var(--pc,#888)}
@@ -479,6 +498,11 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 #pop{position:fixed;z-index:85;pointer-events:none;filter:drop-shadow(0 8px 24px rgba(0,0,0,.7))}
 #pop{display:flex;gap:8px}
 #pop img.hidden{display:none}
+/* (the key terms on the card you're pointing at, beside its picture) */
+#popTerms{flex:none;width:230px;align-self:flex-start;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:rgba(18,11,34,.97);border:1px solid var(--felt-edge);font-size:12px;line-height:1.35;color:var(--parchment);max-height:100%;overflow:hidden}
+#popTerms.hidden{display:none}
+#popTerms b{color:var(--brass);font-size:12.5px}
+#popTerms p{margin:1px 0 0}
 #pop img{flex:1;min-width:0;width:100%;display:block;border-radius:4.75%/3.5%;aspect-ratio:63/88;background:#000}
 .modal-card h2{font:700 22px var(--serif);margin:0 0 10px}
 .grid{display:flex;flex-wrap:wrap;gap:8px}
@@ -847,6 +871,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
         </div>
         <div class="row" style="justify-content:space-between"><span id="landChip" class="chip"></span><span class="hint" id="handCount"></span></div>
         <div id="czone" data-drop="cz"></div>
+        <div id="cmdGrid" class="hidden" role="table" aria-label="Commander damage: who took how much from whose commander"></div>
         <div id="ctrlBox"></div>  <!-- (below the piles, so a long commander damage list at a big table doesn't push them out of view) -->
         <div id="dungeonBox"></div>
       </div>
@@ -861,7 +886,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
 
 <ul id="feed" aria-hidden="true"></ul>
 <div id="menu" class="hidden" role="menu"></div>
-<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""><img id="popImg2" alt="" class="hidden"></div>
+<div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""><img id="popImg2" alt="" class="hidden"><div id="popTerms" class="hidden"></div></div>
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
 <div id="toast" class="hidden" role="status"></div>
 <div id="audios" class="hidden"></div>
@@ -2626,7 +2651,7 @@ function sizeBoards(){
   const bar = $("#combatBar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + g : g;
   const hw = $("#handWrap"), handH = hw && hw.parentElement === play && getComputedStyle(hw).position === "static" ? hw.offsetHeight + g : 0;  // (the hand as a strip under the table)
   const Ha = play.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - handH;
-  const side = $("#side"), top = side?.getBoundingClientRect().top || 0, kids = side ? [...side.children].filter(e => e.offsetParent) : [];
+  const side = $("#side"), top = side?.getBoundingClientRect().top || 0, kids = side ? [...side.children].filter(e => e.offsetParent && e.id !== "cmdGrid") : [];  // (the grid only fills the lines the rest make)
   // (in whole pixels: measured from the layout it sizes, a fraction of a pixel would otherwise creep in and nudge the boards)
   const m = Math.ceil(Math.max(44, ...kids.map(e => e.getBoundingClientRect().bottom - top + 4))), cols = play.classList.contains("lt4") || play.classList.contains("lt5") ? 2 : 1;
   // (the mats' shape: as deep as the table allows, so the seats across and on your side fill its depth too)
@@ -2816,6 +2841,42 @@ function cmdHits(p){
     chip.style.setProperty("--pc", SEAT_HEX[from - 1]); return chip;
   });
 }
+/* Commander damage at the long table: one small grid in the middle, beside your life. A row for each player (the one
+   who took it), a column for each commander (in its player's color); red when that player is within 5 of the amount
+   that knocks them out. Click a number in your own row to change it. It fills the space the middle already has (two
+   lines high), so the boards never move. */
+function renderCmdGrid(on){
+  const g = $("#cmdGrid"); g.classList.toggle("hidden", !on); if (!on) { g.innerHTML = ""; return; }
+  const seats = [mySeat, ...seatsAfter(mySeat, presentSeats()).filter(s => s !== mySeat)];
+  const cz = s => s === mySeat ? [...me.zones.cz, ...me.zones.bf] : [...(players[s]?.cz || []), ...(players[s]?.bf || [])];
+  const cols = seats.flatMap(s => cz(s).filter(c => c.cmdr).map(c => ({ s, iid:c.iid, name:String(c.name || nameOf(c)).split(",")[0] })));
+  const two = s => cols.filter(c => c.s === s).length > 1, lethal = ruleNum("cmdrDmg");
+  const who = s => s === mySeat ? "You" : players[s]?.name || `Seat ${s}`;
+  g.style.gridTemplateColumns = `auto repeat(${Math.max(1, cols.length)}, minmax(0, 1fr))`;
+  g.style.gridTemplateRows = `auto repeat(${seats.length}, minmax(0, 1fr))`;
+  const kids = [el("span", { className:"cg-corner", role:"columnheader", textContent:"took / from" })];
+  for (const c of cols) { const h = el("span", { className:"cg-head", role:"columnheader", title:`${who(c.s) === "You" ? "Your" : who(c.s) + "'s"} commander: ${c.name}`, textContent:two(c.s) ? c.name.slice(0, 9) : (c.s === mySeat ? "Yours" : who(c.s)) }); h.style.setProperty("--pc", SEAT_HEX[c.s - 1]); kids.push(h); }
+  for (const s of seats) {
+    const took = s === mySeat ? me.cmd : players[s]?.cmd || {};
+    kids.push(el("b", { className:"cg-name", role:"rowheader", textContent:who(s) }));
+    for (const c of cols) {
+      if (c.s === s) { kids.push(el("span", { className:"cg-self", ariaHidden:"true", textContent:"·" })); continue; }
+      const key = `${c.s}:${c.iid}`, v = took[key] || 0, cls = "cg-n" + (v ? "" : " zero") + (v >= lethal - 5 ? " danger" : "");
+      const label = `${who(s)} took ${v} from ${who(c.s) === "You" ? "your" : who(c.s) + "'s"} ${c.name}`;
+      if (s === mySeat) { const b = el("button", { type:"button", className:cls + " mine", title:`${label}: click to change`, ariaLabel:`${label}: change`, textContent:v }); b.onclick = () => editCmdDamage(c, key); kids.push(b); }
+      else kids.push(el("span", { className:cls, role:"cell", title:label, textContent:v }));
+    }
+  }
+  g.replaceChildren(...kids);
+}
+function editCmdDamage(c, key){
+  const out = el("b", { textContent:me.cmd[key] || 0, style:"min-width:40px;text-align:center;font-size:22px" });
+  const set = v => { v = Math.max(0, v); const d = v - (me.cmd[key] || 0); if (!d) return; me.cmd[key] = v; me.life -= d;
+    say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${nm(c.s)}).`); changed(); out.textContent = v; };
+  const b = (t, label, d) => { const x = el("button", { type:"button", className:"btn", textContent:t, ariaLabel:label }); x.onclick = () => set((me.cmd[key] || 0) + d); return x; };
+  openModal(`Commander damage from ${c.name}`, el("div", {}, el("p", { className:"hint", textContent:`${nm(c.s)}'s commander. Changing it changes your life too; ${ruleNum("cmdrDmg")} from one commander knocks you out.` }),
+    el("div", { className:"row", style:"gap:10px;align-items:center" }, b("−", "One less", -1), out, b("+", "One more", 1))), [{ label:"Done", primary:true }]);
+}
 function renderOpps(){
   const box = $("#opps"), seats = Object.keys(players).map(Number).sort((a, b) => a - b);
   const order = seatsAfter(mySeat, seats).filter(s => s !== mySeat);
@@ -2945,7 +3006,9 @@ function renderMine(){
   };
   ctrl("Poison", () => me.poison, v => { me.poison = v; }, ruleNum("poison"));
   if (me.energy || settings.showEnergy) ctrl("Energy", () => me.energy, v => { me.energy = v; });
-  const theirCmdrs = FORMATS[table.fmt].cmdr ? presentSeats().filter(s => s !== mySeat).flatMap(s => [...(players[s]?.cz || []), ...(players[s]?.bf || [])].filter(c => c.cmdr).map(c => [s, c])) : [];
+  const gridMode = $("#play").classList.contains("lt") && !!FORMATS[table.fmt].cmdr;
+  $("#play").classList.toggle("cmdgrid", gridMode); renderCmdGrid(gridMode);
+  const theirCmdrs = FORMATS[table.fmt].cmdr && !gridMode ? presentSeats().filter(s => s !== mySeat).flatMap(s => [...(players[s]?.cz || []), ...(players[s]?.bf || [])].filter(c => c.cmdr).map(c => [s, c])) : [];
   if (theirCmdrs.length) box.append(el("div", { className:"ctrlhead", textContent:"Commander damage you've taken" }));
   for (const [s, c] of theirCmdrs) {
     const key = `${s}:${c.iid}`;
@@ -2954,16 +3017,6 @@ function renderMine(){
       if (d) say(`${d > 0 ? "took" : "undid"} ${Math.abs(d)} commander damage from ${c.name} (${players[s]?.name}).`);
     }, ruleNum("cmdrDmg"), `Commander damage from ${c.name} (${players[s]?.name}). Also changes your life.`);
     r.classList.add("cmdc"); r.style.setProperty("--pc", SEAT_HEX[s - 1]);
-  }
-  // (the long table: what each other player has taken, on the same line as your counters in the middle of the table,
-  // so the middle never grows and the boards never move; the line scrolls sideways if it's long)
-  if ($("#play").classList.contains("lt") && FORMATS[table.fmt].cmdr) {
-    const rows = presentSeats().filter(x => x !== mySeat).map(s => [s, cmdHits(players[s])]).filter(([, h]) => h.length);
-    if (rows.length) box.append(el("span", { className:"cmdsep", ariaHidden:"true" }));
-    for (const [s, hits] of rows) {
-      const row = el("div", { className:"ocmd mid", title:`Commander damage ${players[s].name} has taken (${ruleNum("cmdrDmg")} from one commander knocks them out)` }, el("span", { textContent:`${players[s].name} took:` }), ...hits);
-      row.dataset.seat = s; row.style.setProperty("--pc", SEAT_HEX[s - 1]); box.append(row);
-    }
   }
   const db = $("#dungeonBox"); db.innerHTML = "";
   const dc = dungeonCard(mySeat, me.dungeon, true); if (dc) db.append(dc);
@@ -3181,33 +3234,45 @@ document.addEventListener("pointerover", e => {
   else { const img = ce.querySelector("img"); src = img ? img.src.replace("/small/", "/normal/") : ""; id = findPub(iid)?.id || ""; }
   if (!src) return;
   $("#zoomImg").src = src;
-  if (e.pointerType === "mouse" && settings.hoverPop && !drag) { popOut(ce, src); if (!mineC?.fd || !ce.closest("#opps")) bothFaces(ce, id, src, () => hoverIid === iid); }
+  if (e.pointerType === "mouse" && settings.hoverPop && !drag) { popOut(ce, src); if (!mineC?.fd || !ce.closest("#opps")) bothFaces(ce, id, src, () => hoverIid === iid, kwGiven(mineC || findPub(iid) || {})); }
   const face = mineC?.face || 0;
   cardById(id).then(c => { if (c && hoverIid === iid) $("#zoomText").textContent = textOf(c, face); });
 });
 /* Pop-out: the card you're pointing at, large, next to it (on the table, in your hand, and in "Keep this hand?") */
-function popOut(ce, src, back = ""){
-  const pop = $("#pop"), img = $("#popImg"), img2 = $("#popImg2"), r = ce.getBoundingClientRect();
-  // (a double-faced card: both faces side by side, a little smaller each)
-  const one = back ? Math.min(300, (innerWidth - 40) / 2 * 0.9) : Math.min(340, innerWidth * 0.42), w = back ? one * 2 + 8 : one, h = one * 88 / 63;
+function popOut(ce, src, back = "", terms = []){
+  const pop = $("#pop"), img = $("#popImg"), img2 = $("#popImg2"), tl = $("#popTerms"), r = ce.getBoundingClientRect();
+  // (a double-faced card: both faces side by side, a little smaller each; key terms in a column beside them)
+  const tw = terms.length ? 238 : 0;
+  const one = back ? Math.min(300, (innerWidth - 40 - tw) / 2 * 0.9) : Math.min(340, (innerWidth - tw) * 0.42), w = (back ? one * 2 + 8 : one) + tw, h = one * 88 / 63;
   if (r.width >= one * 0.9) { hidePop(); return; }  // (already big)
   if (img.getAttribute("src") !== src) img.src = src;
+  img.style.width = img2.style.width = `${one}px`; img.style.flex = img2.style.flex = "none";
   img2.classList.toggle("hidden", !back); if (back && img2.getAttribute("src") !== back) img2.src = back;
+  tl.classList.toggle("hidden", !terms.length); tl.replaceChildren(...terms.map(t => el("div", {}, el("b", { textContent:t.name }), el("p", { textContent:t.def }))));
   let x = r.right + 12; if (x + w > innerWidth - 8) x = r.left - w - 12; if (x < 8) x = clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8);
   const y = clamp(r.top + r.height / 2 - h / 2, 8, Math.max(8, innerHeight - h - 8));
   pop.style.width = w + "px"; pop.style.left = x + "px"; pop.style.top = y + "px";
   pop.dataset.iid = ce.dataset.iid || ""; pop.classList.remove("hidden");
 }
 function hidePop(){ $("#pop").classList.add("hidden"); }
-// The other face of a double-faced card (transform, modal double-faced): looked up, then shown beside the one you see
-function bothFaces(ce, id, src, still){
+/* Once the card is looked up: the other face of a double-faced card (transform, modal double-faced) beside the one you
+   see, and the key terms on it with what they mean (its keywords, ones given on the table, and terms in its text) */
+function bothFaces(ce, id, src, still, given = []){
   if (!id) return;
   cardById(id).then(c => {
-    const f = faces(c); if (!f || f.length < 2 || !still() || $("#pop").classList.contains("hidden")) return;
-    const all = f.map((x, i) => imgOf(c, i)), base = u => String(u || "").replace(/\/(small|normal|large)\//, "/").split("?")[0];
-    const shown = Math.max(0, all.findIndex(u => base(u) === base(src)));
-    popOut(ce, src, all[(shown + 1) % all.length]);
+    if (!c || !still() || $("#pop").classList.contains("hidden")) return;
+    const f = faces(c), all = f && f.length > 1 ? f.map((x, i) => imgOf(c, i)) : [], base = u => String(u || "").replace(/\/(small|normal|large)\//, "/").split("?")[0];
+    const shown = Math.max(0, all.findIndex(u => base(u) === base(src))), back = all.length ? all[(shown + 1) % all.length] : "";
+    popOut(ce, src, back, cardTerms(c, shown, given));
   });
+}
+function cardTerms(c, face, given){
+  const out = [], seen = new Set(), add = (name, def) => { const k = norm(name); if (def && !seen.has(k)) { seen.add(k); out.push({ name, def }); } };
+  for (const g of given) add(g, termDef(g) || "Given on the table.");
+  const fc = c.card_faces?.[face] || c;
+  for (const k of [...(fc.keywords || []), ...(c.keywords || [])]) add(k, termDef(k));
+  for (const t of termsIn([fc.oracle_text || c.oracle_text || "", fc.type_line || c.type_line || ""].join("\n"))) add(t.name, t.def);
+  return out.slice(0, 6);
 }
 document.addEventListener("pointerout", e => { const ce = e.target.closest?.(".card, .clink"); if (ce && !ce.contains(e.relatedTarget)) hidePop(); });
 document.addEventListener("pointerdown", hidePop, true);

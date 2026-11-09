@@ -2,8 +2,6 @@ import { test, expect } from "@playwright/test";
 import { launchBrowser, newPlayer, settle } from "../support/players.mjs";
 import { BASE } from "../support/global-setup.mjs";
 
-// (in the middle of the table, on the line with your own counters: each other player who has taken some)
-const took = (page, n) => page.locator(`#ctrlBox .ocmd.mid[data-seat="${n}"]`);
 const boards = page => page.evaluate(() => [...document.querySelectorAll("#myFrame, .oframe")].map(e => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }));
 
 test("Commander on the digital table: everyone sees the commander damage each player has taken, in the middle of the table", async () => {
@@ -23,22 +21,28 @@ test("Commander on the digital table: everyone sees the commander damage each pl
   // (once the table has settled after everyone sat down)
   let before = ""; await expect.poll(async () => { const now = JSON.stringify(await boards(luke)); const same = now === before; before = now; return same; }, { timeout:15000, intervals:[700] }).toBe(true);
   before = JSON.parse(before);
-  await expect(luke.locator("#ctrlBox .ocmd.mid")).toHaveCount(0);
+  // (a grid in the middle: a row for each player, a column for each commander)
+  const cell = (page, label) => page.locator(`#cmdGrid [title^="${label}"]`);
+  await expect(luke.locator("#cmdGrid .cg-name")).toHaveText(["You", "Rick", "Sam"]);
+  await expect(cell(luke, "Rick took 0 from your Gamma Card")).toHaveCount(1);
   // Rick has taken 5 from Sam's commander and 18 from Luke's (his own counters)
   await rick.evaluate(() => { const cz = s => ktPlay.players[s].cz[0].iid; ktPlay.me.cmd[`3:${cz(3)}`] = 5; ktPlay.me.cmd[`1:${cz(1)}`] = 18; ktPlay.changed(); });
-  // Luke sees it in the middle: Sam's 5, and his own 18 ("You"), red as it's close to 21
-  const onLuke = took(luke, 2);
-  await expect(onLuke).toContainText("Rick took:", { timeout:15000 });
-  await expect(onLuke).toContainText("Sam 5", { timeout:15000 });
-  await expect(onLuke.locator("b", { hasText:"You 18" })).toHaveClass(/danger/);
+  // Luke sees it in Rick's row: 5 under Sam's commander, 18 under his own, red as it's close to 21
+  await expect(cell(luke, "Rick took 5 from Sam's Gamma Card")).toHaveText("5", { timeout:15000 });
+  await expect(cell(luke, "Rick took 18 from your Gamma Card")).toHaveClass(/danger/);
   // ...and so does Sam
-  await expect(took(sam, 2)).toContainText("Luke 18", { timeout:15000 });
-  await expect(took(sam, 2)).toContainText("You 5");
-  // The boards didn't move or change size: it's on a line the middle already has
+  await expect(cell(sam, "Rick took 18 from Luke's Gamma Card")).toHaveText("18", { timeout:15000 });
+  await expect(cell(sam, "Rick took 5 from your Gamma Card")).toHaveText("5");
+  // The boards didn't move or change size: the grid fills the space the middle already had
   expect(await boards(luke)).toEqual(before);
-  // Nobody else has taken any: no chips on their mats
-  await expect(took(luke, 3)).toHaveCount(0);
   await expect(luke.locator(".opp .ocmd")).toHaveCount(0);  // (not on the mats at the long table)
+  // Luke changes his own (a number in his row): it changes his life too, and everyone sees it
+  await cell(luke, "You took 0 from Sam's Gamma Card").click();
+  await luke.locator(".modal").getByRole("button", { name:"One more" }).click();
+  await luke.locator(".modal").getByRole("button", { name:"One more" }).click();
+  await luke.locator(".modal").getByRole("button", { name:"Done" }).click();
+  await expect(luke.locator("#lifeOut")).toHaveText("38");
+  await expect(cell(rick, "Luke took 2 from Sam's Gamma Card")).toHaveText("2", { timeout:15000 });
   await luke.screenshot({ path:`${process.env.SHOT_DIR || "test-results"}/commander-damage.png` }).catch(() => {});
   for (const p of ps) expect(p.errors).toEqual([]);
   await browser.close();
