@@ -5,7 +5,7 @@ import { BASE } from "../support/global-setup.mjs";
 const ktp = (page, fn, arg) => page.evaluate(fn, arg);
 const boards = page => page.evaluate(() => [...document.querySelectorAll("#myFrame, .oframe")].map(e => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }));
 
-test("digital table: the steps of the turn in the middle, and the tools, log and chat beside the table on a wide screen", async () => {
+test("digital table: the next thing to do in the middle, and the tools, log and chat beside the table on a wide screen", async () => {
   test.setTimeout(120000);
   const browser = await launchBrowser(), ps = []; let room = "";
   for (const name of ["Luke", "Rick", "Sam"]) {
@@ -32,28 +32,27 @@ test("digital table: the steps of the turn in the middle, and the tools, log and
   // (neither panel touches the table)
   expect(await a.evaluate(() => { const d = document.querySelector("#dock").getBoundingClientRect(), p = document.querySelector("#panel").getBoundingClientRect(), fr = [...document.querySelectorAll("#myFrame, .oframe")].map(e => e.getBoundingClientRect());
     return d.right < Math.min(...fr.map(r => r.left)) && p.left > Math.max(...fr.map(r => r.right)); })).toBe(true);
-  // The game starts: the steps of the turn light up in the middle, for everyone; only the player whose turn it is moves them
+  // The game starts: the player whose turn it is has Go to combat and End my turn in the middle; the others see whose turn it is
   await a.locator("#startBtn").click(); await a.locator(".modal").getByRole("button", { name:"Start the game" }).click();
   for (const p of ps) await p.locator(".modal").getByRole("button", { name:"Keep", exact:true }).click();
   const turn = await ktp(a, () => ktPlay.table.turnSeat), me = ps[turn - 1], other = ps[turn % 3];
   await me.setViewportSize({ width:1920, height:910 }); await other.setViewportSize({ width:1920, height:910 });
-  await expect(me.locator("#phaseRow button.on")).toHaveText("Main 1");
-  await expect(other.locator("#phaseRow button").first()).toBeDisabled(); await expect(other.locator("#endTurnBtn")).toBeHidden();
+  await expect(me.locator("#attackBtn")).toHaveText("Go to combat"); await expect(me.locator("#endTurnBtn")).toBeVisible();
+  await expect(other.locator("#attackBtn")).toBeHidden(); await expect(other.locator("#endTurnBtn")).toBeHidden();
+  await expect(me.locator("#phaseRow")).toHaveCount(0);  // (no steps of the turn in the middle)
   await expect(other.locator("#turnToken")).toContainText("is up");
   const before = await boards(me);
   // Draw a card from the dock
   const hand = await me.locator("#hand .card").count();
   await me.locator("#dock #drawBtn").click(); await expect(me.locator("#hand .card")).toHaveCount(hand + 1);
-  // Go to combat: the Combat step lights up on every screen, and the attack panel fills the middle beside your life
+  // Go to combat: the attack panel fills the middle beside your life
   await me.locator("#attackBtn").click();
-  await expect(me.locator("#phaseRow button.on")).toHaveText("Combat"); await expect(other.locator("#phaseRow button.on")).toHaveText("Combat", { timeout:15000 });
   await expect(me.locator("#atkBar .atksteps .on")).toHaveText(/Pick attackers/);
   await expect(me.locator(".opp.atkt")).toHaveCount(2);
   await expect.poll(() => me.evaluate(() => { const l = document.querySelector("#side .lifebox").getBoundingClientRect(), p = document.querySelector("#atkBar .atkside").getBoundingClientRect(), s = document.querySelector("#side").getBoundingClientRect();
     return p.left > l.right && p.top >= s.top - 1 && p.bottom <= s.bottom + 1; })).toBe(true);  // (once it has slid in)
   await me.locator("#atkBar").getByRole("button", { name:"Cancel", exact:true }).click(); await expect(me.locator("#atkBar")).toBeHidden();
-  // A step is a click away, and End my turn passes the turn
-  await me.locator("#phaseRow button", { hasText:"Main 2" }).click(); await expect(other.locator("#phaseRow button.on")).toHaveText("Main 2", { timeout:15000 });
+  // End my turn passes the turn
   expect(await boards(me)).toEqual(before);  // (none of it moved the boards)
   await ktp(me, () => { while (ktPlay.me.zones.hand.length > 7) ktPlay.move(ktPlay.me.zones.hand[0].iid, "lib"); });  // (no discarding down to seven first)
   await me.locator("#endTurnBtn").click();

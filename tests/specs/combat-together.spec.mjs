@@ -54,6 +54,7 @@ test("digital table: combat damage waits for everyone attacked, Interrupt calls 
   await box1.getByRole("button", { name:"Take the damage", exact:true }).click();
   await expect(box1).toContainText(`Waiting for ${n2}`);
   await box2.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await a.locator("#goBox").getByRole("button", { name:"Deal combat damage", exact:true }).click();  // (everyone has answered: the attacker deals the damage)
   await expect(d1.locator("#lifeOut")).toHaveText("17");
   await expect(d2.locator("#lifeOut")).toHaveText("17");
   await expect(a.locator("#bf .card.attacking")).toHaveCount(0);

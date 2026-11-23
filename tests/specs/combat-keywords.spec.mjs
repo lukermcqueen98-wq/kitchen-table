@@ -140,7 +140,8 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   };
   const done = () => box.getByRole("button", { name:"Done: take the damage", exact:true }).click();
   const life = p => p.locator("#lifeOut");
-  const settleCombat = async () => { await expect(box).toBeHidden(); await a.waitForTimeout(1600); };
+  // (the blocks are in: the attacker deals the damage)
+  const settleCombat = async () => { await a.locator("#goBox").getByRole("button", { name:"Deal combat damage", exact:true }).click(); await expect(box).toBeHidden(); await a.waitForTimeout(1600); };
 
   // Trample: a 5/5 trampler blocked by a 2/2 deals 3 to the player, and the 2/2 dies
   const tr = await put(a, { name:"Trampler", pt:"5/5", kw:["Trample"] }), wall = await put(d, { name:"Small Wall", pt:"2/2" });

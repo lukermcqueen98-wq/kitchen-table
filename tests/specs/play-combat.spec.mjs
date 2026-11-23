@@ -79,6 +79,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(box.getByRole("button", { name:"Block with Gamma Card (3/4)" })).toHaveAttribute("aria-pressed", "true");
   await expect(box).toContainText("0 damage to you with these blocks.");
   await box.getByRole("button", { name:"Done: take the damage", exact:true }).click();
+  await a.locator("#goBox").getByRole("button", { name:"Deal combat damage", exact:true }).click();
   await expect(box).toBeHidden();
   await expect(b.locator("#log")).toContainText("You blocked Luke's Gamma Card with Gamma Card.");
   await expect(b.locator("#lifeOut")).toHaveText("20");
@@ -94,6 +95,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await attack();
   await expect(box).toBeVisible();
   await box.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await a.locator("#goBox").getByRole("button", { name:"Deal combat damage", exact:true }).click();
   await expect(b.locator("#lifeOut")).toHaveText("17");
   await expect(a.locator("#log")).toContainText("Rick took 3 combat damage from Gamma Card.");
   // (it got through: it leaves combat, its attack mark and arrow gone on both screens)
@@ -117,6 +119,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(box).toContainText("Test Elder");
   await expect(box).toContainText("3 damage to you if you take it.");
   await box.getByRole("button", { name:"Take the damage", exact:true }).click();
+  await a.locator("#goBox").getByRole("button", { name:"Deal combat damage", exact:true }).click();
   await expect(b.locator("#lifeOut")).toHaveText("14");
   await a.click("#nextTurn");
   // (ending the turn with more than 7 cards asks for discards: keep them)
