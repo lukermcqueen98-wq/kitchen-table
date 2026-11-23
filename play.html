@@ -295,10 +295,27 @@ main#play.lt [data-slot="R"] .ocmd{top:auto;bottom:6px}
 .orderlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
 .orderlist li{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--felt-edge);border-radius:10px}
 .orderlist li b{flex:1}
-main#play.lt.cmdgrid #side{display:grid;grid-template-columns:auto auto minmax(0,1fr);grid-template-areas:"life turn grid" "row ctrl grid";row-gap:6px;column-gap:10px;align-items:center;justify-items:start}
-main#play.lt.cmdgrid #side .lifebox{grid-area:life} main#play.lt.cmdgrid #turnToken{grid-area:turn}
-main#play.lt.cmdgrid #side .row{grid-area:row} main#play.lt.cmdgrid #ctrlBox{grid-area:ctrl;justify-content:flex-start}
-main#play.lt.cmdgrid #myBadges{grid-column:1 / -1}
+/* The middle of the long table, the same two lines whatever is in them (so the boards never move): your life over
+   your counters; the steps of the turn over the one thing to do next; then, in Commander, the damage grid */
+main#play.lt #side{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"life phases row" "ctrl acts acts";grid-template-rows:46px 44px;row-gap:6px;align-content:start;column-gap:10px;align-items:center;justify-items:start;container-type:inline-size}
+main#play.lt.cmdgrid #side{grid-template-columns:auto minmax(0,1fr) auto minmax(0,32%);grid-template-areas:"life phases row grid" "ctrl acts acts grid"}
+main#play.lt #side .lifebox{grid-area:life} main#play.lt #phaseRow{grid-area:phases} main#play.lt #actsRow{grid-area:acts}
+main#play.lt #side .row{grid-area:row;justify-self:end} main#play.lt #ctrlBox{grid-area:ctrl;justify-content:flex-start;max-width:190px}
+main#play.lt #myBadges,main#play.lt #dungeonBox{grid-column:1 / -1}
+main#play.lt #handCount{display:none}  /* (your hand is right there) */
+#phaseRow,#actsRow{display:none}
+main#play.lt #phaseRow{display:flex;gap:4px;padding:3px;overflow:hidden;justify-self:stretch}
+#phaseRow button{flex:1 1 0;min-width:0;border:0;border-radius:999px;padding:4px 6px;font-size:11px;font-weight:600;font-family:inherit;color:var(--muted);background:rgba(255,255,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#phaseRow button.on{background:var(--brass);color:#241602;font-weight:800}
+#phaseRow button:disabled{cursor:default}
+#phaseRow button:not(:disabled):not(.on):hover{background:rgba(255,255,255,.14);color:var(--parchment)}
+main#play.lt #side #actsRow{display:flex;align-items:center;gap:8px;box-sizing:border-box;height:44px;padding:0;border:0;background:none;border-radius:0;overflow:hidden;justify-self:stretch}
+#actsRow .btn{flex:none;height:38px;padding:0 16px;border-radius:999px;white-space:nowrap}
+#actsRow .btn.primary{font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+#actsRow #combatNote{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#actsRow #combatNote:empty{display:none}
+#actsRow.incombat #endTurnBtn{display:none}  /* (your attack is waiting on blocks) */
+@container (max-width:640px){ main#play.lt #phaseRow{display:none} #actsRow #endTurnBtn{display:none} }
 /* (its height is the two lines', never more: it never pushes the boards) */
 #cmdGrid{grid-area:grid;justify-self:stretch;align-self:stretch;height:0;min-height:100%;box-sizing:border-box;display:grid;column-gap:4px;row-gap:1px;align-items:center;
   padding:3px 10px !important;border-radius:12px !important;font-size:11px;line-height:1;overflow:hidden}
@@ -613,7 +630,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #side{grid-area:mid;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 10px;padding:0;border:0;background:none;overflow:visible;min-height:0}
   main#play.lt #side>*{flex-shrink:1;min-width:0;max-width:100%;background:rgba(15,9,30,.9);border:1px solid rgba(0,0,0,.5);border-radius:999px;padding:3px 12px}
   main#play.lt #side>:empty{display:none}
-  main#play.lt #turnToken{display:inline-flex;order:2;background:var(--brass);color:#241602;font-weight:800;padding:8px 26px;box-shadow:0 6px 18px rgba(0,0,0,.55)}
+  main#play.lt #turnToken{display:inline-flex;align-items:center;flex:none;box-sizing:border-box;height:38px;border-radius:999px;background:var(--brass);color:#241602;font-weight:800;padding:0 22px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.5)}
   main#play.lt #side .lifebox{order:1;gap:8px}
   main#play.lt #side .lifebox output{font-size:24px}
   main#play.lt #side .row{order:3;gap:10px}
@@ -626,7 +643,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   main#play.lt #ctrlBox .ctrlhead{display:none}
   main#play.lt #ctrlBox .ctrl{gap:6px}
   main#play.lt #dungeonBox{order:5}
-  main#play.lt #combatBar{grid-area:bar;margin:0}
+  main#play.lt #combatBar{display:none}  /* (its note is in the middle strip) */
   /* (your hand, like Arena: docked at the bottom with just the tops showing; point at it and it rises) */
   main#play.lt #handWrap{position:fixed;left:50%;bottom:0;z-index:50;max-width:calc(100vw - 40px);padding:0 16px;border:0;background:none;
     transform:translate(-50%,calc(100% - 62px));transition:transform .18s ease-out;pointer-events:auto}
@@ -642,6 +659,54 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
   body.handstrip main#play.lt{padding-bottom:10px}
 }
 #turnToken{display:none}
+/* The space beside the table, when there is some: every table tool and game setting as a button on the left (instead
+   of the Table and Game menus), and the card you point at with the log and chat on the right (instead of pop-ups) */
+#dock{display:none}
+body.rails #dock{position:fixed;z-index:41;left:10px;top:60px;bottom:10px;width:var(--rail,180px);box-sizing:border-box;display:flex;flex-direction:column;gap:3px;padding:8px;overflow-y:auto;scrollbar-width:thin;
+  border-radius:14px;background:rgba(15,9,30,.94);border:1px solid var(--felt-edge)}
+#dock .dhead{margin:8px 4px 2px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#dock .dhead:first-child{margin-top:2px}
+#dock .mhead{padding:0 4px 4px;font-size:12px;color:var(--muted)}
+#dock .mitem{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:none;width:100%;min-height:36px;padding:4px 10px;border-radius:9px;text-align:left;font-size:13px;white-space:normal}
+#dock .mitem.hidden{display:none}
+#dock .mitem[data-key]::after{content:attr(data-key);flex:none;padding:1px 6px;border-radius:5px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.35);color:var(--muted);font-size:10px;font-weight:600}
+body.rails details.tmenu,body.rails #logBtn,body.rails #feed,body.rails #panelClose{display:none}
+body.rails aside#panel{display:flex;left:auto;right:10px;top:60px;bottom:10px;width:var(--rail,180px);box-sizing:border-box;z-index:41;border:1px solid var(--felt-edge);border-radius:14px;box-shadow:none;background:rgba(15,9,30,.94);overflow:hidden}
+body.rails #chatForm{flex-wrap:wrap}
+body.rails #chatForm input{min-width:0;flex:1 1 100%}
+/* Attacking at the long table: the middle walks you through it, and every other mat is a place to drop attackers */
+#atkBar.mid{position:fixed;inset:0;z-index:55;display:block;padding:0;border:0;border-radius:0;background:none;box-shadow:none;pointer-events:none;animation:none}
+#atkBar.mid>*{position:fixed;pointer-events:auto;box-sizing:border-box}
+#atkBar.mid .atkdrop{flex:none;min-width:150px;min-height:0;max-width:300px;translate:-50% -50%;align-items:center;text-align:center;padding:6px 12px;border-radius:12px;background:rgba(20,12,40,.95);box-shadow:0 6px 20px rgba(0,0,0,.55)}
+#atkBar.mid .atkdrop .chips{justify-content:center}
+#atkBar .atkall{font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--felt-edge);background:rgba(255,255,255,.06);color:var(--parchment)}
+#atkBar.mid .atkside{flex-direction:column;justify-content:space-between;gap:4px;padding:6px 14px;border-radius:14px;background:rgba(20,12,40,.97);border:2px solid #ff9d6b;box-shadow:0 8px 30px rgba(0,0,0,.5);overflow:hidden;animation:slideDown .26s cubic-bezier(.2,.8,.3,1)}
+.atksteps{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--muted);white-space:nowrap}
+.atksteps span{display:inline-flex;align-items:center;gap:6px}
+.atksteps i{font-style:normal;display:inline-block;width:20px;height:20px;border-radius:50%;border:1px solid var(--felt-edge);box-sizing:border-box;text-align:center;line-height:18px;font-size:11px}
+.atksteps .on{color:var(--brass);font-weight:800}
+.atksteps .on i{background:var(--brass);border-color:var(--brass);color:#241602}
+.atksteps .hint{margin-left:auto;overflow:hidden;text-overflow:ellipsis}
+.atkgo{display:flex;align-items:center;gap:8px}
+.atkgo .sum{flex:1;min-width:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atkgo .sum small{color:var(--muted);font-size:12px}
+.atkgo .btn{flex:none;height:34px;padding:0 16px;border-radius:999px;white-space:nowrap}
+.opp.atkt .oframe{outline:3px dashed var(--pc,#ff9d6b);outline-offset:-3px}
+body.nomotion #atkBar .atkside{animation:none}
+/* Being attacked at the long table: who, with what, and your choices, in the middle (your mat is outlined) */
+#defendBox.mid{transform:none;max-height:none;width:auto;padding:6px 14px;display:flex;flex-direction:column;justify-content:space-between;gap:4px;overflow:hidden;box-sizing:border-box}
+#defendBox.mid .dline{display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden}
+#defendBox.mid h2{margin:0;font-size:15px;white-space:nowrap;flex:none}
+#defendBox.mid .atkrow{flex:0 1 auto;min-width:30px;overflow:hidden;gap:6px;padding:2px 8px 2px 2px;border:0;border-radius:8px;background:rgba(255,255,255,.06);margin:0;flex-wrap:nowrap}
+#defendBox.mid .atkrow img{width:22px}
+#defendBox.mid .atkname{font-size:12px;line-height:1.25;white-space:nowrap}
+#defendBox.mid .atkname small{display:block;color:var(--muted)}
+#defendBox.mid p.hint{margin:0 0 0 auto;flex:none;font-size:12px;white-space:nowrap}
+#defendBox.mid .acts{margin:0;justify-content:flex-start;align-items:center;flex-wrap:nowrap}
+#defendBox.mid .acts .btn{flex:none;height:34px;padding:0 16px;border-radius:999px;white-space:nowrap}
+#defendBox .acts .intr{margin-left:auto;border-color:var(--danger)}
+#defendBox .acts .intrnote{max-width:170px;font-size:11px;line-height:1.3;color:var(--muted)}
+body.attacked #myFrame{outline:3px solid var(--danger);outline-offset:-3px;box-shadow:0 0 18px rgba(255,125,156,.55)}
 /* (motion for everything that opens: dialogs pop, menus drop, combat boxes slide in, buttons give when pressed) */
 @keyframes fadeIn{from{opacity:0}}
 @keyframes popIn{from{opacity:0;transform:translateY(10px) scale(.96)}}
@@ -809,9 +874,10 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
     <div class="topbar">
       <span class="grp"><span class="title">Kitchen Table</span>
         <details class="tmenu playonly"><summary class="btn small">Table</summary><div class="tmenu-pop" role="menu" aria-label="Table">
-          <button role="menuitem" class="btn small mitem playonly" id="undoBtn" title="Undo your last move (Ctrl+Z)">Undo</button>
-          <button role="menuitem" class="btn small mitem" id="untapAllBtn" title="Untap everything you control (U)">Untap everything</button>
-          <button role="menuitem" class="btn small mitem playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
+          <button role="menuitem" class="btn small mitem playonly" id="drawBtn" data-key="D" title="Draw a card from your library (D)">Draw a card</button>
+          <button role="menuitem" class="btn small mitem" id="untapAllBtn" data-key="U" title="Untap everything you control (U)">Untap everything</button>
+          <button role="menuitem" class="btn small mitem playonly" id="undoBtn" data-key="Ctrl Z" title="Undo your last move (Ctrl+Z)">Undo</button>
+          <button role="menuitem" class="btn small mitem playonly" id="rollBtn" data-key="R" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
           <button role="menuitem" class="btn small mitem playonly" id="tokenBtn">Tokens</button>
           <button role="menuitem" class="btn small mitem playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
           <button role="menuitem" class="btn small mitem playonly" id="orderBtn" title="Change the turn order, and whose turn it is, any time">Turn order...</button>
@@ -830,7 +896,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
           <button role="menuitem" class="btn small mitem" id="helpBtn">Help</button>
           <button role="menuitem" class="btn small mitem" id="leaveBtn">Leave</button>
         </div></details>
-        <button class="btn small primary playonly hidden" id="attackBtn" title="Pick which of your creatures attack, and who">Attack</button>
+        <button class="btn small primary playonly hidden" id="attackBtn" title="Pick which of your creatures attack, and who">Go to combat</button>
       </span>
       <span class="grp mid">
         <span class="turnpill" id="turnPill">
@@ -884,6 +950,7 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
   </aside>
 </section>
 
+<nav id="dock" aria-label="Table tools and game settings"></nav>
 <ul id="feed" aria-hidden="true"></ul>
 <div id="menu" class="hidden" role="menu"></div>
 <div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""><img id="popImg2" alt="" class="hidden"><div id="popTerms" class="hidden"></div></div>
@@ -907,6 +974,7 @@ const FORMATS = {
   sixty:{ label:"60-card formats (up to 4 players, 20 life)", short:"60-card", life:20, max:4, cmdr:false }
 };
 const PHASES = ["Untap", "Upkeep", "Draw", "Main 1", "Combat", "Main 2", "End"];
+const PHASE_PILLS = [["Main 1", 3], ["Combat", 4], ["Main 2", 5], ["End", 6]];  // (the steps shown in the middle of the table; a turn starts in the first)
 const COLORS = ["W", "U", "B", "R", "G", "C"], ORDER5 = ["W", "U", "B", "R", "G"];
 const $ = s => document.querySelector(s);
 const store = {
@@ -2641,7 +2709,7 @@ function drawBattlefield(box, list, opts){
    so a board and its cards look the same on every screen */
 function sizeBoards(){
   const play = $("#play");
-  if (!play.classList.contains("lt")) { play.style.removeProperty("grid-template-columns"); play.style.removeProperty("grid-template-rows"); return; }
+  if (!play.classList.contains("lt")) { play.style.removeProperty("grid-template-columns"); play.style.removeProperty("grid-template-rows"); placeRails(); return; }
   /* Every mat the same size (fw: the battlefield's width; the mat is that plus the pile column, and fw / A deep),
      the biggest that fits: the seats across and on your side upright, the end seats turned sideways and running the
      table's depth. Each seat is then exactly its mat, so the mats fill the table with slight borders between them
@@ -2663,6 +2731,7 @@ function sizeBoards(){
   play.style.setProperty("--fw", `${fw}px`); play.style.setProperty("--ba", `${A}`);
   play.style.gridTemplateColumns = `${H}px ${cols === 2 ? `${W}px ${W}px` : `${W}px`} ${H}px`;
   play.style.gridTemplateRows = `${H + P}px ${midRow}px ${H}px auto`;
+  requestAnimationFrame(placeSides);
 }
 addEventListener("resize", () => requestAnimationFrame(sizeBoards));
 /* A shuffle: the player's library pile riffles (its two halves fan apart and snap back) on every screen, when their
@@ -2895,16 +2964,26 @@ function renderOpps(){
   if (lt && side.parentElement === $("#me")) {
     $("#play").append(side);
     const frame = el("div", { id:"myFrame" }); $("#me").prepend(frame); frame.append($("#bf"), $("#czone"), $("#libPile"), $("#gyPile"), $("#exPile"));
-    side.prepend(el("span", { id:"turnToken", role:"status" }));
+    // (the steps of the turn, over the one thing to do next)
+    const steps = el("div", { id:"phaseRow", role:"group", ariaLabel:"Steps of the turn" }, ...PHASE_PILLS.map(([label, ph]) => { const b = el("button", { type:"button", textContent:label }); b.onclick = () => { if (table.phase !== ph) changeTable({ phase:ph }); }; return b; }));
+    const end = el("button", { type:"button", id:"endTurnBtn", className:"btn small", textContent:"End my turn", title:"Pass the turn to the next player" }); end.onclick = () => $("#nextTurn").click();
+    side.append(steps, el("div", { id:"actsRow" }, el("span", { id:"turnToken", role:"status" }), $("#attackBtn"), end, $("#combatNote")));
   }
   if (!lt && side.parentElement !== $("#me")) {
     $("#me").prepend($("#bf")); $("#me").append(side); side.querySelector(".lifebox").after($("#myPiles")); $("#myPiles").append($("#libPile"), $("#gyPile"), $("#exPile")); $("#ctrlBox").before($("#czone"));
-    $("#myFrame")?.remove(); $("#turnToken")?.remove();
+    $("#combatBar").append($("#combatNote")); document.querySelector(".topbar .grp").append($("#attackBtn"));
+    $("#myFrame")?.remove(); $("#phaseRow")?.remove(); $("#actsRow")?.remove();
   }
   if (lt) {
     // (whose turn it is, in the middle of the table)
     $("#me").style.setProperty("--mat", `color-mix(in srgb, ${SEAT_HEX[mySeat - 1]} 32%, #1a1030)`);
+    const myTurn = table.started && table.turnSeat === mySeat && !me.out, lit = Math.max(0, table.phase - 3);
     $("#turnToken").textContent = !table.started ? "Waiting to start" : table.turnSeat === mySeat ? "Your turn" : `${nm(table.turnSeat)} is up`;
+    $("#turnToken").classList.toggle("hidden", myTurn);
+    $("#phaseRow").classList.toggle("hidden", !table.started);
+    [...$("#phaseRow").children].forEach((b, i) => { b.classList.toggle("on", i === lit); b.disabled = !myTurn; b.ariaPressed = String(i === lit); b.title = myTurn ? `Move to ${b.textContent}` : `${b.textContent}: only the player whose turn it is moves this`; });
+    $("#endTurnBtn").classList.toggle("hidden", !myTurn); $("#endTurnBtn").classList.toggle("primary", table.phase >= 5);
+    $("#attackBtn").classList.toggle("primary", table.phase < 5);
   }
   // (open seats at the long table, until the game starts (then it's bare table); alone, the one across from you asks
   // for players)
@@ -2994,7 +3073,7 @@ function renderMine(){
   $("#me").classList.toggle("is-out", !!me.out);
   $("#outBtn").textContent = me.out ? "Back in the game" : "Concede";
   $("#handCount").textContent = `Hand ${z.hand.length}`;
-  const lc = $("#landChip"); lc.textContent = `Lands played: ${me.lands}`; lc.classList.toggle("warn", me.lands > 1);
+  const lc = $("#landChip"); lc.textContent = $("#play").classList.contains("lt") ? `Lands ${me.lands}` : `Lands played: ${me.lands}`; lc.title = "Lands you have played this turn (one a turn, normally)"; lc.classList.toggle("warn", me.lands > 1);
   // Poison, energy, experience, and commander damage from each other player's commander
   const box = $("#ctrlBox"); box.innerHTML = "";
   const ctrl = (label, get, set, lethal, title) => {
@@ -3030,7 +3109,10 @@ function renderCombat(){
   $("#combatBar").classList.toggle("hidden", !attackers.length);
   if (atMe.length > lastAtMe) cue("attack");
   lastAtMe = atMe.length;
-  note.textContent = atMe.length ? `${atMe.length} attacking you` : attackers.length ? `${attackers.length} attacking` : "";
+  const mineAtk = attackers.filter(a => a.s === mySeat), now = mineAtk.length && !atMe.length ? combatNow() : null;
+  const waitOn = now && !resolvedKeys.has(now.key) ? now.defenders.filter(d => answerOf(d)?.key !== now.key).map(nm).join(", ") : "";
+  note.textContent = atMe.length ? `${atMe.length} attacking you` : waitOn ? `Waiting for ${waitOn} to block` : attackers.length ? `${attackers.length} attacking` : "";
+  $("#actsRow")?.classList.toggle("incombat", !!waitOn);
   cancelCombat(); renderDefend(); renderAssign(); renderAtkBar(); resolveCombat();
 }
 // The middle of a round table (4 or 5 opponents): whose turn it is, and the turn order as seats around a circle,
@@ -3178,6 +3260,11 @@ document.addEventListener("pointerup", e => {
   const tag = !d.moved && d.zone === "bf" && e.target.closest?.(".mtag");
   if (tag) { const f = findCard(d.iid); if (f) manaFromTag(f.c, tag.dataset.mana); return; }
   if (!d.moved) { if (d.el.dataset.stack && d.zone === "bf") { if (d.el.dataset.pile === "tapped") untapFromStack(d.el.dataset.stack, 1); else tapFromStack(d.el.dataset.stack, 1); } else clickCard(d.iid, d.zone, e); return; }
+  // (planning an attack: a creature dropped anywhere on a player's mat attacks that player)
+  if (atkPlan && d.zone === "bf" && !document.elementsFromPoint(e.clientX, e.clientY).some(x => x.dataset?.drop?.startsWith("atk:"))) {
+    const o = document.elementsFromPoint(e.clientX, e.clientY).map(x => x.closest?.(".opp[data-seat]")).find(Boolean);
+    if (o) { planAttack(d.iid, +o.dataset.seat); return; }
+  }
   const t = dropTarget(e); if (!t) return;
   const to = t.dataset.drop;
   if (to.startsWith("atk:")) { if (d.zone === "bf" && atkPlan) planAttack(d.iid, +to.slice(4)); return; }
@@ -3289,6 +3376,8 @@ document.addEventListener("keydown", e => {
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
   if (k === "u") untapAll();
+  else if (k === "d" && !me.watch) { if (me.zones.lib.length) draw(1); }
+  else if (k === "r" && !me.watch) $("#rollBtn").click();
   else if (k === "t" && hoverIid) { const f = findCard(hoverIid); if (f?.z === "bf") toggleTap(f.c); }
 });
 
@@ -3970,39 +4059,84 @@ let atkPlan = null;  // (while choosing: creature -> the seat it attacks)
 function startAttack(){
   if (!presentSeats().some(s => s !== mySeat && !isOut(s))) { toast("There's no one to attack."); return; }
   atkPlan = new Map(me.zones.bf.filter(c => c.atk).map(c => [c.iid, c.atk]));
+  if (table.turnSeat === mySeat && table.phase < 4) changeTable({ phase:4 });  // (the Combat step lights up in the middle)
   renderAtkBar();
+}
+// Why a creature of yours can't attack ("" when it can)
+function cantAttack(c){
+  if (!isCreature(c)) return `${nameOf(c)} isn't a creature.`;
+  if (c.tapped && !c.atk) return `${nameOf(c)} is tapped, so it can't attack.`;
+  const kw = combatKw(c);
+  if (kw.has("defender")) return `${nameOf(c)} has defender, so it can't attack.`;
+  if (c.etb === table.turnNum && !kw.has("haste")) return `${nameOf(c)} came in this turn and doesn't have haste, so it can't attack yet.`;
+  return "";
 }
 function planAttack(iid, seat){
   const c = me.zones.bf.find(x => x.iid === iid); if (!c) return;
-  if (!isCreature(c)) { toast(`${nameOf(c)} isn't a creature.`); return; }
-  if (c.tapped && !c.atk) { toast(`${nameOf(c)} is tapped, so it can't attack.`); return; }
-  if (seat) {
-    const kw = combatKw(c);
-    if (kw.has("defender")) { toast(`${nameOf(c)} has defender, so it can't attack.`); return; }
-    if (c.etb === table.turnNum && !kw.has("haste")) { toast(`${nameOf(c)} came in this turn and doesn't have haste, so it can't attack yet.`); return; }
-  }
+  const why = seat ? cantAttack(c) : !isCreature(c) ? `${nameOf(c)} isn't a creature.` : "";
+  if (why) { toast(why); return; }
   if (seat) atkPlan.set(iid, seat); else atkPlan.delete(iid);
   renderAtkBar();
 }
-function renderAtkBar(){
-  const bar = $("#atkBar");
-  if (!atkPlan || !table.started || table.turnSeat !== mySeat || me.out) { atkPlan = null; bar.classList.add("hidden"); document.querySelectorAll("#bf .card.planatk").forEach(x => x.classList.remove("planatk")); return; }
-  const foes = presentSeats().filter(s => s !== mySeat && !isOut(s));
-  for (const [iid, s] of atkPlan) if (!foes.includes(s) || !me.zones.bf.some(c => c.iid === iid)) atkPlan.delete(iid);
-  const sig = JSON.stringify([foes.map(nm), [...atkPlan], me.zones.bf.filter(c => atkPlan.has(c.iid)).map(nameOf)]);
-  if (bar.dataset.sig !== sig || bar.classList.contains("hidden")) { bar.dataset.sig = sig; bar.replaceChildren(...foes.map(s => {
-    const mine = me.zones.bf.filter(c => atkPlan.get(c.iid) === s);
-    const box = el("div", { className:"atkdrop", title:`Drag creatures here to attack ${nm(s)}` }, el("b", { textContent:`Attack ${nm(s)}` }),
-      mine.length ? el("div", { className:"chips" }, ...mine.map(c => { const x = el("button", { type:"button", textContent:`${nameOf(c)} ×`, ariaLabel:`${nameOf(c)} stays home` }); x.onclick = () => planAttack(c.iid, 0); return x; }))
-        : el("span", { className:"hint", textContent:"Drag creatures here" }));
-    box.dataset.drop = `atk:${s}`; box.style.borderColor = SEAT_HEX[s - 1]; return box;
-  }), el("div", { className:"atkside" },
-    (() => { const b = el("button", { type:"button", className:"btn small primary", textContent:`Attack (${atkPlan.size})` }); b.onclick = confirmAttack; return b; })(),
-    (() => { const b = el("button", { type:"button", className:"btn small", textContent:"Cancel" }); b.onclick = () => { atkPlan = null; renderAtkBar(); }; return b; })())); }
-  bar.classList.remove("hidden");
+// The slot in the middle of the long table that the attack and "you're being attacked" panels fill: everything to
+// the right of your life (which stays in view)
+function midSlot(){
+  const side = $("#side"), life = side?.querySelector(".lifebox"); if (!side || !life || !$("#play").classList.contains("lt")) return null;
+  const s = side.getBoundingClientRect(), l = life.getBoundingClientRect(); if (!s.width) return null;
+  const x = Math.max(l.right, $("#ctrlBox").getBoundingClientRect().right || 0) + 10;  // (your life and counters stay in view)
+  return { left:x, top:s.top, width:s.right - x, height:s.height };
+}
+const putAt = (e, r) => { e.style.left = `${r.left}px`; e.style.top = `${r.top}px`; e.style.width = `${r.width}px`; e.style.height = `${r.height}px`; };
+function placeAtkBar(){
+  const bar = $("#atkBar"); if (bar.classList.contains("hidden")) return;
+  const slot = bar.classList.contains("mid") && midSlot();
+  if (slot) {
+    putAt(bar.querySelector(".atkside"), slot);
+    for (const box of bar.querySelectorAll(".atkdrop")) {
+      const f = document.querySelector(`.opp[data-seat="${box.dataset.drop.slice(4)}"] .oframe`)?.getBoundingClientRect(); if (!f?.width) continue;
+      box.style.left = `${f.left + f.width / 2}px`; box.style.top = `${f.top + f.height / 2}px`; box.style.maxWidth = `${Math.max(150, f.width - 24)}px`;
+    }
+    return;
+  }
   const r = $("#bf").getBoundingClientRect();
   bar.style.left = `${Math.max(8, r.left)}px`; bar.style.width = `${Math.min(r.width, innerWidth - 16)}px`;
   bar.style.top = `${Math.max(56, r.top - bar.offsetHeight - 6)}px`;
+}
+function renderAtkBar(){
+  const bar = $("#atkBar");
+  if (!atkPlan || !table.started || table.turnSeat !== mySeat || me.out) {
+    atkPlan = null; bar.classList.add("hidden"); document.querySelectorAll("#bf .card.planatk").forEach(x => x.classList.remove("planatk"));
+    document.querySelectorAll(".opp.atkt").forEach(x => x.classList.remove("atkt")); return;
+  }
+  const foes = presentSeats().filter(s => s !== mySeat && !isOut(s)), mid = !!midSlot();
+  for (const [iid, s] of atkPlan) if (!foes.includes(s) || !me.zones.bf.some(c => c.iid === iid)) atkPlan.delete(iid);
+  const able = me.zones.bf.filter(c => !cantAttack(c));
+  const sig = JSON.stringify([mid, foes.map(nm), [...atkPlan], me.zones.bf.filter(c => atkPlan.has(c.iid)).map(nameOf), able.length]);
+  if (bar.dataset.sig !== sig || bar.classList.contains("hidden")) {
+    bar.dataset.sig = sig; bar.classList.toggle("mid", mid); bar.removeAttribute("style");
+    const send = el("button", { type:"button", className:"btn small primary", textContent:`Send the attack (${atkPlan.size})` }); send.onclick = confirmAttack;
+    const cancel = el("button", { type:"button", className:"btn small", textContent:"Cancel" }); cancel.onclick = () => { atkPlan = null; renderAtkBar(); };
+    // (how hard it hits if nothing blocks: the attackers' power, where it's a plain number)
+    const dmg = [...atkPlan.keys()].reduce((n, iid) => n + (parseInt(players[mySeat]?.bf?.find(c => c.iid === iid)?.pt, 10) || 0), 0);
+    const whom = foes.filter(s => [...atkPlan.values()].includes(s)).map(nm).join(" and ");
+    bar.replaceChildren(...foes.map(s => {
+      const mine = me.zones.bf.filter(c => atkPlan.get(c.iid) === s), rest = able.filter(c => atkPlan.get(c.iid) !== s);
+      const all = el("button", { type:"button", className:"atkall", textContent:"Send everything here", title:`Every creature of yours that can attack goes at ${nm(s)}` });
+      all.onclick = () => { for (const c of able) atkPlan.set(c.iid, s); renderAtkBar(); };
+      const box = el("div", { className:"atkdrop", title:`Drag creatures here to attack ${nm(s)}` }, el("b", { textContent:`Attack ${nm(s)}` }),
+        mine.length ? el("div", { className:"chips" }, ...mine.map(c => { const x = el("button", { type:"button", textContent:`${nameOf(c)} ×`, ariaLabel:`${nameOf(c)} stays home` }); x.onclick = () => planAttack(c.iid, 0); return x; }))
+          : el("span", { className:"hint", textContent:mid ? "Drop creatures on this mat" : "Drag creatures here" }), mid && rest.length ? all : "");
+      box.dataset.drop = `atk:${s}`; box.style.borderColor = SEAT_HEX[s - 1]; return box;
+    }), mid ? el("div", { className:"atkside" },
+        el("div", { className:"atksteps" }, el("span", { className:"on" }, el("i", { textContent:"1" }), "Pick attackers"), el("span", {}, el("i", { textContent:"2" }), "They block"), el("span", {}, el("i", { textContent:"3" }), "Damage"),
+          el("span", { className:"hint", textContent:"Drag creatures onto a player's mat." })),
+        el("div", { className:"atkgo" }, el("span", { className:"sum" }, el("b", { textContent:atkPlan.size ? `${atkPlan.size} creature${atkPlan.size === 1 ? "" : "s"} attacking ${whom}` : "No attackers yet" }),
+          dmg ? el("small", { textContent:` ${dmg} damage if nothing blocks` }) : ""), cancel, send))
+      : el("div", { className:"atkside" }, send, cancel));
+  }
+  bar.classList.remove("hidden");
+  for (const o of document.querySelectorAll(".opp[data-seat]")) o.classList.toggle("atkt", mid && foes.includes(+o.dataset.seat));
+  placeAtkBar();
   document.querySelectorAll("#bf .card").forEach(x => x.classList.toggle("planatk", atkPlan.has(x.dataset.iid)));
 }
 function confirmAttack(){
@@ -4020,6 +4154,29 @@ function confirmAttack(){
 }
 $("#attackBtn").onclick = () => { if (atkPlan) { atkPlan = null; renderAtkBar(); } else startAttack(); };
 addEventListener("resize", () => { if (atkPlan) renderAtkBar(); });
+/* Beside the table: with room to spare there (a wide screen), the Table and Game menus open out as a column of
+   buttons on the left, and the log, chat and the card you point at stay open on the right */
+function placeRails(){
+  const fr = [...document.querySelectorAll("#myFrame, .oframe, .waitmat")].map(e => e.getBoundingClientRect()).filter(r => r.width);
+  let w = 0;
+  if ($("#play").classList.contains("lt") && fr.length && !$("#play").closest(".hidden")) {
+    const gut = Math.min(Math.min(...fr.map(r => r.left)), innerWidth - Math.max(...fr.map(r => r.right))) - 14;  // (to the table's edge)
+    if (gut >= 168) w = Math.min(gut - 20, 250);
+  }
+  const on = w > 0, dock = $("#dock");
+  if (on) document.body.style.setProperty("--rail", `${Math.round(w)}px`);
+  if (on === document.body.classList.contains("rails")) return;
+  document.body.classList.toggle("rails", on);
+  const pops = [...document.querySelectorAll(".tmenu-pop")];
+  if (on) {
+    document.querySelectorAll(".tmenu[open]").forEach(d => { d.open = false; });
+    pops.forEach((pop, i) => { const kids = [...pop.children]; kids.forEach(k => { k.dataset.pop = i; }); dock.append(el("span", { className:"dhead", textContent:pop.getAttribute("aria-label") === "Game" ? "This game" : "Table tools" }), ...kids); });
+  } else {
+    for (const k of [...dock.children]) if (k.dataset.pop !== undefined) pops[+k.dataset.pop].append(k);
+    dock.replaceChildren();
+  }
+}
+function placeSides(){ placeRails(); placeAtkBar(); placeDefend(); }
 /* Being attacked: a box at the top (your battlefield stays in view) with the attackers. Take the damage, or Respond:
    cast spells and so on as usual, pick blockers, then take the damage from the ones not blocked. */
 /* An attack: every attacking creature not yet dealt with, and the players it attacks. Each player attacked answers in
@@ -4166,19 +4323,26 @@ function cancelCombat(){
     if (c.blk && theirs.has(c.blk)) { c.blk = ""; ch = true; }
   }
   if (ch) { me.arrows = (me.arrows || []).filter(r => !mine.has(r.from)); changed(); }
-  if (!me.watch) $("#defendBox").classList.add("hidden");
+  if (!me.watch) { $("#defendBox").classList.add("hidden"); document.body.classList.remove("attacked"); }
+}
+// (at the long table the "you're being attacked" box sits in the middle until you choose blockers)
+function placeDefend(){
+  const box = $("#defendBox"); if (box.classList.contains("hidden")) return;
+  const slot = box.classList.contains("mid") && midSlot();
+  if (slot) putAt(box, slot); else { box.classList.remove("mid"); box.removeAttribute("style"); }
 }
 function renderDefend(){
   const box = $("#defendBox"), { atk:all, key, defenders } = combatNow();
   const atk = all.filter(a => a.d === mySeat);
-  if (!atk.length || !defenders.includes(mySeat) || resolvedKeys.has(key)) { box.classList.add("hidden"); return; }
+  if (!atk.length || !defenders.includes(mySeat) || resolvedKeys.has(key)) { box.classList.add("hidden"); document.body.classList.remove("attacked"); return; }
   if (key !== defend.key) defend = { key, mode:"ask", blocks:{} };
   if (me.cresp?.key === key) defend.mode = "wait";
   const answering = defenders.filter(d => d !== mySeat && answerOf(d)?.key !== key).map(nm).join(", ");
   const dividing = !answering && defenders.every(d => answerOf(d)?.key === key) ? [...new Set(multiBlocked(atk.length ? all : [], key).filter(f => assignOf(f.a.s)?.key !== key).map(f => nm(f.a.s)))].join(", ") : "";
   const waitingOn = answering || dividing;
-  const sig = `${key}|${defend.mode}|${waitingOn}|${JSON.stringify(defend.blocks)}`;
-  if (!box.classList.contains("hidden") && box.dataset.sig === sig) return;
+  const compact = defend.mode !== "respond" && !!midSlot();
+  const sig = `${key}|${defend.mode}|${waitingOn}|${JSON.stringify(defend.blocks)}|${compact}`;
+  if (!box.classList.contains("hidden") && box.dataset.sig === sig) { placeDefend(); return; }
   box.dataset.sig = sig;
   const blocksOf = a => defend.blocks[a.c.iid] || [];
   const myBlockers = (players[mySeat]?.bf || []).filter(c => !c.tapped && me.zones.bf.some(x => x.iid === c.iid && isCreature(x)));
@@ -4225,14 +4389,18 @@ function renderDefend(){
   const btn = (label, fn, primary) => { const b = el("button", { type:"button", className:"btn" + (primary ? " primary" : ""), textContent:label }); b.onclick = fn; return b; };
   const interrupt = btn("Interrupt", () => { me.cpause = key; say("interrupted the attack: it's called off for everyone, with no combat damage. Sort out what happens next by hand."); changed(); });
   interrupt.title = "Call off the whole attack, for everyone, before any damage (to cast an instant, say); then sort out what happens by hand";
-  const acts = el("div", { className:"acts" }, interrupt, ...(defend.mode === "ask"
-    ? [btn("Respond", () => { defend.mode = "respond"; renderDefend(); }), btn("Take the damage", answer, true)]
+  interrupt.classList.add("intr");
+  const acts = el("div", { className:"acts" }, ...(defend.mode === "ask"
+    ? [btn("Choose blockers", () => { defend.mode = "respond"; renderDefend(); }, myBlockers.length > 0), btn("Take the damage", answer, !myBlockers.length)]
     : defend.mode === "respond" ? [btn("Back", () => { defend.mode = "ask"; defend.blocks = {}; box.dataset.sig = ""; renderDefend(); }), btn("Done: take the damage", answer, true)]
-    : [el("span", { className:"hint", textContent:answering ? `Waiting for ${answering} to answer: all combat damage happens at once.` : dividing ? `Waiting for ${dividing} to divide damage among your blockers.` : "Combat damage..." })]));
-  box.replaceChildren(el("h2", { textContent:"You're being attacked" }),
+    : [el("span", { className:"hint", textContent:answering ? `Waiting for ${answering} to answer: all combat damage happens at once.` : dividing ? `Waiting for ${dividing} to divide damage among your blockers.` : "Combat damage..." })]),
+    interrupt, el("span", { className:"intrnote", textContent:"Calls off the whole attack so you can respond first." }));
+  box.classList.toggle("mid", compact);
+  if (compact) box.replaceChildren(el("div", { className:"dline" }, el("h2", { textContent:"You're being attacked" }), ...rows, total), acts);
+  else box.replaceChildren(el("h2", { textContent:"You're being attacked" }),
     ...(defend.mode === "respond" ? [el("p", { className:"hint", textContent:"Cast spells and use abilities as usual. Pick blockers for any attacker (click your creatures), then Done." })] : []),
     ...rows, total, acts);
-  box.classList.remove("hidden");
+  box.classList.remove("hidden"); document.body.classList.add("attacked"); placeDefend();
 }
 // Everyone attacked has answered: the damage, all at once, on every screen. Each player then sees to their own side:
 // life, poison and commander damage taken, their creatures that died (to the graveyard), -1/-1 counters, life gained
@@ -4243,6 +4411,7 @@ function resolveCombat(){
   if (multi.some(f => assignOf(f.a.s)?.key !== key)) return;  // (an attacker's player is still dividing its damage)
   resolvedKeys.add(key);
   for (const a of atk) resolvedAtk.add(a.c.iid);
+  if (table.turnSeat === mySeat && table.phase === 4 && !me.watch) setTimeout(() => { if (table.turnSeat === mySeat && table.phase === 4) changeTable({ phase:5 }); }, 1200);  // (combat's over: the second main step)
   const assigns = Object.fromEntries(multi.map(f => [f.a.c.iid, assignOf(f.a.s)?.as?.[f.a.c.iid]]).filter(([, m]) => m));
   const r = fight(pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]), assigns);
   const fought = pairsOf(atk.filter(a => defenders.includes(a.d)), a => answerOf(a.d)?.blocks?.[a.c.iid]);
@@ -4530,6 +4699,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".tmenu[open]").forEach(d => { d.open = false; }); });
 $("#untapAllBtn").onclick = () => untapAll();
+$("#drawBtn").onclick = () => { if (me.zones.lib.length) draw(1); else toast("Your library is empty."); };
 $("#termsBtn").onclick = () => {
   const ui = window.KT_termsUI();
   openModal("Magic terms", ui.el);
@@ -4746,8 +4916,8 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
-    el("p", { innerHTML:"<b>Combat</b>: on your turn, <b>Attack</b> at the top lists your creatures; pick the player each one attacks. The player attacked gets a box at the top: <b>Take the damage</b>, or <b>Respond</b> to cast spells and pick blockers first. Creatures fighting each other is up to you. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
-    el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. The log and chat open from <b>Log &amp; chat</b> at the top; while it's closed, new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
+    el("p", { innerHTML:"<b>Combat</b>: on your turn, <b>Go to combat</b> in the middle of the table outlines every other player's mat; drag each attacker onto the mat of the player it attacks, then <b>Send the attack</b>. The player attacked gets their choices in the middle: <b>Take the damage</b>, <b>Choose blockers</b> (cast spells first if you like), or <b>Interrupt</b>, which calls off the whole attack. Creatures fighting each other is up to you. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
+    el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. On a wide screen every tool is a button to the left of the table (D draws, U untaps everything, R rolls dice) and the log and chat stay open on the right; otherwise they're in the <b>Table</b> and <b>Game</b> menus and <b>Log &amp; chat</b> at the top, and new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
     s("hoverPop", "Enlarge a card when I point at it"),

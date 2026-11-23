@@ -29,7 +29,7 @@ test("digital table: combat damage waits for everyone attacked, Interrupt calls 
   await a.click("#attackBtn");
   await dragTo(a, a.locator(`#bf .card[data-iid="${x}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${n1}` }));
   await dragTo(a, a.locator(`#bf .card[data-iid="${y}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${n2}` }));
-  await a.locator("#atkBar").getByRole("button", { name:"Attack (2)", exact:true }).click();
+  await a.locator("#atkBar").getByRole("button", { name:"Send the attack (2)", exact:true }).click();
   // The first takes the damage: nothing happens yet, his box waits for the other
   const box1 = d1.locator("#defendBox"), box2 = d2.locator("#defendBox");
   await box1.getByRole("button", { name:"Take the damage", exact:true }).click();
@@ -50,7 +50,7 @@ test("digital table: combat damage waits for everyone attacked, Interrupt calls 
   await a.click("#attackBtn");
   await dragTo(a, a.locator(`#bf .card[data-iid="${x}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${n1}` }));
   await dragTo(a, a.locator(`#bf .card[data-iid="${y}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${n2}` }));
-  await a.locator("#atkBar").getByRole("button", { name:"Attack (2)", exact:true }).click();
+  await a.locator("#atkBar").getByRole("button", { name:"Send the attack (2)", exact:true }).click();
   await box1.getByRole("button", { name:"Take the damage", exact:true }).click();
   await expect(box1).toContainText(`Waiting for ${n2}`);
   await box2.getByRole("button", { name:"Take the damage", exact:true }).click();

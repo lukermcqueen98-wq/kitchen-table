@@ -131,11 +131,11 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   const attack = async (iids) => {
     await a.click("#attackBtn");
     for (const iid of iids) await dragTo(a, a.locator(`#bf .card[data-iid="${iid}"]`), a.locator("#atkBar .atkdrop").first());
-    await a.locator("#atkBar").getByRole("button", { name:`Attack (${iids.length})`, exact:true }).click();
+    await a.locator("#atkBar").getByRole("button", { name:`Send the attack (${iids.length})`, exact:true }).click();
     await expect(box).toBeVisible();
   };
   const block = async (...names) => {
-    await box.getByRole("button", { name:"Respond", exact:true }).click();
+    await box.getByRole("button", { name:"Choose blockers", exact:true }).click();
     for (const nm of names) await box.getByRole("button", { name:new RegExp(`^Block with ${nm} `) }).first().click();
   };
   const done = () => box.getByRole("button", { name:"Done: take the damage", exact:true }).click();
@@ -174,7 +174,7 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   // Flying: a ground creature can't block it, one with reach can
   const fl = await put(a, { name:"Flyer", pt:"2/2", kw:["Flying"] }), sp = await put(d, { name:"Spider", pt:"1/4", kw:["Reach"] });
   await attack([fl]);
-  await box.getByRole("button", { name:"Respond", exact:true }).click();
+  await box.getByRole("button", { name:"Choose blockers", exact:true }).click();
   await expect(box.getByRole("button", { name:/^Block with Guard Two / })).toBeDisabled();
   await expect(box.getByRole("button", { name:/^Block with Spider / })).toBeEnabled();
   await box.getByRole("button", { name:/^Block with Spider / }).click();
@@ -189,7 +189,7 @@ test("combat in a game: trample, menace, flying and reach, haste, defender, vigi
   await dragTo(a, a.locator(`#bf .card[data-iid="${def}"]`), a.locator("#atkBar .atkdrop").first());
   await expect(a.locator("#toast, .toast").last()).toContainText("defender");
   await dragTo(a, a.locator(`#bf .card[data-iid="${quick}"]`), a.locator("#atkBar .atkdrop").first());
-  await a.locator("#atkBar").getByRole("button", { name:"Attack (1)", exact:true }).click();
+  await a.locator("#atkBar").getByRole("button", { name:"Send the attack (1)", exact:true }).click();
   await expect(a.locator(`#bf .card[data-iid="${quick}"].tapped`)).toHaveCount(0);   // (vigilance)
   await box.getByRole("button", { name:"Take the damage", exact:true }).click(); await settleCombat();
   await expect(life(d)).toHaveText("15");
