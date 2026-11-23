@@ -27,16 +27,13 @@ test("digital table: players who are out are skipped in turn order (0 life, or c
   const turn = () => ktp(a, () => ktPlay.table.turnSeat);
   const pass = async () => { const s = await turn(), n = await ktp(a, () => ktPlay.table.turnNum); await pages[s - 1].click("#nextTurn"); await keepHand(pages[s - 1]); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
 
-  // Maximum hand size: ending his turn with 9 cards, Luke discards 2 first
+  // No maximum hand size is applied: ending his turn with 9 cards just passes the turn (discarding is by hand)
   while (await turn() !== 1) await pass();
   await ktp(a, () => { ktPlay.draw(9 - ktPlay.me.zones.hand.length, true); });
   const n0 = await ktp(a, () => ktPlay.table.turnNum);
   await a.click("#nextTurn");
-  await expect(a.locator(".modal-card h2")).toHaveText("Discard 2 (you have 9, the most at the end of your turn is 7)");
-  for (const i of [0, 1]) await a.locator(".modal .gcard").nth(i).getByRole("button", { name:"Discard" }).click();
-  await button(a, "Done");
   await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n0 + 1);
-  expect(await ktp(a, () => ktPlay.me.zones.hand.length)).toBe(7);
+  expect(await ktp(a, () => ktPlay.me.zones.hand.length)).toBe(9);
 
   // Sam hits 0 life on his own turn: he's asked, says he's out, and his turn passes on by itself
   while (await turn() !== 3) await pass();

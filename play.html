@@ -1906,10 +1906,6 @@ function afterTable(before){
     me.life = FORMATS[table.fmt].life; if (!FORMATS[table.fmt].cmdr) { me.zones.cz = []; } else if (!me.zones.cz.length) me.zones.cz = cmdrIds.map(id => newCard(id, { cmdr:true, tax:0 }));
     changed(); if (!FORMATS[table.fmt].cmdr || FORMATS[before.fmt].cmdr) setTimeout(checkMyDeck, 400);  // (a switch to Commander asks for the commander first)
   }
-  // The monarch draws at the beginning of their end step (here: when their turn passes); a rule, so always
-  if (table.started && before.turnSeat === mySeat && before.turnNum !== table.turnNum && table.gameId === before.gameId && table.monarch === mySeat && me.gameId === table.gameId) {
-    withoutUndo(() => { draw(1, true); say("drew a card for being the monarch (end step)."); changed(); });
-  }
   if (before.day !== table.day && table.gameId === before.gameId) matchDayNight();
   // Taking the initiative (from the menu, or a player leaving) ventures into the Undercity
   if (table.started && table.initiative === mySeat && before.initiative !== mySeat && table.gameId === before.gameId && before.gameId) setTimeout(() => venture("took the initiative"), 50);
@@ -3789,7 +3785,7 @@ function sideboardDialog(done, cancel){
 $("#sideBtn").onclick = () => sideboardDialog(() => { if (table.started && me.gameId === table.gameId) toast("Your new deck is used from the next game."); });
 
 /* The monarch, the initiative, and day and night: kept with the table, so everyone sees them. A player who deals
-   combat damage to the monarch (or the initiative's holder) takes it from this menu; the monarch draws as their turn ends. */
+   combat damage to the monarch (or the initiative's holder) takes it from this menu; the monarch draws their own card. */
 /* Turn order, any time: move players up and down the list (the table lays itself out around you in this order too),
    and pick whose turn it is now if that should change as well; everyone gets the new order */
 $("#orderBtn").onclick = () => {
