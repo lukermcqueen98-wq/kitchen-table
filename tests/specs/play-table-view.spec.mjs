@@ -114,12 +114,11 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   await expect(hisCard).toContainText("🗝 Initiative");
   expect(await a.evaluate(() => { const l = document.querySelector("#landChip").getBoundingClientRect(), d = document.querySelector("#dungeonBox .dungeon").getBoundingClientRect(); return d.top >= l.bottom || d.bottom <= l.top || d.left >= l.right || d.right <= l.left; })).toBe(true);  // (not covering it)
 
-  // Day and night: it's day; Rick casts nothing on his turn, so as the next turn begins it becomes night
+  // Day and night are by hand: it's day, and it stays day as turns pass until someone changes it
   await tool(a, "#desigBtn"); await a.getByRole("menuitem", { name:"It becomes day", exact:true }).click();
   await expect(b.locator("#dayChip")).toHaveText("☀ Day");
   await pass(b);
-  await expect(a.locator("#log")).toContainText("It becomes night (Rick cast no spells last turn).");
-  for (const p of [a, b]) await expect(p.locator("#dayChip")).toHaveText("☾ Night");
+  for (const p of [a, b]) await expect(p.locator("#dayChip")).toHaveText("☀ Day");
 
   // Luke's upkeep with the initiative: venture again, choosing where the map splits
   await expect(a.locator(".modal-card h2")).toHaveText("Venture into the Undercity");
@@ -128,11 +127,10 @@ test("digital table: the initiative's Undercity card for everyone, and day and n
   await button(a, "I'll do it myself");
   await expect(hisCard.locator(".droom.here")).toHaveText("Lost Well");
 
-  // Luke casts two spells this turn, so as the next turn begins it becomes day again
+  // Luke casts two spells this turn: nothing changes by itself
   for (let i = 0; i < 2; i++) await ktp(a, () => { const c = ktPlay.me.zones.lib.find(c => ktPlay.cards.get(c.id)?.name === "Gamma Card"); ktPlay.move(c.iid, "hand"); ktPlay.move(c.iid, "bf"); });
   await expect.poll(() => ktp(b, () => ktPlay.table.spells)).toBe(2);
   await pass(a);
-  await expect(b.locator("#log")).toContainText("It becomes day (Luke cast 2 spells last turn).");
   await expect(b.locator("#dayChip")).toHaveText("☀ Day");
 
   // Rick hits Luke (combat is by hand) and takes the initiative: he ventures into his own Undercity
@@ -518,7 +516,6 @@ test("digital table: attacking by hand, each creature at its own opponent (arrow
   while (await ktp(a, () => ktPlay.table.turnSeat) !== 1) {
     const t = await ktp(a, () => ktPlay.table.turnSeat), p = [a, b, c][t - 1];
     await p.click("#nextTurn");
-    const keep = p.locator(".modal").getByRole("button", { name:"Keep them (no maximum hand size)" }); if (await keep.isVisible().catch(() => false)) await keep.click();
     await expect.poll(() => ktp(a, () => ktPlay.table.turnSeat)).not.toBe(t);
   }
   await attack([[three[0], "Rick"], [three[1], "Sam"]]);
