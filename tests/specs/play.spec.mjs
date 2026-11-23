@@ -116,14 +116,13 @@ test("digital table: first-visit choice, decklists, dealing and mulligans, playi
   await expect(opp(b, "Luke").locator(".olife")).toHaveText("37");
   await expect(b.locator("#log li", { hasText:"Luke lost 3 life (40 → 37)" })).toHaveCount(1, { timeout:5000 });
 
-  // Turns: passing to the other player untaps their permanents and draws them a card
+  // Turns: passing to the other player makes it their turn, and that's all: they untap and draw themselves
   const first = await ktp(a, () => ktPlay.table.turnSeat);
   const [active, other] = first === 1 ? [a, b] : [b, a];
   const libBefore = await ktp(other, () => ktPlay.me.zones.lib.length);
   await active.click("#nextTurn");
-  await expect.poll(() => ktp(other, () => ktPlay.me.zones.lib.length)).toBe(libBefore - 1);
   await expect(other.locator("#turnInfo")).toContainText("Your turn (2)");
-  if (other === a) await expect(a.locator("#bf .card.tapped")).toHaveCount(0);
+  await other.waitForTimeout(500); expect(await ktp(other, () => ktPlay.me.zones.lib.length)).toBe(libBefore);
 
   // Library tools: scry 2, keeping both on top in a new order
   await a.locator("#libPile").click({ button:"right" });

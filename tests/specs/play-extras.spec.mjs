@@ -99,22 +99,22 @@ test("digital table: deck check, house rules, sideboarding, pop-out cards, power
   await tool(a, "#desigBtn"); await menu(a, "It becomes night");
   await expect(b.locator("#dayChip")).toHaveText("☾ Night");
 
-  // Turns: Rick's tab is in the background, so his turn starting chimes and notifies; the monarch draws as his turn
-  // ends; and "until end of turn" changes wear off
+  // Turns: Rick's tab is in the background, so his turn starting chimes and notifies; and "until end of turn"
+  // changes wear off
   await ktp(b, () => {
     Object.defineProperty(document, "hidden", { configurable:true, get:() => true });
     window.__notes = []; window.Notification = class { static permission = "granted"; constructor(t){ window.__notes.push(t); } };
   });
   const pass = async (page) => { const n = await ktp(a, () => ktPlay.table.turnNum); await page.click("#nextTurn"); await keepHand(page); await expect.poll(() => ktp(a, () => ktPlay.table.turnNum)).toBe(n + 1); };
-  if (await ktp(a, () => ktPlay.table.turnSeat) === 2) { await pass(b); await expect(a.locator("#log")).toContainText("Rick drew a card for being the monarch (end step)."); }
+  if (await ktp(a, () => ktPlay.table.turnSeat) === 2) await pass(b);
   await pass(a);
   await expect(pt).toHaveText("2/3");  // (the +2/+2 wore off; the counter stays)
   await expect.poll(() => ktp(b, () => window.__notes)).toEqual(["Your turn"]);
   expect(await ktp(b, () => ktPlay.alerts)).toEqual(["Your turn"]);
   await expect(b).toHaveTitle(/^● Your turn/);
   const hand = await ktp(b, () => ktPlay.me.zones.hand.length);
-  await pass(b);
-  await expect.poll(() => ktp(b, () => ktPlay.me.zones.hand.length)).toBe(hand + 1);
+  await pass(b); await b.waitForTimeout(500);
+  expect(await ktp(b, () => ktPlay.me.zones.hand.length)).toBe(hand);  // (the monarch draws their own card: nothing is drawn for them)
   // Rick, the monarch, leaves the game: the monarch passes to the player whose turn it is (or the next one)
   await expect(b.locator("#myBadges .badge")).toHaveText("👑 Monarch");
   await tool(b, "#leaveBtn");
