@@ -511,7 +511,7 @@ test("digital table: attacking by hand, each creature at its own opponent (arrow
   const attack = async (plan) => {
     await a.click("#attackBtn");
     for (const [iid, who] of plan) await dragTo(a, a.locator(`#bf .card[data-iid="${iid}"]`), a.locator("#atkBar .atkdrop", { hasText:`Attack ${who}` }));
-    await a.locator("#atkBar").getByRole("button", { name:/^Attack \(/ }).click();
+    await a.locator("#atkBar").getByRole("button", { name:/^Send the attack \(/ }).click();
   };
   // One at Rick, one at Sam, one stays home: an arrow for each, on every screen
   // (Attack is on Luke's turn: pass to him; ending a turn with 8 cards asks for a discard, and they keep them)

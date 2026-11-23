@@ -61,7 +61,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
     await a.click("#attackBtn");
     await dragTo(a, a.locator(`#bf .card[data-iid="${bear}"]`), a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" }));
     await expect(a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" })).toContainText("Gamma Card");
-    await a.locator("#atkBar").getByRole("button", { name:"Attack (1)", exact:true }).click();
+    await a.locator("#atkBar").getByRole("button", { name:"Send the attack (1)", exact:true }).click();
     await expect(a.locator("#atkBar")).toBeHidden();
   };
   await attack();
@@ -74,7 +74,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   const box = b.locator("#defendBox");
   await expect(box).toContainText("You're being attacked");
   await expect(box).toContainText("3 damage to you if you take it.");
-  await box.getByRole("button", { name:"Respond", exact:true }).click();
+  await box.getByRole("button", { name:"Choose blockers", exact:true }).click();
   await box.getByRole("button", { name:"Block with Gamma Card (3/4)" }).click();  // (his creatures, as cards)
   await expect(box.getByRole("button", { name:"Block with Gamma Card (3/4)" })).toHaveAttribute("aria-pressed", "true");
   await expect(box).toContainText("0 damage to you with these blocks.");
@@ -113,7 +113,7 @@ test("digital table: undo, casting, and combat by hand (arrows)", async () => {
   await expect(a.locator('#bf .card[data-iid="eldercard"] .pt')).toHaveText("3/3");
   await a.click("#attackBtn");
   await dragTo(a, a.locator('#bf .card[data-iid="eldercard"]'), a.locator("#atkBar .atkdrop", { hasText:"Attack Rick" }));
-  await a.locator("#atkBar").getByRole("button", { name:/^Attack \(/ }).click();
+  await a.locator("#atkBar").getByRole("button", { name:/^Send the attack \(/ }).click();
   await expect(box).toContainText("Test Elder");
   await expect(box).toContainText("3 damage to you if you take it.");
   await box.getByRole("button", { name:"Take the damage", exact:true }).click();
