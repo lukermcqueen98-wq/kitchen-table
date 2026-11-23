@@ -304,8 +304,8 @@ main#play.lt #side .row{grid-area:row;justify-self:end} main#play.lt #ctrlBox{gr
 main#play.lt #myBadges,main#play.lt #dungeonBox{grid-column:1 / -1}
 main#play.lt #handCount{display:none}  /* (your hand is right there) */
 #phaseRow,#actsRow{display:none}
-main#play.lt #phaseRow{display:flex;gap:4px;padding:3px;overflow:hidden;justify-self:stretch}
-#phaseRow button{flex:1 1 0;min-width:0;border:0;border-radius:999px;padding:4px 6px;font-size:11px;font-weight:600;font-family:inherit;color:var(--muted);background:rgba(255,255,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main#play.lt #side #phaseRow{display:flex;gap:3px;padding:3px;overflow:hidden;justify-self:stretch}
+#phaseRow button{flex:1 1 0;min-width:0;border:0;border-radius:999px;padding:4px 2px;font-size:11px;font-weight:600;font-family:inherit;color:var(--muted);background:rgba(255,255,255,.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #phaseRow button.on{background:var(--brass);color:#241602;font-weight:800}
 #phaseRow button:disabled{cursor:default}
 #phaseRow button:not(:disabled):not(.on):hover{background:rgba(255,255,255,.14);color:var(--parchment)}
@@ -315,7 +315,8 @@ main#play.lt #side #actsRow{display:flex;align-items:center;gap:8px;box-sizing:b
 #actsRow #combatNote{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #actsRow #combatNote:empty{display:none}
 #actsRow.incombat #endTurnBtn{display:none}  /* (your attack is waiting on blocks) */
-@container (max-width:640px){ main#play.lt #phaseRow{display:none} #actsRow #endTurnBtn{display:none} }
+@container (max-width:700px){ main#play.lt #side .row{display:none} }
+@container (max-width:560px){ main#play.lt #side #phaseRow{display:none} #actsRow #endTurnBtn{display:none} }
 /* (its height is the two lines', never more: it never pushes the boards) */
 #cmdGrid{grid-area:grid;justify-self:stretch;align-self:stretch;height:0;min-height:100%;box-sizing:border-box;display:grid;column-gap:4px;row-gap:1px;align-items:center;
   padding:3px 10px !important;border-radius:12px !important;font-size:11px;line-height:1;overflow:hidden}
