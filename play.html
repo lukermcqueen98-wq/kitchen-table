@@ -406,6 +406,8 @@ table.stats td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card .pt.down{border-color:var(--danger);color:#ffb3a1}
 .obf .card .pt{font-size:10px;line-height:13px;padding:0 3px}
 .card .ctrs{position:absolute;left:2px;bottom:2px;display:flex;flex-direction:column;gap:1px;align-items:flex-start}
+.card .buffs{position:absolute;right:2px;top:2px;z-index:2;display:flex;flex-direction:column;gap:1px;align-items:flex-end;max-width:calc(100% - 4px)}
+.card .buffs span{background:rgba(6,32,48,.92);border:1px solid #7fd4ff;color:#d6f1ff;border-radius:4px;padding:0 4px;font-size:9px;font-weight:700;line-height:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .card .ctrs span{background:rgba(0,0,0,.8);border:1px solid var(--brass);color:var(--parchment);border-radius:8px;padding:0 4px;font-size:10px;line-height:14px;white-space:nowrap}
 .card .tok{position:absolute;right:2px;top:2px;background:rgba(0,0,0,.75);font-size:9px;padding:0 3px;border-radius:4px}
 .card .tax{position:absolute;left:2px;top:2px;white-space:nowrap;background:var(--brass);color:#241602;font-size:10px;padding:0 4px;border-radius:6px;font-weight:600}
@@ -1492,7 +1494,7 @@ function pubCard(c, onBf = false){
   const k = cardOf(c);
   return { ...ptInfo, iid:c.iid, id:c.id, name:nameOf(c), img:imgOf(k, c.face), x:c.x, y:c.y, tapped:c.tapped, ctr:c.ctr, tok:!!c.tok, cmdr:!!c.cmdr, tax:c.tax || 0,
            own:c.owner || 0, att:c.att || "", atk:c.atk || 0, aw:c.atk ? c.aw || "" : "", blk:c.blk || "", at:c.at || 0, ...(c.mana?.length ? { mana:c.mana } : {}), ...(c.kw?.length ? { kw:c.kw.map(x => ({ n:x.n, eot:!!x.eot })) } : {}),
-           ...(onBf ? { ck:[...combatKw(c)], col:colorsOf(c) } : {}) };
+           ...(onBf ? { ck:[...combatKw(c)], col:colorsOf(c), bu:buffList(c) } : {}) };
 }
 function pub(){
   const z = me.zones;
@@ -1812,7 +1814,7 @@ function cleanPub(st){
     img:typeof c.img === "string" && /^https:\/\/cards\.scryfall\.io\//.test(c.img) ? c.img : "", x:+c.x || 0, y:+c.y || 0, tapped:!!c.tapped,
     fd:!!c.fd, tok:!!c.tok, cmdr:!!c.cmdr, tax:clamp(+c.tax || 0, 0, 99), own:clamp(+c.own || 0, 0, MAX), att:String(c.att || "").slice(0, 20),
     atk:clamp(+c.atk || 0, 0, MAX), aw:String(c.aw || "").slice(0, 20), blk:String(c.blk || "").slice(0, 20), at:+c.at || 0, mana:Array.isArray(c.mana) ? COLORS.filter(k => c.mana.includes(k)) : [], kw:cleanKw(c.kw),
-    ck:Array.isArray(c.ck) ? c.ck.filter(k => COMBAT_KW.includes(k)) : [], col:String(c.col || "").replace(/[^WUBRG]/g, "").slice(0, 5),
+    ck:Array.isArray(c.ck) ? c.ck.filter(okKw) : [], bu:Array.isArray(c.bu) ? c.bu.slice(0, 6).map(x => String(x).slice(0, 60)) : [], col:String(c.col || "").replace(/[^WUBRG]/g, "").slice(0, 5),
     ...(typeof c.pt === "string" ? { pt:c.pt.slice(0, 16), ptDir:clamp(Math.sign(+c.ptDir || 0), -1, 1) } : {}), ctr:c.ctr && typeof c.ctr === "object" ? Object.fromEntries(Object.entries(c.ctr).slice(0, 8).map(([k, v]) => [String(k).slice(0, 20), clamp(+v || 0, -999, 999)])) : {}
   } : null).filter(Boolean);
   const num = (v, a, b) => clamp(Math.round(+v || 0), a, b);
@@ -2282,7 +2284,14 @@ const isPermanent = c => /\b(Creature|Artifact|Enchantment|Planeswalker|Land|Bat
    A daybound permanent arriving when it's neither makes it day. Daybound and nightbound cards turn to match. */
 function dayAfter(day, spells){ return day === "day" && spells === 0 ? "night" : day === "night" && spells >= 2 ? "day" : day; }
 // A spell cast by the player whose turn it is (kept with the table, since that's what day and night count)
-function countSpell(){ if (table.started && table.turnSeat === mySeat) changeTable({ spells:(table.spells || 0) + 1 }); }
+function countSpell(k, fd){
+  // (prowess: your creatures with it get +1/+1 until end of turn when you cast a spell that isn't a creature)
+  if (k && !fd && !/\bCreature\b/.test(typeOf(k, 0))) {
+    const pro = me.zones.bf.filter(c => !c.fd && isCreature(c) && kwOf(c).some(x => /^prowess$/i.test(x)));
+    for (const c of pro) addPt(c, { eot:[1, 1] });
+    if (pro.length) { say(`${pro.map(nameOf).join(", ")} ${pro.length === 1 ? "gets" : "get"} +1/+1 until end of turn (prowess).`); changed(); }
+  }
+  if (table.started && table.turnSeat === mySeat) changeTable({ spells:(table.spells || 0) + 1 }); }
 function matchDayNight(){
   if (!table.day || !me) return;
   let n = 0;
@@ -2306,10 +2315,10 @@ function castSpell(iid, target){
     const c = findCard(iid)?.c; if (c) { c.att = target.card; c.x = 0.02; c.y = 0.02; }
     say(`cast ${nameOf(f.c)}, enchanting ${target.text}.`); ping(target); changed(); return;
   }
-  if (isPermanent(k) || fd) { move(iid, "bf", { quiet:fromElsewhere }); if (fromElsewhere) { if (!isLand(k) || fd) countSpell(); say(`${isLand(k) && !fd ? "played" : "cast"} ${nameOf(f.c)} from their ${ZONE_NAME[f.z]}.`); } return; }
+  if (isPermanent(k) || fd) { move(iid, "bf", { quiet:fromElsewhere }); if (fromElsewhere) { if (!isLand(k) || fd) countSpell(k, fd); say(`${isLand(k) && !fd ? "played" : "cast"} ${nameOf(f.c)} from their ${ZONE_NAME[f.z]}.`); } return; }
   // (an instant or sorcery goes to the graveyard; one cast with flashback or jump-start is exiled instead)
   const after = f.c.afterCast || "gy"; delete f.c.afterCast;
-  move(iid, after, { quiet:true }); countSpell();
+  move(iid, after, { quiet:true }); countSpell(k);
   say(`cast ${nameOf(f.c)}${target?.text ? ` targeting ${target.text}` : ""}.`);
   if (target) ping(target);
   const fx = cardEffects(k);
@@ -2370,7 +2379,7 @@ function move(iid, to, opt = {}){
   }
   me.zones[from].splice(f.i, 1);
   if (from === "bf" && to !== "bf") { c.att = null; detachFrom(c); if (c.gave) removeGiven(c, true); }
-  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; delete c.etb; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; delete c.base; if (to !== "lib") c.fd = false; }
+  if (to !== "bf") { c.tapped = false; c.ctr = {}; delete c.mana; delete c.kw; delete c.etb; c.atk = 0; c.blk = ""; delete c.eot; delete c.mod; delete c.base; delete c.aura; delete c.renowned; if (to !== "lib") c.fd = false; }
   if (to === "st") c.at = Date.now();
   if (c.tok && to !== "bf") {  // tokens stop existing when they leave the battlefield
     say(`removed the token ${nameOf(c)}.`); changed(); return;
@@ -2384,7 +2393,7 @@ function move(iid, to, opt = {}){
     if (from === "hand" && isLand(cardOf(c)) && !c.fd) { me.lands++; if (me.lands > 1) toast(`That's land number ${me.lands} this turn.`); }
   }
   if (to === "st" && from === "cz") c.fromCz = true;
-  if ((from === "hand" || from === "cz") && (to === "bf" || to === "st") && (c.fd || !isLand(cardOf(c)))) countSpell();
+  if ((from === "hand" || from === "cz") && (to === "bf" || to === "st") && (c.fd || !isLand(cardOf(c)))) countSpell(cardOf(c), c.fd);
   // A daybound permanent arriving when it's neither day nor night makes it day
   if (to === "bf" && !c.fd && !table.day && table.started && /\bDaybound\b/.test(cardText(cardOf(c)))) { changeTable({ day:"day" }); say(`made it day (${nameOf(c)} is daybound).`); }
   if (to === "lib") { if (opt.bottom) me.zones.lib.push(c); else me.zones.lib.unshift(c); }
@@ -2474,15 +2483,26 @@ const kwOf = c => { const k = cards.get(c.id); return c.fd ? kwGiven(c) : [...(k
    and its colors (for protection). Each player works these out for their own cards and shares them. */
 const COMBAT_KW = ["flying", "reach", "haste", "vigilance", "trample", "lifelink", "deathtouch", "first strike", "double strike", "menace",
   "indestructible", "defender", "infect", "wither", "hexproof", "shroud", "ward", "can't be blocked", "can't block",
-  "protection from white", "protection from blue", "protection from black", "protection from red", "protection from green"];
+  "protection from white", "protection from blue", "protection from black", "protection from red", "protection from green",
+  "protection from creatures", "protection from everything", "fear", "intimidate", "shadow", "horsemanship", "skulk", "daunt", "flanking", "exalted", "battle cry", "melee",
+  "islandwalk", "swampwalk", "forestwalk", "mountainwalk", "plainswalk"];
+// (key terms with a number: "toxic 2", "bushido 1")
+const KW_NUM = ["bushido", "toxic", "poisonous", "afflict", "renown"], KW_NUM_RE = new RegExp(`^(${KW_NUM.join("|")}) \\d{1,2}$`);
+const okKw = k => COMBAT_KW.includes(k) || KW_NUM_RE.test(k);
+// (not worked out for you: a reminder when the creature attacks)
+const KW_REMIND = ["annihilator", "myriad", "mentor", "training", "dethrone", "enlist"];
+const WALKS = { islandwalk:"Island", swampwalk:"Swamp", forestwalk:"Forest", mountainwalk:"Mountain", plainswalk:"Plains" };
 const COLOR_WORD = { W:"white", U:"blue", B:"black", R:"red", G:"green" };
 function combatKw(c){
-  const out = new Set(kwOf(c).map(x => String(x).toLowerCase()).filter(x => COMBAT_KW.includes(x)));
+  const all = kwOf(c).map(x => String(x).toLowerCase()), out = new Set(all.filter(okKw));
   if (c.fd) return out;
   const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k, text = String(f?.oracle_text ?? k?.oracle_text ?? ""), name = String(f?.name || k?.name || "");
   const me_ = `(?:${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|This creature)`;
   if (new RegExp(`(^|\\n)${me_} can't be blocked\\.`, "i").test(text)) out.add("can't be blocked");
   if (new RegExp(`(^|\\n)${me_} can't block\\.`, "i").test(text)) out.add("can't block");
+  if (/can't be blocked by creatures with power 2 or less/i.test(text)) out.add("daunt");
+  // (the number comes from the card's text: "Toxic 2"; each time it's printed counts)
+  for (const n of KW_NUM) if (all.includes(n)) { const v = [...text.matchAll(new RegExp(`\\b${n} (\\d+)`, "gi"))].reduce((t, m) => t + +m[1], 0); if (v) out.add(`${n} ${Math.min(v, 99)}`); }
   for (const m of text.matchAll(/(?:^|\n)protection from ([a-z]+)(?: and from ([a-z]+))?/gi)) for (const w of [m[1], m[2]]) if (w && COMBAT_KW.includes(`protection from ${w.toLowerCase()}`)) out.add(`protection from ${w.toLowerCase()}`);
   return out;
 }
@@ -2627,13 +2647,31 @@ function ptCounters(c){
 }
 /* A * in printed power/toughness (Dungrove Elder, Tarmogoyf) counts as 0: put counters on the creature for what its
    text makes it ("1+*" is 1 plus its counters) */
+/* A buff a card gives your creatures for as long as it's on the battlefield (Patchwork Banner, a lord): not counters,
+   and gone the moment the card leaves. aura = { p, t, who:"all"|"type"|"pick", type, ids, self } on the card giving it. */
+const sgn = v => (v < 0 ? "" : "+") + v;
+function auraHits(src, c){
+  const a = src.aura; if (!a || (src === c && !a.self) || !isCreature(c)) return false;
+  if (a.who === "pick") return src === c || (a.ids || []).includes(c.iid);
+  if (a.who === "type") return !c.fd && !!a.type && new RegExp(`\\b${a.type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "i").test(typeOf(cardOf(c), c.face || 0));
+  return true;
+}
+const aurasOn = c => me && me.zones.bf.includes(c) ? me.zones.bf.filter(s => auraHits(s, c)) : [];
+// What's changing a card's power/toughness that isn't a counter, to show on it (separate from its counters)
+function buffList(c){
+  const out = aurasOn(c).map(s => `${sgn(s.aura.p)}/${sgn(s.aura.t)} ${nameOf(s)}`);
+  if (c.mod) out.push(`${sgn(c.mod[0])}/${sgn(c.mod[1])} while it's out`);
+  if (c.eot) out.push(`${sgn(c.eot[0])}/${sgn(c.eot[1])} this turn`);
+  return out;
+}
 const starPt = v => { const m = v == null ? null : /^(\d*)\+?\*$/.exec(String(v)); return m ? String(+m[1] || 0) : v; };
 function ptOf(c){
   const k = cardOf(c), f = k?.card_faces?.[c.face || 0] || k;
   // (base: a base power/toughness set on the table, in place of the printed one; a * counts as 0)
   const bp = c.base ? String(c.base[0]) : c.fd ? "2" : starPt(f?.power ?? k?.power), bt = c.base ? String(c.base[1]) : c.fd ? "2" : starPt(f?.toughness ?? k?.toughness);
   const [np, nt] = ptCounters(c);
-  const dp = np + (c.mod?.[0] || 0) + (c.eot?.[0] || 0), dt = nt + (c.mod?.[1] || 0) + (c.eot?.[1] || 0);
+  const au = aurasOn(c).reduce((t, s) => [t[0] + s.aura.p, t[1] + s.aura.t], [0, 0]);
+  const dp = np + (c.mod?.[0] || 0) + (c.eot?.[0] || 0) + au[0], dt = nt + (c.mod?.[1] || 0) + (c.eot?.[1] || 0) + au[1];
   if (bp == null && !dp && !dt && !c.mod && !c.eot) return null;
   const p0 = parseInt(bp ?? 0, 10), t0 = parseInt(bt ?? 0, 10), sg = v => (v < 0 ? "" : "+") + v;
   if (isNaN(p0) || isNaN(t0)) return { p:(isNaN(p0) ? 0 : p0) + dp, t:(isNaN(t0) ? 0 : t0) + dt, str:`${bp}/${bt}${dp || dt ? ` ${sg(dp)}/${sg(dt)}` : ""}`, dir:Math.sign(dp + dt) };
@@ -2649,6 +2687,9 @@ function cardEl(c, { mine = false, zone = "", small = false, cz = false } = {}){
   const cs = Object.entries(c.ctr || {}).filter(([, v]) => v);
   // (a power/toughness counter shows as what it adds up to: three +1/+0 counters read "+3/+0")
   if (cs.length) e.append(el("div", { className:"ctrs" }, ...cs.map(([k, v]) => el("span", { textContent:PT_CTRS[k] && v > 0 ? k.replace(/1/g, v) : `${v} ${k}` }))));
+  // (buffs that aren't counters, on their own: from a card that's out, lasting, or until end of turn)
+  const bu = Array.isArray(c.bu) ? c.bu : zone === "bf" && mine ? buffList(c) : [];
+  if (bu.length) e.append(el("div", { className:"buffs", title:`Not counters:\n${bu.join("\n")}` }, ...bu.slice(0, 3).map(t => el("span", { textContent:t }))));
   if (c.tok) e.append(el("span", { className:"tok", textContent:"token" }));
   const kwl = cleanKw(c.kw);
   // (each key term shows what it means when you point at it)
@@ -3471,7 +3512,16 @@ function cardPanel(iid){
       x.onclick = here(() => { delete c.eot; say(`took away ${nameOf(c)}'s until end of turn change (now ${ptOf(c)?.str || "no power/toughness"}).`); changed(); }); eot.append(x); }
     for (const [p, t] of [[1, 1], [2, 2], [3, 3], [1, 0], [-1, -1], [-2, -2]])
       eot.append(btn(`${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t}`, here(() => { addPt(c, { eot:[p, t] }); say(`gave ${nameOf(c)} ${ptText({ eot:[p, t] })} (now ${ptOf(c)?.str}).`); changed(); })));
-    right.append(sec("Counters", ctrs, eot, lend));
+    // Lasting, for as long as this card is out (an Aura on it, say), and what this card gives your creatures while it's out
+    const modRow = el("div", { className:"cp-row cp-mod" }, el("span", { className:"hint", textContent:"While it's out:" }));
+    if (c.mod) { const x = el("button", { type:"button", className:"btn small primary", textContent:`${sgn(c.mod[0])}/${sgn(c.mod[1])} ×`, ariaLabel:"Take away the lasting change" });
+      x.onclick = here(() => { delete c.mod; say(`took away ${nameOf(c)}'s lasting change (now ${ptOf(c)?.str || "no power/toughness"}).`); changed(); }); modRow.append(x); }
+    for (const [p, t] of [[1, 1], [2, 2], [1, 0], [0, 1], [-1, -1]])
+      modRow.append(btn(`${sgn(p)}/${sgn(t)}`, here(() => { addPt(c, { mod:[p, t] }); say(`gave ${nameOf(c)} ${sgn(p)}/${sgn(t)} for as long as it's out (now ${ptOf(c)?.str}).`); changed(); })));
+    const auraRow = el("div", { className:"cp-row cp-aura" }, btn(c.aura ? "Change what it gives your creatures..." : "Buff your creatures while this is out...", act(() => auraDialog(c, () => cardPanel(iid)))));
+    if (c.aura) auraRow.append(el("span", { className:"hint", textContent:`Gives ${auraWho(c)} ${sgn(c.aura.p)}/${sgn(c.aura.t)} (gone when it leaves)` }),
+      btn("Stop", here(() => { delete c.aura; say(`${nameOf(c)} no longer buffs their creatures.`); changed(); })));
+    right.append(sec("Counters", ctrs, lend), sec("Buffs (not counters)", eot, modRow, auraRow));
     // Key terms: printed ones and ones given on the table; point at (or click) one to see what it means
     const kws = el("div", { className:"cp-row" }), printed = c.fd ? [] : (k?.keywords || []).filter(n => !(c.kw || []).some(x => x.n === n));
     const chip = (n, given) => {
@@ -4031,6 +4081,37 @@ function baseDialog(c, back){
 }
 /* Counters a card gives your creatures ("each other creature you control gets a +1/+1 counter"): they go on now, and
    the card remembers them (gave), so they come off again when it leaves the battlefield */
+const auraWho = c => { const a = c.aura; return a.who === "type" ? `your ${a.type} creatures` : a.who === "pick" ? `${(a.ids || []).filter(id => me.zones.bf.some(x => x.iid === id)).length} chosen creature${a.ids?.length === 1 ? "" : "s"}` : a.self ? "all your creatures" : "your other creatures"; };
+// What a card gives your creatures while it's on the battlefield: how much, and which ones
+function auraDialog(c, back){
+  const a = c.aura ? { ...c.aura, ids:[...(c.aura.ids || [])] } : { p:1, t:1, who:"all", type:"", ids:[], self:false };
+  const body = el("div"), rows = el("div"), pick = el("div", { style:"margin:4px 0 8px 22px;display:flex;flex-direction:column;gap:2px" });
+  const type = el("input", { type:"text", maxLength:30, value:a.type, placeholder:"Elf, Soldier...", ariaLabel:"Creature type", style:"width:150px" });
+  const radio = (v, label, extra) => { const r = el("input", { type:"radio", name:"auraWho", checked:a.who === v }); r.onchange = () => { a.who = v; draw_(); }; return el("label", { style:"display:flex;gap:6px;align-items:center;margin:3px 0" }, r, label, extra || ""); };
+  const self = el("input", { type:"checkbox", checked:!!a.self }); self.onchange = () => { a.self = self.checked; };
+  const draw_ = () => {
+    rows.replaceChildren(...[["Power", "p"], ["Toughness", "t"]].map(([label, k]) => {
+      const m = el("button", { innerHTML:"&minus;", ariaLabel:`${label} minus` }), p = el("button", { textContent:"+", ariaLabel:`${label} plus` });
+      m.onclick = () => { a[k] = Math.max(-20, a[k] - 1); draw_(); }; p.onclick = () => { a[k] = Math.min(20, a[k] + 1); draw_(); };
+      return el("div", { className:"ctrl ctrgrid" }, el("span", { textContent:label }), m, el("b", { textContent:sgn(a[k]) }), p);
+    }));
+    pick.replaceChildren(...(a.who !== "pick" ? [] : me.zones.bf.filter(x => x !== c && isCreature(x)).map(x => {
+      const b = el("input", { type:"checkbox", checked:a.ids.includes(x.iid) }); b.onchange = () => { a.ids = a.ids.filter(i => i !== x.iid); if (b.checked) a.ids.push(x.iid); };
+      return el("label", { style:"display:flex;gap:6px;align-items:center" }, b, `${nameOf(x)}${ptOf(x) ? ` (${ptOf(x).str})` : ""}`); })));
+    if (a.who === "pick" && !pick.children.length) pick.append(el("span", { className:"hint", textContent:"You have no other creatures out yet." }));
+  };
+  draw_();
+  body.append(el("p", { className:"hint", textContent:`Not counters: your creatures get this for as long as ${nameOf(c)} is on the battlefield, and lose it the moment it leaves.` }), rows,
+    radio("all", "All your other creatures (new ones too)"), radio("type", "Your creatures of one type (new ones too):", type), radio("pick", "Only the ones you tick:"), pick,
+    isCreature(c) ? el("label", { style:"display:flex;gap:6px;align-items:center;margin-top:6px" }, self, `${nameOf(c)} gets it too`) : "");
+  const go = () => {
+    a.type = type.value.trim().replace(/s$/i, ""); if (a.who === "type" && !a.type) { toast("Type the creature type first."); setTimeout(() => auraDialog(c, back)); return; }
+    if (!a.p && !a.t) delete c.aura; else c.aura = { p:a.p, t:a.t, who:a.who, type:a.type.slice(0, 30), ids:a.ids.slice(0, 60), self:!!a.self && isCreature(c) };
+    say(c.aura ? `${nameOf(c)} gives ${auraWho(c)} ${sgn(a.p)}/${sgn(a.t)} for as long as it's out (not counters).` : `${nameOf(c)} no longer buffs their creatures.`);
+    changed(); if (back) setTimeout(back);
+  };
+  openModal(`What ${nameOf(c)} gives your creatures`, body, [{ label:"Cancel", fn:() => { if (back) setTimeout(back); } }, { label:"Save", primary:true, fn:go }]);
+}
 function lendDialog(c, back){
   const types = ["+1/+1", "-1/-1", "+1/+0", "+0/+1", "-1/-0", "-0/-1", "Loyalty", "Charge", "Shield", "Stun", "Lore", "Time", "Oil", "Defense"];
   const want = {}, body = el("div");
@@ -4078,7 +4159,7 @@ const walkerName = (seat, iid) => { const w = (seat === mySeat ? players[mySeat]
 // What to remember about a creature in combat: abilities that trigger when it attacks, or when it deals combat damage
 function combatTriggers(c){
   const k = cardOf(c), t = c.fd ? "" : String(k?.card_faces?.[c.face || 0]?.oracle_text || k?.oracle_text || "");
-  return { attack:/\bwhenever [^.]*\battacks?\b/i.test(t), damage:/\bdeals? combat damage\b/i.test(t) };
+  return { attack:/\bwhenever [^.]*\battacks?\b/i.test(t) || kwOf(c).some(x => KW_REMIND.includes(String(x).toLowerCase())), damage:/\bdeals? combat damage\b/i.test(t) };
 }
 function startAttack(){
   if (!presentSeats().some(s => s !== mySeat && !isOut(s))) { toast("There's no one to attack."); return; }
@@ -4240,13 +4321,25 @@ const cpw = c => parseInt(c.pt, 10) || 0;
    Indestructible: lethal damage doesn't destroy it (0 toughness still does).
    pairs: [{ a:{ c, s, d }, blockers:[{ c, s }] }], the cards as shared (pt "3/4", ck: key terms, col: colors). */
 function fight(pairs, assigns = {}){
-  const out = { player:{}, dies:[], minus:{}, gain:{}, took:{}, walker:{} };
+  const out = { player:{}, dies:[], minus:{}, gain:{}, took:{}, walker:{}, lose:{}, renown:{} };
+  const numKw = (u, name) => [...u.kw].reduce((n, k) => k.startsWith(name + " ") ? n + (+k.slice(name.length + 1) || 0) : n, 0);
   const unit = (c, s) => { const m = /^(-?\d+)\/(-?\d+)/.exec(c.pt || ""); return { c, s, p:m ? +m[1] : 0, t:m ? +m[2] : 0, kw:new Set(c.ck || []), col:c.col || "", dmg:0, minus:0, dt:false, dead:false }; };
   const has = (u, k) => u.kw.has(k), tough = u => u.t - u.minus;
   const P = d => out.player[d] ||= { life:0, poison:0, cmd:{}, from:[] };
   const fs = pairs.map(pr => ({ a:pr.a, A:unit(pr.a.c, pr.a.s), B:pr.blockers.map(b => unit(b.c, b.s)), blocked:pr.blocked ?? pr.blockers.length > 0 }));  // (blocked stays blocked, even if its blocker has since gone)
+  // (what triggers before the damage: bushido, flanking, exalted, battle cry, melee, afflict)
+  const bySeat = {}; for (const f of fs) (bySeat[f.A.s] ||= []).push(f);
+  for (const f of fs) {
+    const A = f.A, mates = bySeat[A.s]; let n;
+    if (f.blocked && (n = numKw(A, "bushido"))) { A.p += n; A.t += n; }
+    for (const b of f.B) { if ((n = numKw(b, "bushido"))) { b.p += n; b.t += n; } if (has(A, "flanking") && !has(b, "flanking")) { b.p -= 1; b.t -= 1; } }
+    if (mates.length === 1) { const ex = (players[A.s]?.bf || []).filter(c => (c.ck || []).includes("exalted")).length; A.p += ex; A.t += ex; }
+    if (has(A, "battle cry")) for (const g of mates) if (g !== f) g.A.p += 1;
+    if (has(A, "melee")) { const opp = new Set(mates.map(g => g.a.d)).size; A.p += opp; A.t += opp; }
+    if (f.blocked && (n = numKw(A, "afflict"))) out.lose[f.a.d] = (out.lose[f.a.d] || 0) + n;
+  }
   const deal = (src, dst, n) => {
-    if (n <= 0 || [...src.col].some(x => dst.kw.has(`protection from ${COLOR_WORD[x]}`))) return 0;
+    if (n <= 0 || dst.kw.has("protection from creatures") || dst.kw.has("protection from everything") || [...src.col].some(x => dst.kw.has(`protection from ${COLOR_WORD[x]}`))) return 0;
     if (has(src, "infect") || has(src, "wither")) dst.minus += n; else dst.dmg += n;
     if (has(src, "deathtouch")) dst.dt = true;
     return n;
@@ -4256,6 +4349,8 @@ function fight(pairs, assigns = {}){
     if (f.a.c.aw) { out.walker[f.a.c.aw] = (out.walker[f.a.c.aw] || 0) + n; return n; }  // (it attacked a planeswalker or battle)
     const p = P(f.a.d);
     if (has(src, "infect")) p.poison += n; else p.life += n;
+    p.poison += numKw(src, "toxic") + numKw(src, "poisonous");
+    const rn = numKw(src, "renown"); if (rn) out.renown[f.a.c.iid] = rn;
     if (f.a.c.cmdr) { const k = `${f.a.s}:${f.a.c.iid}`; p.cmd[k] = (p.cmd[k] || 0) + n; }
     if (!p.from.includes(f.a.c)) p.from.push(f.a.c);
     return n;
@@ -4342,6 +4437,16 @@ function cantBlock(b, a){
   if (ak.has("can't be blocked")) return "it can't be blocked";
   if (bk.has("can't block")) return "this creature can't block";
   if (ak.has("flying") && !bk.has("flying") && !bk.has("reach")) return "it has flying (block with flying or reach)";
+  if (ak.has("protection from creatures") || ak.has("protection from everything")) return "it has protection from creatures";
+  const art = !b.fd && /\bArtifact\b/.test(typeOf(cardOf(b), 0)), ac = a.col || "", bp = parseInt(b.pt, 10) || 0, ap = parseInt(a.pt, 10) || 0;
+  if (ak.has("fear") && !art && !bc.includes("B")) return "it has fear (block with an artifact or black creature)";
+  if (ak.has("intimidate") && !art && ![...bc].some(x => ac.includes(x))) return "it has intimidate (block with an artifact creature or one that shares a color with it)";
+  if (ak.has("shadow") && !bk.has("shadow")) return "it has shadow (only a creature with shadow can block it)";
+  if (bk.has("shadow") && !ak.has("shadow")) return "this creature has shadow (it can block only creatures with shadow)";
+  if (ak.has("horsemanship") && !bk.has("horsemanship")) return "it has horsemanship (block with horsemanship)";
+  if (ak.has("skulk") && bp > ap) return "it has skulk (a creature with greater power can't block it)";
+  if (ak.has("daunt") && bp <= 2) return "it can't be blocked by creatures with power 2 or less";
+  for (const [w, land] of Object.entries(WALKS)) if (ak.has(w) && (players[a.atk]?.bf || []).some(c => !c.fd && new RegExp(`\\b${land}\\b`).test(typeOf(cardOf(c), 0)))) return `it has ${w} and you control ${/^[AEIOU]/.test(land) ? "an" : "a"} ${land}`;
   const pro = [...bc].find(x => ak.has(`protection from ${COLOR_WORD[x]}`));
   return pro ? `it has protection from ${COLOR_WORD[pro]}` : "";
 }
@@ -4523,6 +4628,8 @@ function resolveCombat(){
       say(p ? `took ${p.life ? `${p.life} combat damage` : ""}${p.life && p.poison ? " and " : ""}${p.poison ? `${p.poison} poison counter${p.poison === 1 ? "" : "s"}` : ""} from ${p.from.map(c => c.name || "a face-down creature").join(", ")}.` : "took no combat damage.");
     }
     if (r.gain[mySeat]) { noteLife(); me.life += r.gain[mySeat]; say(`gained ${r.gain[mySeat]} life (lifelink).`); }
+    if (r.lose[mySeat] && defenders.includes(mySeat)) { noteLife(); me.life -= r.lose[mySeat]; say(`lost ${r.lose[mySeat]} life (afflict).`); }
+    for (const c of mine) if (r.renown[c.iid] && !c.renowned) { c.renowned = true; c.ctr = { ...c.ctr, "+1/+1":(c.ctr?.["+1/+1"] || 0) + r.renown[c.iid] }; say(`${nameOf(c)} is renowned: ${r.renown[c.iid]} +1/+1 counter${r.renown[c.iid] === 1 ? "" : "s"}.`); }
     for (const c of mine) if (r.walker[c.iid]) {
       const n = r.walker[c.iid], t = ["Loyalty", "Defense"].find(x => c.ctr?.[x]);
       if (!t) { say(`${nameOf(c)} took ${n} combat damage (take that many counters off it).`); continue; }
@@ -5016,7 +5123,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Other players:</b> a card that does something to them (\"each opponent draws a card\", \"each player discards a card\", like Cut a Deal) has it in its right-click menu, and offers it when it resolves; <b>Group effects</b> does the same for anything else. Discards and sacrifices let each player choose. <b>Terms</b> lists Magic's keywords and terms, and viewing a card shows the ones on it." }),
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
-    el("p", { innerHTML:"<b>Combat</b>: on your turn, <b>Go to combat</b> in the middle of the table outlines every other player's mat; drag each attacker onto the mat of the player it attacks, then <b>Send the attack</b>. The player attacked gets their choices in the middle: <b>Take the damage</b>, <b>Choose blockers</b> (cast spells first if you like), or <b>Interrupt</b>, which calls off the whole attack. Creatures fighting each other is up to you. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
+    el("p", { innerHTML:"<b>Combat</b>: on your turn, <b>Go to combat</b> in the middle of the table outlines every other player's mat; drag each attacker onto the mat of the player it attacks, then <b>Send the attack</b>. The player attacked gets their choices in the middle: <b>Take the damage</b>, <b>Choose blockers</b> (cast spells first if you like), or <b>Interrupt</b>, which calls off the whole attack. When the blocks are in, the attacker casts any spells and then presses <b>Deal combat damage</b> (or <b>No damage</b>). Drop an attacker on a planeswalker or battle to attack it. Right-click a card for <b>Buffs (not counters)</b>. Creatures fighting each other is up to you. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
     el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. On a wide screen every tool is a button to the left of the table (U untaps everything, Ctrl+Z undoes) and the log and chat stay open on the right; otherwise they're in the <b>Table</b> and <b>Game</b> menus and <b>Log &amp; chat</b> at the top, and new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
