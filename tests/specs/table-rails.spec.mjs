@@ -41,10 +41,9 @@ test("digital table: the steps of the turn in the middle, and the tools, log and
   await expect(other.locator("#phaseRow button").first()).toBeDisabled(); await expect(other.locator("#endTurnBtn")).toBeHidden();
   await expect(other.locator("#turnToken")).toContainText("is up");
   const before = await boards(me);
-  // Draw a card from the dock, and with D
+  // Draw a card from the dock
   const hand = await me.locator("#hand .card").count();
   await me.locator("#dock #drawBtn").click(); await expect(me.locator("#hand .card")).toHaveCount(hand + 1);
-  await me.keyboard.press("d"); await expect(me.locator("#hand .card")).toHaveCount(hand + 2);
   // Go to combat: the Combat step lights up on every screen, and the attack panel fills the middle beside your life
   await me.locator("#attackBtn").click();
   await expect(me.locator("#phaseRow button.on")).toHaveText("Combat"); await expect(other.locator("#phaseRow button.on")).toHaveText("Combat", { timeout:15000 });
@@ -65,9 +64,8 @@ test("digital table: the steps of the turn in the middle, and the tools, log and
   await expect(a.locator("#dock #rollBtn")).toBeHidden(); await expect(a.locator("details.tmenu").first()).toBeHidden();
   const full = await boards(a);
   await a.locator("#dockTab").click(); await expect(a.locator("#dock #rollBtn")).toBeVisible();
-  await a.locator("#dock #termsBtn").click(); await expect(a.locator(".modal-card h2")).toHaveText("Magic terms");
+  await a.locator("#dock #untapAllBtn").click();
   await expect(a.locator("#dock #rollBtn")).toBeHidden();  // (picking a tool puts the panel away)
-  await a.keyboard.press("Escape");
   await a.locator("#logTab").click(); await expect(a.locator("aside#panel #chatIn")).toBeVisible();
   await a.locator("#logTab").click(); await expect(a.locator("aside#panel #chatIn")).toBeHidden();
   expect(await boards(a)).toEqual(full);  // (the table stays as it is)

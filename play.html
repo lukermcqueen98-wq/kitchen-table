@@ -891,10 +891,10 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
     <div class="topbar">
       <span class="grp"><span class="title">Kitchen Table</span>
         <details class="tmenu playonly"><summary class="btn small">Table</summary><div class="tmenu-pop" role="menu" aria-label="Table">
-          <button role="menuitem" class="btn small mitem playonly" id="drawBtn" data-key="D" title="Draw a card from your library (D)">Draw a card</button>
+          <button role="menuitem" class="btn small mitem playonly" id="drawBtn" title="Draw a card from your library">Draw a card</button>
           <button role="menuitem" class="btn small mitem" id="untapAllBtn" data-key="U" title="Untap everything you control (U)">Untap everything</button>
           <button role="menuitem" class="btn small mitem playonly" id="undoBtn" data-key="Ctrl Z" title="Undo your last move (Ctrl+Z)">Undo</button>
-          <button role="menuitem" class="btn small mitem playonly" id="rollBtn" data-key="R" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
+          <button role="menuitem" class="btn small mitem playonly" id="rollBtn" title="Roll any die, several dice, the planar die, or flip a coin" aria-haspopup="menu">Roll dice</button>
           <button role="menuitem" class="btn small mitem playonly" id="tokenBtn">Tokens</button>
           <button role="menuitem" class="btn small mitem playonly" id="fxBtn" title="Make other players draw, discard, lose life and so on">Group effects</button>
           <button role="menuitem" class="btn small mitem playonly" id="orderBtn" title="Change the turn order, and whose turn it is, any time">Turn order...</button>
@@ -3395,8 +3395,6 @@ document.addEventListener("keydown", e => {
   if (!$("#modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
   if (k === "u") untapAll();
-  else if (k === "d" && !me.watch) { if (me.zones.lib.length) draw(1); }
-  else if (k === "r" && !me.watch) $("#rollBtn").click();
   else if (k === "t" && hoverIid) { const f = findCard(hoverIid); if (f?.z === "bf") toggleTap(f.c); }
 });
 
@@ -4180,7 +4178,8 @@ const fullScreen = () => fullMq.matches || !!document.fullscreenElement || !!win
 function placeRails(){
   const fr = [...document.querySelectorAll("#myFrame, .oframe, .waitmat")].map(e => e.getBoundingClientRect()).filter(r => r.width);
   let w = 0, mode = "";
-  if ($("#play").classList.contains("lt") && fr.length && !$("#play").closest(".hidden")) {
+  // (not with the hand as a strip under the table, as the tests have it: that runs the table's full width)
+  if ($("#play").classList.contains("lt") && fr.length && !$("#play").closest(".hidden") && !document.body.classList.contains("handstrip")) {
     const gut = Math.min(Math.min(...fr.map(r => r.left)), innerWidth - Math.max(...fr.map(r => r.right))) - 14;  // (to the table's edge)
     if (gut >= 168) { w = Math.min(gut - 20, 250); mode = "rails"; }
     else if (fullScreen()) { w = 240; mode = "slide"; }  // (no room beside the table: the panels slide out over its ends)
@@ -4948,7 +4947,7 @@ $("#helpBtn").onclick = () => {
     el("p", { innerHTML:"<b>Out of the game:</b> at 0 life (or the poison or commander damage limit) you're asked whether you're out, and <b>Concede</b> is always there. Players who are out are skipped in turn order." }),
     el("p", { innerHTML:"<b>House rules</b> (friendly mulligans, starting life, table agreements) are picked before the first game. <b>Monarch...</b> tracks the monarch, the initiative, and day and night. In 60-card games, <b>Sideboard</b> swaps cards between games. The lobby checks your deck against the format." }),
     el("p", { innerHTML:"<b>Combat</b>: on your turn, <b>Go to combat</b> in the middle of the table outlines every other player's mat; drag each attacker onto the mat of the player it attacks, then <b>Send the attack</b>. The player attacked gets their choices in the middle: <b>Take the damage</b>, <b>Choose blockers</b> (cast spells first if you like), or <b>Interrupt</b>, which calls off the whole attack. Creatures fighting each other is up to you. Arrows clear when the turn passes, or with <b>Clear arrows</b>. <b>Roll dice</b> has every die. Right-click your library, graveyard or exile for everything cards do to them. Basic lands of one kind stack: click a stack to tap one, right-click for more. The clocks at the top count the game and the turn; <b>House rules</b> can set a turn time limit." }),
-    el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. On a wide screen every tool is a button to the left of the table (D draws, U untaps everything, R rolls dice) and the log and chat stay open on the right; otherwise they're in the <b>Table</b> and <b>Game</b> menus and <b>Log &amp; chat</b> at the top, and new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
+    el("p", { innerHTML:"<b>Undo</b> (or Ctrl+Z) takes back your last moves. On a wide screen every tool is a button to the left of the table (U untaps everything, Ctrl+Z undoes) and the log and chat stay open on the right; otherwise they're in the <b>Table</b> and <b>Game</b> menus and <b>Log &amp; chat</b> at the top, and new lines pop up for a few seconds at the bottom left. Click an empty part of another player's battlefield (or <b>Zoom in</b>) to see it up close; click again or press Esc to go back. Anyone can watch a table by ticking <b>Just watch</b> in the lobby." }),
     el("h3", { textContent:"Helpers" }),
     s("autoUntap", "Untap my permanents at the start of my turn"), s("autoDraw", "Draw a card at the start of my turn (not on the first turn of a two-player game)"),
     s("hoverPop", "Enlarge a card when I point at it"),
