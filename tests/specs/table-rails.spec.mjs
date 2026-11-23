@@ -59,6 +59,20 @@ test("digital table: the steps of the turn in the middle, and the tools, log and
   await ktp(me, () => { while (ktPlay.me.zones.hand.length > 7) ktPlay.move(ktPlay.me.zones.hand[0].iid, "lib"); });  // (no discarding down to seven first)
   await me.locator("#endTurnBtn").click();
   await expect.poll(() => ktp(a, () => ktPlay.table.turnSeat), { timeout:15000 }).not.toBe(turn);
+  // Full screen, where the table fills the width: a tab on each edge slides the same panels out over the table's ends
+  await a.evaluate(() => { window.__ktFull = true; }); await a.setViewportSize({ width:1920, height:1080 });
+  await expect(a.locator("#dockTab")).toBeVisible(); await expect(a.locator("#logTab")).toBeVisible();
+  await expect(a.locator("#dock #rollBtn")).toBeHidden(); await expect(a.locator("details.tmenu").first()).toBeHidden();
+  const full = await boards(a);
+  await a.locator("#dockTab").click(); await expect(a.locator("#dock #rollBtn")).toBeVisible();
+  await a.locator("#dock #termsBtn").click(); await expect(a.locator(".modal-card h2")).toHaveText("Magic terms");
+  await expect(a.locator("#dock #rollBtn")).toBeHidden();  // (picking a tool puts the panel away)
+  await a.keyboard.press("Escape");
+  await a.locator("#logTab").click(); await expect(a.locator("aside#panel #chatIn")).toBeVisible();
+  await a.locator("#logTab").click(); await expect(a.locator("aside#panel #chatIn")).toBeHidden();
+  expect(await boards(a)).toEqual(full);  // (the table stays as it is)
+  if (process.env.SHOT) { await a.locator("#dockTab").click(); await a.locator("#logTab").click(); await a.waitForTimeout(500); await a.screenshot({ path:process.env.SHOT }); await a.keyboard.press("Escape"); }
+  await a.evaluate(() => { window.__ktFull = false; });
   // Back on a narrow screen the buttons go back into their menus
   await a.setViewportSize({ width:1400, height:900 });
   await expect(a.locator("#dock")).toBeHidden(); await expect(a.locator("details.tmenu > summary")).toHaveText(["Table", "Game"]);

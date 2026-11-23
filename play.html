@@ -663,7 +663,7 @@ body.targeting .card:hover,body.targeting .opp:hover{outline:2px solid var(--bra
 /* The space beside the table, when there is some: every table tool and game setting as a button on the left (instead
    of the Table and Game menus), and the card you point at with the log and chat on the right (instead of pop-ups) */
 #dock{display:none}
-body.rails #dock{position:fixed;z-index:41;left:10px;top:60px;bottom:10px;width:var(--rail,180px);box-sizing:border-box;display:flex;flex-direction:column;gap:3px;padding:8px;overflow-y:auto;scrollbar-width:thin;
+body.docked #dock{position:fixed;z-index:41;left:10px;top:60px;bottom:10px;width:var(--rail,180px);box-sizing:border-box;display:flex;flex-direction:column;gap:3px;padding:8px;overflow-y:auto;scrollbar-width:thin;
   border-radius:14px;background:rgba(15,9,30,.94);border:1px solid var(--felt-edge)}
 #dock .dhead{margin:8px 4px 2px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 #dock .dhead:first-child{margin-top:2px}
@@ -671,10 +671,26 @@ body.rails #dock{position:fixed;z-index:41;left:10px;top:60px;bottom:10px;width:
 #dock .mitem{display:flex;align-items:center;justify-content:space-between;gap:6px;flex:none;width:100%;min-height:36px;padding:4px 10px;border-radius:9px;text-align:left;font-size:13px;white-space:normal}
 #dock .mitem.hidden{display:none}
 #dock .mitem[data-key]::after{content:attr(data-key);flex:none;padding:1px 6px;border-radius:5px;border:1px solid var(--felt-edge);background:rgba(0,0,0,.35);color:var(--muted);font-size:10px;font-weight:600}
-body.rails details.tmenu,body.rails #logBtn,body.rails #feed,body.rails #panelClose{display:none}
-body.rails aside#panel{display:flex;left:auto;right:10px;top:60px;bottom:10px;width:var(--rail,180px);box-sizing:border-box;z-index:41;border:1px solid var(--felt-edge);border-radius:14px;box-shadow:none;background:rgba(15,9,30,.94);overflow:hidden}
-body.rails #chatForm{flex-wrap:wrap}
-body.rails #chatForm input{min-width:0;flex:1 1 100%}
+body.docked details.tmenu,body.docked #logBtn,body.rails #feed,body.docked #panelClose{display:none}
+body.docked aside#panel{display:flex;left:auto;right:10px;top:60px;bottom:10px;width:var(--rail,180px);box-sizing:border-box;z-index:41;border:1px solid var(--felt-edge);border-radius:14px;box-shadow:none;background:rgba(15,9,30,.94);overflow:hidden}
+body.docked #chatForm{flex-wrap:wrap}
+body.docked #chatForm input{min-width:0;flex:1 1 100%}
+/* Full screen, where the table fills the width: the same two panels slide out over the table's ends from a tab on
+   each edge, and back */
+.sidetab{display:none}
+body.slide .sidetab{display:flex;align-items:center;gap:6px;position:fixed;z-index:63;top:50%;writing-mode:vertical-rl;padding:14px 5px;border:1px solid var(--brass);background:rgba(20,12,40,.96);color:var(--parchment);
+  font-size:13px;font-weight:700;font-family:inherit;letter-spacing:.04em;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.55);transition:translate .2s ease-out,background .15s}
+body.slide .sidetab:hover{background:rgba(255,207,90,.2)}
+body.slide #dockTab{left:0;translate:0 -50%;border-left:0;border-radius:0 10px 10px 0}
+body.slide #logTab{right:0;translate:0 -50%;border-right:0;border-radius:10px 0 0 10px}
+body.slide.dock-open #dockTab{translate:calc(var(--rail) + 14px) -50%}
+body.slide.panel-open #logTab{translate:calc(-1 * var(--rail) - 14px) -50%}
+body.slide #logTab #logNew{margin:4px 0 0;padding:6px 0}
+body.slide #dock,body.slide aside#panel{z-index:62;box-shadow:0 12px 40px rgba(0,0,0,.7);transition:translate .2s ease-out,visibility .2s;visibility:hidden}
+body.slide #dock{translate:calc(-100% - 16px) 0}
+body.slide aside#panel{translate:calc(100% + 16px) 0}
+body.slide.dock-open #dock,body.slide.panel-open aside#panel{translate:0 0;visibility:visible}
+body.nomotion.slide :is(#dock,aside#panel,.sidetab){transition:none}
 /* Attacking at the long table: the middle walks you through it, and every other mat is a place to drop attackers */
 #atkBar.mid{position:fixed;inset:0;z-index:55;display:block;padding:0;border:0;border-radius:0;background:none;box-shadow:none;pointer-events:none;animation:none}
 #atkBar.mid>*{position:fixed;pointer-events:auto;box-sizing:border-box}
@@ -952,6 +968,8 @@ body.nomotion :is(.rolldie svg,.rollfx.coin .rolldie svg,.rollfx.landed .rolldie
 </section>
 
 <nav id="dock" aria-label="Table tools and game settings"></nav>
+<button type="button" class="sidetab" id="dockTab" aria-controls="dock" aria-expanded="false">Tools</button>
+<button type="button" class="sidetab" id="logTab" aria-controls="panel" aria-expanded="false">Log &amp; chat</button>
 <ul id="feed" aria-hidden="true"></ul>
 <div id="menu" class="hidden" role="menu"></div>
 <div id="pop" class="hidden" aria-hidden="true"><img id="popImg" alt=""><img id="popImg2" alt="" class="hidden"><div id="popTerms" class="hidden"></div></div>
@@ -4157,19 +4175,24 @@ $("#attackBtn").onclick = () => { if (atkPlan) { atkPlan = null; renderAtkBar();
 addEventListener("resize", () => { if (atkPlan) renderAtkBar(); });
 /* Beside the table: with room to spare there (a wide screen), the Table and Game menus open out as a column of
    buttons on the left, and the log, chat and the card you point at stay open on the right */
+const fullMq = matchMedia("(display-mode: fullscreen)");
+const fullScreen = () => fullMq.matches || !!document.fullscreenElement || !!window.__ktFull;  // (F11, or a page gone full screen)
 function placeRails(){
   const fr = [...document.querySelectorAll("#myFrame, .oframe, .waitmat")].map(e => e.getBoundingClientRect()).filter(r => r.width);
-  let w = 0;
+  let w = 0, mode = "";
   if ($("#play").classList.contains("lt") && fr.length && !$("#play").closest(".hidden")) {
     const gut = Math.min(Math.min(...fr.map(r => r.left)), innerWidth - Math.max(...fr.map(r => r.right))) - 14;  // (to the table's edge)
-    if (gut >= 168) w = Math.min(gut - 20, 250);
+    if (gut >= 168) { w = Math.min(gut - 20, 250); mode = "rails"; }
+    else if (fullScreen()) { w = 240; mode = "slide"; }  // (no room beside the table: the panels slide out over its ends)
   }
-  const on = w > 0, dock = $("#dock");
-  if (on) document.body.style.setProperty("--rail", `${Math.round(w)}px`);
-  if (on === document.body.classList.contains("rails")) return;
-  document.body.classList.toggle("rails", on);
+  const cl = document.body.classList, was = cl.contains("rails") ? "rails" : cl.contains("slide") ? "slide" : "", dock = $("#dock");
+  if (mode) document.body.style.setProperty("--rail", `${Math.round(w)}px`);
+  if (mode === was) return;
+  cl.toggle("rails", mode === "rails"); cl.toggle("slide", mode === "slide"); cl.toggle("docked", !!mode); cl.remove("dock-open", "panel-open"); sideTabs();
+  if (mode === "slide") $("#logTab").append($("#logNew")); else $("#logBtn").append($("#logNew"));
+  if (!!mode === !!was) return;
   const pops = [...document.querySelectorAll(".tmenu-pop")];
-  if (on) {
+  if (mode) {
     document.querySelectorAll(".tmenu[open]").forEach(d => { d.open = false; });
     pops.forEach((pop, i) => { const kids = [...pop.children]; kids.forEach(k => { k.dataset.pop = i; }); dock.append(el("span", { className:"dhead", textContent:pop.getAttribute("aria-label") === "Game" ? "This game" : "Table tools" }), ...kids); });
   } else {
@@ -4177,6 +4200,13 @@ function placeRails(){
     dock.replaceChildren();
   }
 }
+function sideTabs(){ const cl = document.body.classList; $("#dockTab").ariaExpanded = String(cl.contains("dock-open")); $("#logTab").ariaExpanded = String(cl.contains("panel-open")); }
+$("#dockTab").onclick = () => { document.body.classList.toggle("dock-open"); sideTabs(); };
+$("#logTab").onclick = () => { $("#logBtn").click(); sideTabs(); };
+// (a tool picked from the slide-out panel, or Esc, puts it away)
+$("#dock").addEventListener("click", e => { if (document.body.classList.contains("slide") && e.target.closest(".mitem")) { document.body.classList.remove("dock-open"); sideTabs(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("slide")) { document.body.classList.remove("dock-open", "panel-open"); sideTabs(); } });
+fullMq.addEventListener("change", () => requestAnimationFrame(sizeBoards)); document.addEventListener("fullscreenchange", () => requestAnimationFrame(sizeBoards));
 function placeSides(){ placeRails(); placeAtkBar(); placeDefend(); }
 /* Being attacked: a box at the top (your battlefield stays in view) with the attackers. Take the damage, or Respond:
    cast spells and so on as usual, pick blockers, then take the damage from the ones not blocked. */
